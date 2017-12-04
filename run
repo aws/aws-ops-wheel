@@ -1,0 +1,276 @@
+#!/usr/bin/env python3.6
+#
+#  Copyright 2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License").
+#  You may not use this file except in compliance with the License.
+#  A copy of the License is located at
+#
+#      http://aws.amazon.com/apache2.0/
+#
+#  or in the "license" file accompanying this file. This file is distributed
+#  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+#  express or implied. See the License for the specific language governing
+#  permissions and limitations under the License.
+
+import subprocess
+import argparse
+import json
+import tempfile
+import glob
+import os
+import uuid
+import re
+import logging
+
+LOG = logging.getLogger()
+LOG.addHandler(logging.StreamHandler())
+
+
+def run(*subprocess_command, log_level=logging.DEBUG, **kwargs):
+    readable_command = [c if '\n' not in c else '<multiple-line-parameter>' for c in subprocess_command]
+    LOG.log(level=log_level, msg=f"Calling: {' '.join(readable_command)}")
+    return subprocess.check_output(subprocess_command, **kwargs)
+
+
+def aws(*aws_args, **kwargs):
+    output = run('aws', '--output', 'json', *aws_args, **kwargs).strip().decode()
+    try:
+        return json.loads(output or 'null')
+    except json.decoder.JSONDecodeError:
+        return output
+
+
+def cf(*cf_args, **kwargs):
+    return aws('cloudformation', *cf_args, **kwargs)
+
+
+def stack_exists(stack_name):
+    summaries = cf('list-stacks')['StackSummaries']
+    return stack_name in [s['StackName'] for s in summaries if s['StackStatus'] != 'DELETE_COMPLETE']
+
+
+def _list_stack_resources(stack_name):
+    raw = cf('list-stack-resources', '--stack-name', stack_name)
+    return {resource["LogicalResourceId"]: resource for resource in raw['StackResourceSummaries']}
+
+
+def list_stack_resources(initial_stack, *stacks):
+    resources = _list_stack_resources(initial_stack)
+    for stack in stacks:
+        resources = _list_stack_resources(resources[stack]['PhysicalResourceId'])
+    return resources
+
+
+def format_important_message(message):
+    return '\n'.join(['=' * len(message), message, '=' * len(message)])
+
+SOURCE_DIRECTORY = os.path.abspath(os.path.dirname(__file__))
+BUILD_DIRECTORY = os.path.join(SOURCE_DIRECTORY, 'build')
+DEPLOY_DIRECTORY = os.path.join(SOURCE_DIRECTORY, 'deploy')
+API_DIRECTORY = os.path.join(SOURCE_DIRECTORY, 'api')
+UI_DIRECTORY = os.path.join(SOURCE_DIRECTORY, 'ui')
+TEMPLATE_COMPILE_SCRIPT = os.path.join(SOURCE_DIRECTORY, '_compile_cloudformation_template.py')
+TEMPLATE_DIRECTORY = os.path.join(SOURCE_DIRECTORY, 'cloudformation')
+DEPLOY_TEMPLATE_FILENAME = 'cloudformation-template.yml'
+TEMPLATE_COMPILE_ORDER = ['cognito.yml', 'lambda.yml', 'api_gateway.yml', 'api_gateway_lambda_roles.yml', 'aws-ops-wheel.yml']
+SOURCE_BUCKET_STACK_NAME = 'AWSOpsWheelSourceBucket'
+
+
+class DevManager:
+    VALID_COMMANDS = ['build', 'deploy', 'build_ui', 'build_api', 'delete']
+
+    def __init__(self, stack_name, clean, email):
+        self.stack_name = stack_name
+        self.clean = clean
+        self.email = email
+        self._s3_bucket = None
+        self._region = None
+
+    @property
+    def s3_bucket(self):
+        if self._s3_bucket is None:
+            if not stack_exists(SOURCE_BUCKET_STACK_NAME):
+                cf(
+                    'create-stack',
+                    '--template-body', open(os.path.join(TEMPLATE_DIRECTORY, 'source-bucket.yml')).read(),
+                    '--stack-name', SOURCE_BUCKET_STACK_NAME,
+                )
+                cf('wait', 'stack-create-complete', '--stack-name', SOURCE_BUCKET_STACK_NAME)
+            self._s3_bucket = list_stack_resources(SOURCE_BUCKET_STACK_NAME)['SourceS3Bucket']['PhysicalResourceId']
+        return self._s3_bucket
+
+    @property
+    def region(self):
+        if self._region is None:
+            self._region = aws(
+                's3api', 'get-bucket-location', '--bucket', self.s3_bucket
+            )['LocationConstraint']
+        return self._region
+
+    @property
+    def s3_bucket_public_url(self):
+        return f'https://s3-{self.region}.amazonaws.com/{self.s3_bucket}'
+
+    def build(self):
+        if self.clean and os.path.exists(BUILD_DIRECTORY):
+            run('rm', '-r', BUILD_DIRECTORY)
+
+        self.build_api()
+        self.build_ui()
+
+    @staticmethod
+    def build_ui():
+        os.makedirs(BUILD_DIRECTORY, exist_ok=True)
+        # Copy API resources
+        os.chdir(UI_DIRECTORY)
+        run('npm', 'install')
+        run('npm', 'run', 'build-prod')
+
+        build_id = str(uuid.uuid4())
+        run('mv', os.path.join(BUILD_DIRECTORY, 'static'), os.path.join(BUILD_DIRECTORY, f'static_{build_id}'))
+
+    @staticmethod
+    def build_api():
+        os.makedirs(BUILD_DIRECTORY, exist_ok=True)
+        # Copy API resources
+        api_files = [file_name for file_name in glob.glob(os.path.join(API_DIRECTORY, '[!_]*')) if 'test' not in file_name]
+        run('cp', '-vRL', *api_files, BUILD_DIRECTORY)
+
+    def delete(self):
+        cf('delete-stack', '--stack-name', self.stack_name)
+        cf('wait', f'stack-delete-complete', '--stack-name', self.stack_name)
+
+    def deploy(self):
+        if self.email is None and not stack_exists(self.stack_name):
+            LOG.error(format_important_message('Email is a required parameter during initial stack creation'))
+            raise SystemExit(1)
+
+        os.makedirs(DEPLOY_DIRECTORY, exist_ok=True)
+        deploy_directory = tempfile.mkdtemp(dir=DEPLOY_DIRECTORY)
+        LOG.info(f"Temporary Deployment Directory: {deploy_directory}")
+        # First, make the cloudformation template by copying the script into the build directory so it can import
+        # the API libraries and removing the template once it's done generating the file
+        LOG.info("Copying UI Build Artifacts to S3")
+        run('cp', '-vRL', BUILD_DIRECTORY, os.path.join(deploy_directory, 'build'))
+        resource_directory = glob.glob(os.path.join(deploy_directory, 'build', 'static_*'))[0]
+        build_id = os.path.basename(resource_directory)
+        run('aws', 's3', 'mv', '--recursive', '--acl', 'public-read', resource_directory, f's3://{self.s3_bucket}/{build_id}')
+
+        LOG.info("Compiling the Cloudformation templates for the API")
+        template_compile_script = os.path.join(deploy_directory, 'build', os.path.basename(TEMPLATE_COMPILE_SCRIPT))
+        os.link(TEMPLATE_COMPILE_SCRIPT, template_compile_script)
+        run(template_compile_script, TEMPLATE_DIRECTORY, deploy_directory, f'{self.s3_bucket_public_url}/{build_id}')
+        os.unlink(template_compile_script)
+
+        LOG.info("Using Cloudformation 'package' command to upload resources to s3")
+        compiled_template_directory = os.path.join(deploy_directory, 'compiled_templates')
+        os.makedirs(compiled_template_directory)
+        config_file = None
+        for config_file in TEMPLATE_COMPILE_ORDER:
+            cf('package',
+                '--template-file', os.path.join(deploy_directory, config_file),
+                '--s3-bucket', self.s3_bucket,
+                '--output-template-file', os.path.join(compiled_template_directory, config_file))
+
+        template_filename = os.path.join(compiled_template_directory, config_file)
+        target = f's3://{self.s3_bucket}/{DEPLOY_TEMPLATE_FILENAME}'
+
+        LOG.info(f"Uploading master template to {target}")
+        aws('s3', 'cp', template_filename, target)
+        email_parameter = []
+        if self.email:
+            email_parameter.extend(['--parameters', f'ParameterKey=AdminEmail,ParameterValue={self.email}'])
+        else:
+            email_parameter.extend(['--parameters', f'ParameterKey=AdminEmail,UsePreviousValue=true'])
+
+        if stack_exists(self.stack_name):
+            action = 'update'
+        else:
+            action = 'create'
+        LOG.info(f"{action.capitalize()[:-1]}ing development cloudformation stack: {self.stack_name}")
+
+        cf(f'{action}-stack',
+            '--template-url', f'https://s3.amazonaws.com/{self.s3_bucket}/{DEPLOY_TEMPLATE_FILENAME}',
+            '--stack-name', self.stack_name,
+            '--capabilities', 'CAPABILITY_IAM',
+           *email_parameter)
+        cf('wait', f'stack-{action}-complete', '--stack-name', self.stack_name)
+
+        # Deploy to the app stack
+        api_resources = list_stack_resources('AWSOpsWheel', 'ApiGatewayStack')
+        api_id = api_resources['AWSOpsWheelAPI']['PhysicalResourceId']
+
+        if action == 'update':
+            LOG.info(f'Deploying updated APIGateway to app endpoint')
+            # Deploy to the app stack
+            aws('apigateway', 'create-deployment', '--rest-api-id', api_id, '--stage-name', 'app')
+
+        with open(os.path.join(UI_DIRECTORY, 'development_app_location.js'), 'w') as f:
+            f.write(f"module.exports = 'https://{api_id}.execute-api.{self.region}.amazonaws.com';")
+
+        if self.clean:
+            run('rm', '-r', deploy_directory)
+
+        LOG.info(format_important_message(
+            f'Deployed to https://{api_id}.execute-api.{self.region}.amazonaws.com/app/'
+        ))
+
+
+def check_dependencies():
+    missing_dependencies = []
+    for dependency in ['npm', 'python3.6', 'aws']:
+        try:
+            if f'{dependency} not found' in run('which', dependency).decode():
+                missing_dependencies.append(dependency)
+        except subprocess.CalledProcessError:
+            missing_dependencies.append(dependency)
+
+    if missing_dependencies:
+        LOG.error(f'These executables were missing and must be in your PATH to run developer tools: {", ".join(missing_dependencies)}')
+        raise SystemExit(1)
+
+    try:
+        import yaml
+        import boto3
+    except ImportError:
+        LOG.error(f'Missing Python dependencies.  Install by running:  pip3.6 install pyyaml boto3')
+        raise SystemExit(1)
+
+
+DESCRIPTION = """
+Development automation script for handling common tasks.
+Valid commands are:
+
+- build: Creates and populates the directory that will be packaged up for deployment in './build'
+- deploy: Creates a hashed s3 object of the artifacts for use by lambda and updates the API stack template in S3
+
+Default: 'build deploy'
+"""
+
+
+if __name__ == '__main__':
+    check_dependencies()
+    parser = argparse.ArgumentParser(description=DESCRIPTION)
+    parser.add_argument('-s', '--stack-name', default='AWSOpsWheel',
+                        help='Name of the base pipeline stack. '
+                             'The API stack will be the same but suffixed with "-API".  '
+                             'Default: AWSOpsWheel'
+                        )
+    parser.add_argument('-e', '--email', help='Email address parameter for the template')
+    parser.add_argument('commands', metavar='command', nargs='*', help="Commands to execute in order")
+    parser.add_argument('--no-clean', action='store_true', default=False,
+                        help='Do not clean the build directory before building or remove the deploy working directory')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Increase Log Verbosity to debug level')
+    args = parser.parse_args()
+    LOG.setLevel(logging.DEBUG if args.verbose else logging.INFO)
+    manager = DevManager(stack_name=args.stack_name, clean=not args.no_clean, email=args.email)
+    commands = args.commands or ['build', 'deploy']
+    for command in commands:
+        if command not in DevManager.VALID_COMMANDS:
+            LOG.error(f'{repr(command)} is not a valid command.  Valid commands are: {repr(DevManager.VALID_COMMANDS)}')
+            raise SystemExit(1)
+
+    for command in commands:
+        LOG.info(f"============ {command} ============")
+        getattr(manager, command)()

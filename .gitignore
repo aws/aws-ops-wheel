@@ -1,0 +1,9 @@
+.idea
+.DS_Store
+/build
+/ui/node_modules
+/ui/flow-typed
+/ui/development_app_location.js
+/deploy
+__pycache__
+*.pyc

@@ -1,0 +1,84 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreateRole",
+                "s3:CreateBucket",
+                "iam:AttachRolePolicy",
+                "iam:PutRolePolicy",
+                "dynamodb:DeleteTable",
+                "iam:PassRole",
+                "iam:DetachRolePolicy",
+                "dynamodb:DescribeTable",
+                "iam:DeleteRolePolicy",
+                "s3:PutBucketAcl",
+                "cloudformation:UpdateStack",
+                "lambda:DeleteFunction",
+                "iam:ListRolePolicies",
+                "s3:DeleteBucket",
+                "s3:PutBucketVersioning",
+                "cloudformation:ListStackResources",
+                "iam:GetRole",
+                "apigateway:*",
+                "iam:UpdateRoleDescription",
+                "iam:ListRoles",
+                "iam:DeleteRole",
+                "cloudformation:DescribeStacks",
+                "dynamodb:CreateTable",
+                "lambda:UpdateFunctionCode",
+                "lambda:AddPermission",
+                "s3:PutBucketLogging",
+                "cloudformation:CreateStack",
+                "cloudformation:DeleteStack",
+                "iam:GetRolePolicy",
+                "s3:GetBucketLocation",
+                "lambda:RemovePermission",
+                "dynamodb:UpdateTable"
+            ],
+            "Resource": [
+                "arn:aws:iam::*:role/service-role/AWSOpsWheel-*",
+                "arn:aws:apigateway:*::/restapis",
+                "arn:aws:apigateway:*::/restapis/*",
+                "arn:aws:s3:::awsopswheelsourcebucket-*",
+                "arn:aws:cloudformation:*:*:stack/AWSOpsWheelSourceBucket/*",
+                "arn:aws:cloudformation:*:*:stack/AWSOpsWheel/*",
+                "arn:aws:cloudformation:*:*:stack/AWSOpsWheel-*/*",
+                "arn:aws:dynamodb:*:*:table/AWSOpsWheel-*",
+                "arn:aws:lambda:*:*:function:AWSOpsWheel-*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "cognito-idp:AdminDeleteUser",
+                "lambda:CreateFunction",
+                "cognito-idp:DeleteUserPool",
+                "cloudformation:ListStacks",
+                "dynamodb:UntagResource",
+                "dynamodb:ListTables",
+                "cognito-idp:AdminCreateUser",
+                "cognito-idp:DeleteUserPoolClient",
+                "cognito-idp:CreateUserPool",
+                "lambda:UpdateFunctionConfiguration",
+                "s3:ListObjects",
+                "dynamodb:TagResource",
+                "cognito-idp:CreateUserPoolClient",
+                "cognito-idp:UpdateUserPool"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:PutObject",
+                "s3:GetObject",
+                "s3:DeleteObjectVersion",
+                "s3:DeleteObject",
+                "s3:PutObjectAcl"
+            ],
+            "Resource": "arn:aws:s3:::awsopswheelsourcebucket-*/*"
+        }
+    ]
+}

@@ -1,0 +1,44 @@
+#  Copyright 2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License").
+#  You may not use this file except in compliance with the License.
+#  A copy of the License is located at
+#
+#      http://aws.amazon.com/apache2.0/
+#
+#  or in the "license" file accompanying this file. This file is distributed
+#  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+#  express or implied. See the License for the specific language governing
+#  permissions and limitations under the License.
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS Ops Wheel - API Gateway Stack'
+Parameters:
+  AdminEmail:
+    Type: String
+Resources:
+  AWSOpsWheelAPI:
+    Properties: {Name: AWSOpsWheel}
+    Type: AWS::ApiGateway::RestApi
+  AWSOpsWheelAPIApp:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      Description: Initial deployment of the AWS Ops Wheel API
+      RestApiId: {Ref: AWSOpsWheelAPI}
+      StageName: app
+  AWSOpsWheelS3Role:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: ['sts:AssumeRole']
+          Effect: Allow
+          Principal:
+            Service: [apigateway.amazonaws.com]
+        Version: '2012-10-17'
+      ManagedPolicyArns: ['arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess']
+      Path: /service-role/
+    Type: AWS::IAM::Role
+Outputs:
+  Endpoint:
+    Value:
+      Fn::Sub: 'https://${AWSOpsWheelAPI}.execute-api.${AWS::Region}.amazonaws.com/app/'

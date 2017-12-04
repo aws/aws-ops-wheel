@@ -1,0 +1,45 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS Ops Wheel - Cognito Stack'
+Parameters:
+  AdminEmail:
+    Type: String
+Outputs:
+  CognitoUserPoolArn:
+    Value:
+      Fn::GetAtt: CognitoUserPool.Arn
+Resources:
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName:
+        Ref: AWS::StackName
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+        UnusedAccountValidityDays: 90
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 6
+          RequireLowercase: false
+          RequireNumbers: false
+          RequireSymbols: false
+          RequireUppercase: false
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: WheelUIClient
+      UserPoolId:
+        Ref: CognitoUserPool
+  CognitoUserPoolAdmin:
+    Type: AWS::Cognito::UserPoolUser
+    Properties:
+      Username: admin
+      DesiredDeliveryMediums:
+        - EMAIL
+      UserPoolId:
+        Ref: CognitoUserPool
+      UserAttributes:
+        - Name: email
+          Value:
+            Ref: AdminEmail
