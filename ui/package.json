@@ -18,27 +18,32 @@
   },
   "nyc": {
     "include": [
-      "src/*.js*",
-      "src/**/*.js*"
+      "src/*.jsx",
+      "src/**/*.jsx"
     ],
     "extension": [
       ".js",
       ".jsx"
     ],
     "require": [
+      "core-js/stage/4",
+      "babel-core/register",
+      "source-map-support/register",
       "ignore-styles"
     ],
     "reporter": [
       "text",
       "text-summary"
     ],
-    "sourceMap": true,
-    "instrument": true,
+    "sourceMap": false,
+    "instrument": false,
+    "cache": false,
     "all": true
   },
   "devDependencies": {
     "babel-core": "^6.26.0",
     "babel-loader": "^7.1.2",
+    "babel-plugin-istanbul": "^4.1.5",
     "babel-plugin-transform-class-properties": "^6.24.1",
     "babel-preset-env": "^1.6.1",
     "babel-preset-flow": "^6.23.0",
@@ -78,6 +83,7 @@
     "isomorphic-fetch": "^2.2.1",
     "moment": "^2.19.2",
     "moment-timezone": "^0.5.14",
+    "pixi.js": "^4.6.2",
     "react": "^16.2.0",
     "react-bootstrap": "^0.31.5",
     "react-dom": "16",

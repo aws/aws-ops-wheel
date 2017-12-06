@@ -14,13 +14,16 @@
  */
 
 import React, {PureComponent, PropTypes} from 'react';
+import ReactDOM from 'react-dom';
 import connect from 'react-redux-fetch';
 import {RouteComponentProps} from 'react-router';
 import {Button} from 'react-bootstrap';
 import {WheelType, ParticipantType} from '../types';
-import {WHEEL_COLORS, apiURL, staticURL, LinkWrapper} from '../util';
+import {LinkWrapper, WHEEL_COLORS, apiURL, staticURL} from '../util';
 import '../static_content/wheel_click.mp3';
 import 'isomorphic-fetch';
+import * as PIXI from 'pixi.js';
+
 
 interface WheelDispatchProps {
   dispatchWheelGet: PropTypes.func.isRequired,
@@ -38,6 +41,7 @@ interface WheelState {
   participants: undefined | ParticipantType[],
   isSpinning: boolean,
   fetching: boolean,
+  rigExtra: number | undefined,
 }
 
 type WheelProps = WheelDispatchProps & RouteComponentProps<{ wheelID: string }>;
@@ -75,7 +79,10 @@ function linear(currentTime: number, startAngle: number, incrementAngle: number,
 const CANVAS_SIZE = 1000;
 const INNER_RADIUS = 10;
 const OUTER_RADIUS = CANVAS_SIZE / 2;
-const TEXT_RADIUS = OUTER_RADIUS - 30;
+const TEXT_RADIUS = OUTER_RADIUS - 15;
+const EASE_OUT_FRAMES = 500;
+const LINEAR_FRAMES = 500;
+const RIGGING_PAUSE_FRAMES = 50;
 
 
 /**
@@ -89,6 +96,7 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
       participants: undefined,
       isSpinning: false,
       fetching: true,
+      rigExtra: undefined,
     };
     this.lastSector = 0;
   }
@@ -99,6 +107,14 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
     fetch(staticURL('wheel_click.mp3'), { headers: {'Accept': 'audio/mpeg'} })
       .then(response => response.blob())
       .then(result => this.setState({clickUrl: window.URL.createObjectURL(result)})).catch(err => console.log(err));
+  }
+
+  componentWillUnmount() {
+    if (this.application !== undefined) {
+      this.application.ticker.stop();
+      this.application.stop();
+      this.application.destroy();
+    }
   }
 
   fetchWheelAndParticipants() {
@@ -119,18 +135,19 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
         wheel: wheelFetch.value,
         fetching: false,
         sectorSize: Math.PI * 2 / allParticipantsFetch.value.length,
+        rigExtra: Math.max(QUARTER_CIRCLE, Math.PI * 2 / allParticipantsFetch.value.length),
         }, this.drawInitialWheel);
     }
 
     // Process suggested participant result and spin the wheel
-    if (this.state.selectedParticipant === undefined && participantSuggestFetch.fulfilled) {
+    if (this.state.isSpinning && this.state.selectedParticipant === undefined && participantSuggestFetch.fulfilled) {
       const {participants} = this.state;
       let selectedParticipant = participantSuggestFetch.value;
       // This gives us a random point in the sector for the selection to land
-      let selectedIndex = Math.random();
+      let selectedIndex = Math.random() - 0.5;
       // Let's make it stop exactly in the middle for rigged wheels
       if (selectedParticipant.rigged)
-        selectedIndex = 0.5;
+        selectedIndex = 0;
       // Get the selected participant's index
       for (let participant of participants) {
         if (participant.id === selectedParticipant.participant_id) {
@@ -143,47 +160,53 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
       this.setState({
         targetAngle: (20 * Math.PI) - (this.state.sectorSize * selectedIndex),
         selectedParticipant
-      }, () => window.requestAnimationFrame(this.spin)
+      }, () => this.spinTicker.add(this.spin)
     );
     }
   }
 
   drawInitialWheel() {
     const {participants, sectorSize} = this.state;
-    const halfSector = Math.PI / participants.length;
-    const ctx = this.refs.canvas.getContext('2d');
-    ctx.translate(this.refs.canvas.width / 2, this.refs.canvas.width / 2);
-    ctx.font = `bold ${16 + 80 / participants.length}px Helvetica`;
-    ctx.strokeStyle = 'black';
-    ctx.lineWidth = 3;
-    // Save the initial rotation angle so it can be restored after drawing to keep rotation angles consistent
-    ctx.save()
-    // Draw each of the sectors
-    ctx.rotate(halfSector - Math.PI);
+    const fontSize = 16 + (80 / participants.length);
+    const renderelement = ReactDOM.findDOMNode(this.refs.canvas);
+    this.application = new PIXI.Application({
+       width: CANVAS_SIZE,
+       height: CANVAS_SIZE,
+       view: renderelement,
+       antialias: true,
+       backgroundColor: 0xFAFAFA,
+    });
+    this.spinTicker = this.application.ticker;
+    this.wheelGraphic = new PIXI.Container();
+    const graphics = new PIXI.Graphics();
+    this.wheelGraphic.x = CANVAS_SIZE / 2;
+    this.wheelGraphic.y = CANVAS_SIZE / 2;
+    this.wheelGraphic.addChild(graphics);
+    // ctx.translate(this.refs.canvas.width / 2, this.refs.canvas.width / 2);
+    // ctx.font = `bold ${16 + 80 / participants.length}px Helvetica`;
     for (let i in participants) {
-      ctx.beginPath();
-      ctx.arc(0, 0, OUTER_RADIUS, -halfSector, halfSector, false);
-      ctx.arc(0, 0, INNER_RADIUS, halfSector, -halfSector, true);
-      ctx.closePath();
-      ctx.fillStyle = WHEEL_COLORS[i % 16];
-      ctx.fill();
-      // Position and draw text within the segment.  We flip it upside down so we can preserve the positioning but write from the outside of the circle inwards.
-      ctx.rotate(Math.PI)
-      ctx.fillStyle = 'black';
-      ctx.fillText(participants[i].name, -TEXT_RADIUS, 5);
-      // Flip right-side up and rotate to next sector
-      ctx.rotate(Math.PI + sectorSize);
+      i = parseInt(i);
+      graphics.moveTo(0, 0);
+      graphics.beginFill(parseInt(WHEEL_COLORS[i % 16].replace('#', '0x')));
+      graphics.arc(0, 0, OUTER_RADIUS, (i - 0.5) * sectorSize + Math.PI, (i + 0.5) * sectorSize + Math.PI);
+      graphics.endFill();
+      graphics.closePath();
+      let textPositionAngle = sectorSize * i - Math.atan(-0.5 * fontSize / OUTER_RADIUS) + Math.PI;
+      let basicText = new PIXI.Text(participants[i].name, {fontSize});
+      basicText.x = TEXT_RADIUS * Math.cos(textPositionAngle);
+      basicText.y = TEXT_RADIUS * Math.sin(textPositionAngle);
+      basicText.rotation = sectorSize * i;
+      this.wheelGraphic.addChild(basicText);
     }
-    ctx.restore()
+    this.application.stage.addChild(this.wheelGraphic);
   }
 
   // Renders the initial wheel
   drawWheel = (offset=0, time=undefined) => {
-    const {sectorSize, isSpinning} = this.state;
-    this.refs.canvas.style.transform = `rotate(${offset}rad)`;
-    const currentSector = Math.floor(offset / sectorSize);
+    this.wheelGraphic.rotation = offset;
+    const currentSector = Math.floor(offset / this.state.sectorSize);
     if (currentSector !== this.lastSector && time !== undefined) {
-      if (this.lastClickTime === undefined || time - this.lastClickTime > 150) {
+      if (this.lastClickTime === undefined || time - this.lastClickTime > 15) {
         this.refs.clickSound.currentTime = 0;
         this.refs.clickSound.play();
         this.lastClickTime = time;
@@ -204,50 +227,46 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
     this.props.dispatchParticipantSuggestGet(this.props.wheelFetch.value.id);
   }
 
-  spin = (time) => {
-    if (this.startTime === undefined) {
-      this.startTime = time;
-      this.lastTime = time;
+  spin = (delta) => {
+    if (this.currentAnimationTime === undefined) {
+      this.currentAnimationTime = 0;
     }
-    // Don't render at more than 60fps
-    if (time - this.lastTime < 16) {
-      return window.requestAnimationFrame(this.spin);
-    }
+    const time = this.currentAnimationTime += delta;
     this.lastTime = time;
-    let targetAngle = this.state.targetAngle;
-    if (this.state.selectedParticipant.rigged)
-      targetAngle += QUARTER_CIRCLE;  // Overshoot because we'll go back to them
-    const currentAngle = easeOut(time - this.startTime, 0, targetAngle, 5000);
+    let {selectedParticipant, targetAngle, rigExtra} = this.state;
+    if (selectedParticipant.rigged)
+      targetAngle += rigExtra;  // Overshoot because we'll go back to them
+    const currentAngle = easeOut(this.currentAnimationTime, 0, targetAngle, EASE_OUT_FRAMES);
     if (currentAngle >= targetAngle) {
-      if (this.state.selectedParticipant.rigged) {
+      this.spinTicker.remove(this.spin);
+      if (selectedParticipant.rigged) {
         this.drawWheel(targetAngle, time);
-        this.startTime = time + 500;
-        window.requestAnimationFrame(this.riggedSpin);
+        this.currentAnimationTime = 0;
+        this.spinTicker.add(this.riggedSpin);
       } else {
         this.drawWheel(targetAngle, time);
         this.setState({isSpinning: false, targetAngle: undefined});
-        this.startTime = undefined;
+        this.currentAnimationTime = undefined;
       }
     } else {
       this.drawWheel(currentAngle, time);
-      window.requestAnimationFrame(this.spin);
     }
   }
 
-  riggedSpin = (time) => {
+  riggedSpin = (delta) => {
     // Don't render at more than 60fps
-    if (time < this.startTime || time - this.lastTime < 16 ) {
-      return window.requestAnimationFrame(this.riggedSpin);
-    }
-    this.lastTime = time;
-    const currentAngle = linear(time - this.startTime, this.state.targetAngle + QUARTER_CIRCLE, -QUARTER_CIRCLE, 3000);
-    if (currentAngle <= this.state.targetAngle) {
-      this.drawWheel(this.state.targetAngle, time);
+    const time = (this.currentAnimationTime += delta) - RIGGING_PAUSE_FRAMES;
+    if (time < 0)
+      return;
+    const {targetAngle, rigExtra} = this.state;
+    const currentAngle = linear(time, targetAngle + rigExtra, -rigExtra, LINEAR_FRAMES);
+    if (currentAngle <= targetAngle) {
+      this.spinTicker.remove(this.riggedSpin);
+      this.drawWheel(targetAngle, time);
       this.setState({isSpinning: false, targetAngle: undefined});
-      this.startTime = undefined;
+      this.currentAnimationTime = undefined;
     } else {
       this.drawWheel(currentAngle, time);
-      window.requestAnimationFrame(this.riggedSpin);
     }
   }
 
@@ -286,8 +305,8 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
         header = <div style={{padding: '15px'}}>Loading the Wheel and its Participants...</div>;
       }
     } else {
-      header = <div>
-        <div style={{fontSize: '3vmin', textAlign: 'center'}}>
+      header = <div style={{position: 'relative'}}>
+        <div style={{fontSize: '3vmin', textAlign: 'center', 'width': '100%'}}>
           {wheel.name}
         </div>
         <h3 style={{display: participants.length === 0 ? 'inline-flex' : 'none'}}>
@@ -298,74 +317,64 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
 
     return (
       <div className='pageRoot' style={{textAlign: 'center'}}>
-        <LinkWrapper to={`wheel/${this.props.match.params.wheel_id}/participant`} style={{
-          position: 'absolute',
-          top: '60px',
-          left: '10px',
-        }}>
-          <Button>Edit participants</Button>
-        </LinkWrapper>
         <audio ref='clickSound'
                preload='auto'
                src={this.state.clickUrl}
                type='audio/mpeg' />
         {header}
-        <div style={{display: participants !== undefined && participants.length > 0 ? 'block' : 'none'}}>
+        <div style={{textAlign: 'center', display: 'flex', justifyContent: 'space-around'}}>
+          <LinkWrapper to={`wheel/${this.props.match.params.wheel_id}/participant`} style={{
+            margin: '5px'
+          }}>
+            <Button>Edit participants</Button>
+          </LinkWrapper>
+          <Button bsStyle='primary' bsSize='large' disabled={participantName === undefined}   onClick={this.openParticipantPage}
+          style={{margin: '5px'}}>
+              Choose  <b>{participantName}</b>
+          </Button>
+        </div>
+        <div style={{
+          display: participants !== undefined && participants.length > 0 ? 'block' : 'none',
+          position: 'relative'
+        }}>
+          <span style={{
+            position: 'absolute',
+            height: '0',
+            width: '0',
+            fontSize: '0',
+            borderTop: '2vmin solid transparent',
+            borderBottom: '2vmin solid transparent',
+            borderLeft: '4vmin solid #FF9900',
+            top: 'calc(40vmin - 2vmin)',
+            right: 'calc(50vw + 40vmin)',
+           }}/>
+          <canvas ref='canvas' width={CANVAS_SIZE} height={CANVAS_SIZE}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 'calc(50vw - 40vmin)',
+              height: '80vmin',
+              width: '80vmin',
+              overflow: 'hidden',
+              borderRadius: '50%',
+            }} />
           <Button bsStyle='primary' disabled={isSpinning || participants === undefined || participants.length === 0}
             style={{
             position: 'absolute',
-            top: 'calc(90px + 31.5vmin)',
+            top: 'calc(40vmin - 5vmin)',
             left: 'calc(50vw - 5vmin)',
             height: '10vmin',
             width: '10vmin',
             borderRadius: '50%',
             border: '1vmin solid #FAFAFA',
             overflow: 'hidden',
-            zIndex: 0,
+            padding: 0,
+            zIndex: 100,
             fontSize: '2vmin',
-            }} onClick={this.startSpinningWheel}>Spin</Button>
-          <span style={{
-            position: 'absolute',
-            top: 'calc(90px + 33.5vmin)',
-            right: 'calc(50vw + 32.5vmin)',
-            textAlign: 'right',
-            display: 'flex',
-          }}>
-            <Button bsStyle='primary' bsSize='large' disabled={participantName === undefined} onClick={this.openParticipantPage} style={{
-              position: 'relative',
-              textAlign: 'right',
-              margin: '5px',
-              height: '5vmin',
-              fontSize: '2vmin',
-              verticalAlign: 'middle',
-            }}>
-                Choose  <b>{participantName}</b>
-            </Button>
-            <span style={{
-              height: '0',
-              width: '0',
-              fontSize: '0',
-              float: 'right',
-              position: 'relative',
-              borderTop: '2vmin solid transparent',
-              borderBottom: '2vmin solid transparent',
-              borderLeft: '4vmin solid #FF9900',
-              justifyContent: 'center',
-              flexDirection: 'column',
-              alignSelf: 'center',
-            }}/>
-          </span>
-          <canvas ref='canvas' width={CANVAS_SIZE} height={CANVAS_SIZE}
-            style={{
-              position: 'absolute',
-              top: 'calc(90px + 4vmin)',
-              left: 'calc(50vw - 32.5vmin)',
-              height: '65vmin',
-              width: '65vmin',
-              overflow: 'hidden',
-              borderRadius: '50%',
-              zIndex: -1,
-            }} />
+            textAlign: 'center',
+            }} onClick={this.startSpinningWheel}>
+            Spin
+          </Button>
         </div>
       </div>
     );

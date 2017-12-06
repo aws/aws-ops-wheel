@@ -97,14 +97,15 @@ describe('Wheel', function() {
     const wrapper = shallowWithStore(<Wheel {...Object.assign({}, props, shallowProps, dispatchProps)} />);
     // Let's strip out the drawing and animation stuff
     wrapper.instance().drawInitialWheel = sinon.spy();
-    window.requestAnimationFrame = sinon.spy();
+    wrapper.instance().componentDidUpdate();
+    wrapper.instance().spinTicker = {add: sinon.spy(), remove: sinon.spy(), stop: sinon.spy()};
+    wrapper.instance().setState({isSpinning: true});
     wrapper.instance().componentDidUpdate();
     expect(wrapper.instance().state.wheel).to.equal(shallowProps.wheelFetch.value);
     expect(wrapper.instance().state.participants).to.equal(shallowProps.allParticipantsFetch.value);
     expect(wrapper.instance().state.fetching).to.be.false;
     expect(wrapper.instance().state.fetching).to.be.false;
     expect(wrapper.instance().drawInitialWheel.calledOnce).to.be.true;
-    expect(window.requestAnimationFrame.calledOnce).to.be.true;
     expect(wrapper.instance().state.selectedParticipant).to.deep.equal(testSelectedParticipant);
   });
 
@@ -124,14 +125,15 @@ describe('Wheel', function() {
     const wrapper = shallowWithStore(<Wheel {...Object.assign({}, props, shallowProps, dispatchProps, testProps)} />);
     // Let's strip out the drawing and animation stuff
     wrapper.instance().drawInitialWheel = sinon.spy();
-    window.requestAnimationFrame = sinon.spy();
+    wrapper.instance().componentDidUpdate();
+    wrapper.instance().spinTicker = {add: sinon.spy(), remove: sinon.spy(), stop: sinon.spy()};
+    wrapper.instance().setState({isSpinning: true});
     wrapper.instance().componentDidUpdate();
     expect(wrapper.instance().state.wheel).to.equal(shallowProps.wheelFetch.value);
     expect(wrapper.instance().state.participants).to.equal(shallowProps.allParticipantsFetch.value);
     expect(wrapper.instance().state.fetching).to.be.false;
     expect(wrapper.instance().state.fetching).to.be.false;
     expect(wrapper.instance().drawInitialWheel.calledOnce).to.be.true;
-    expect(window.requestAnimationFrame.calledOnce).to.be.true;
     expect(wrapper.instance().state.selectedParticipant).to.deep.equal(testSelectedParticipant);
   });
 
@@ -139,9 +141,8 @@ describe('Wheel', function() {
     const wrapper = shallowWithStore(<Wheel {...Object.assign({}, props, shallowProps, dispatchProps)} />);
     // Let's strip out the drawing and animation stuff
     wrapper.instance().drawInitialWheel = sinon.spy();
-    window.requestAnimationFrame = sinon.spy();
     wrapper.instance().componentDidUpdate();
-    wrapper.find(Button).at(1).simulate('click');
+    wrapper.find(Button).at(2).simulate('click');
     expect(wrapper.instance().state.isSpinning).to.be.true;
     expect(wrapper.instance().state.selectedParticipant).to.be.undefined;
     expect(dispatchProps.dispatchParticipantSuggestGet.calledWith(wheelId)).to.be.true;
@@ -151,23 +152,23 @@ describe('Wheel', function() {
     expect(dispatchProps.dispatchParticipantSuggestGet.calledWith(wheelId)).to.be.true;
   });
 
-  it('Should set time fields and call requestAnimationFrame and drawWheel upon calls to spin()', () => {
+  it('Should set time fields and call drawWheel upon calls to spin()', () => {
     const testTime = 4;
     const wrapper = shallowWithStore(<Wheel {...Object.assign({}, props, shallowProps, dispatchProps)} />);
     // Let's strip out the drawing and animation stuff
     wrapper.instance().drawInitialWheel = sinon.spy();
     wrapper.instance().drawWheel = sinon.spy();
-    window.requestAnimationFrame = sinon.spy();
     wrapper.instance().componentDidUpdate();
-    console.log('requestAnimationFrame callcount: ', window.requestAnimationFrame.callCount);
+    wrapper.instance().spinTicker = {add: sinon.spy(), remove: sinon.spy(), stop: sinon.spy()};
+    wrapper.instance().setState({isSpinning: true});
+    wrapper.instance().componentDidUpdate();
     wrapper.instance().spin(testTime);
-    expect(wrapper.instance().startTime).to.equal(testTime);
-    expect(wrapper.instance().lastTime).to.equal(testTime);
-    expect(window.requestAnimationFrame.calledTwice).to.be.true;
-    // 2nd spin with time increased by 16 results in a call to drawWheel and requestAnimationFrame
-    wrapper.instance().spin(testTime + 16);
-    expect(window.requestAnimationFrame.calledThrice).to.be.true;
+    expect(wrapper.instance().currentAnimationTime).to.equal(testTime);
     expect(wrapper.instance().drawWheel.calledOnce).to.be.true;
+    // 2nd spin with time increased by 16 results in a call to drawWheel and requestAnimationFrame
+    wrapper.instance().spin(1);
+    expect(wrapper.instance().drawWheel.calledTwice).to.be.true;
+    expect(wrapper.instance().currentAnimationTime).to.equal(testTime + 1);
   });
 
   it('Should render loading message if wheel and participant fetches arent fulfilled', () => {

@@ -5,6 +5,16 @@ Get your own in 3 clicks by starting here: [![Launch the Wheel](https://s3.amazo
 
 Or, simply set up a CloudFormation stack using the S3 template url: https://s3-us-west-2.amazonaws.com/aws-ops-wheel/cloudformation-template.yml
 
+## ScreenShots
+### Wheels Table
+![Wheels Table](screenshots/wheels_table.png)
+### Participants Table
+![Participants Table](screenshots/participants_table.png)
+### Wheel (pre-spin)
+![Participants Table](screenshots/wheel_pre_spin.png)
+### Wheel (post-spin)
+![Participants Table](screenshots/wheel_post_spin.png)
+
 # User Guide
 ## Concepts
 **Wheel**

@@ -20,6 +20,7 @@ import Login from '../../src/components/login';
 import '../globals';
 import {mount} from 'enzyme';
 import {CognitoUserPool, CognitoUser} from "amazon-cognito-identity-js";
+import {Button} from 'react-bootstrap';
 
 
 describe('Login', function() {
@@ -77,7 +78,8 @@ describe('Login', function() {
     expect(wrapper.instance().state.isInFlight).to.be.false;
   });
 
-  it('Should set state and call completeNewPasswordChallenge upon submitNewPassword()', () => {
+  it('Should set state and call completeNewPasswordChallenge upon Login button submit with password not yet set',
+    () => {
     const testPWChangeAttribs = {
       somethingElse: 'test',
     };
@@ -89,10 +91,11 @@ describe('Login', function() {
     wrapper.instance().setState(
       {
         passwordChangeAttributes: testPWChangeAttribs,
-        password: 'test_password',
         user: testUser,
       });
-    wrapper.instance().submitNewPassword({preventDefault: sinon.spy()});
+    wrapper.find('[type="username"]').at(1).simulate('change', {target: {id: 'username', value: 'test_username'}});
+    wrapper.find('[type="password"]').at(1).simulate('change', {target: {id: 'password', value: 'test_password'}});
+    wrapper.find(Button).simulate('submit', {preventDefault: () => {}});
     expect(wrapper.instance().state.isInFlight).to.be.true;
     expect(testUser.completeNewPasswordChallenge.calledWith('test_password', testPWChangeAttribs, wrapper.instance()))
       .to.be.true;
@@ -104,21 +107,24 @@ describe('Login', function() {
     expect(wrapper.instance().state.username).to.equal('test_username');
   });
 
-  it('Should set state appropriately on call to login()', () => {
+  it('Should set state appropriately on Login button submit with password already set', () => {
     const testUser = {
       completeNewPasswordChallenge: sinon.spy(),
     };
+    const expectedUser = new CognitoUser({Username: 'test_username', Pool: props.userPool});
 
     const wrapper = mount(<Login {...props}/>);
-    wrapper.instance().setState(
-      {
-        password: 'test_password',
-        username: 'test_username',
-        user: testUser,
-      });
-    const expectedUser = new CognitoUser({Username: 'test_username', Pool: props.userPool});
-    wrapper.instance().login({preventDefault: sinon.spy()});
+    wrapper.instance().setState({user: testUser});
+    wrapper.find('[type="username"]').at(1).simulate('change', {target: {id: 'username', value: 'test_username'}});
+    wrapper.find('[type="password"]').at(1).simulate('change', {target: {id: 'password', value: 'test_password'}});
+    wrapper.find(Button).simulate('submit', {preventDefault: () => {}});
     expect(wrapper.instance().state.isInFlight).to.be.true;
     expect(wrapper.instance().state.user).to.deep.equal(expectedUser);
+  });
+
+  it('Should render error message if set', () => {
+    const wrapper = mount(<Login {...props}/>);
+    wrapper.instance().setState({error: {message: 'test_error_message'}});
+    expect(wrapper.html()).to.contain('test_error_message');
   });
 });
