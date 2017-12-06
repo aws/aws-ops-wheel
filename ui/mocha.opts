@@ -6,6 +6,7 @@
 --require ignore-styles
 --full-trace
 --watch-extensions js,jsx
-test/*.jsx
-test/**/*.jsx
 --recursive
+--exit
+test/*.test.js*
+test/**/*.test.js*

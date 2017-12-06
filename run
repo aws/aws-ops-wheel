@@ -198,7 +198,7 @@ class DevManager:
         cf('wait', f'stack-{action}-complete', '--stack-name', self.stack_name)
 
         # Deploy to the app stack
-        api_resources = list_stack_resources('AWSOpsWheel', 'ApiGatewayStack')
+        api_resources = list_stack_resources(self.stack_name, 'ApiGatewayStack')
         api_id = api_resources['AWSOpsWheelAPI']['PhysicalResourceId']
 
         if action == 'update':

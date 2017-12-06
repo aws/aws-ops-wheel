@@ -253,10 +253,13 @@ def suggest_participant(event):
     """
     wheel_id = event['pathParameters']['wheel_id']
     wheel = Wheel.get_existing_item(Key={'id': wheel_id})
-    # Only return rigged participant if we're not using hidden rigging
-    if 'rigging' in wheel and not wheel['rigging'].get('hidden', False):
+    if 'rigging' in wheel:
         participant_id = wheel['rigging']['participant_id']
         # Use rigging only if the rigged participant is still available
         if 'Item' in WheelParticipant.get_item(Key={'wheel_id': wheel_id, 'id': participant_id}):
-            return {'participant_id': participant_id, 'rigged': True}
+            return_value = {'participant_id': participant_id}
+            # Only return rigged: True if we're not using hidden rigging
+            if not wheel['rigging'].get('hidden', False):
+                return_value['rigged'] = True
+            return return_value
     return {'participant_id': choice_algorithm.suggest_participant(wheel)}

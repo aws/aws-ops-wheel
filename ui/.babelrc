@@ -1,4 +1,9 @@
 {
-  "presets": ["react", "flow", "env"],
-  "plugins": ["transform-class-properties"]
+  "presets": ["react", "env"],
+  "plugins": ["transform-class-properties"],
+  "env": {
+    "test": {
+        "plugins": ["transform-class-properties", "istanbul"]
+    }
+  }
 }
