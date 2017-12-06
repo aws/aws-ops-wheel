@@ -80,9 +80,10 @@ const CANVAS_SIZE = 1000;
 const INNER_RADIUS = 10;
 const OUTER_RADIUS = CANVAS_SIZE / 2;
 const TEXT_RADIUS = OUTER_RADIUS - 15;
-const EASE_OUT_FRAMES = 500;
-const LINEAR_FRAMES = 500;
+const EASE_OUT_FRAMES = 300;
+const LINEAR_FRAMES = 300;
 const RIGGING_PAUSE_FRAMES = 50;
+const MIN_FRAMES_BETWEEN_CLICKS = 9;
 
 
 /**
@@ -204,9 +205,9 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
   // Renders the initial wheel
   drawWheel = (offset=0, time=undefined) => {
     this.wheelGraphic.rotation = offset;
-    const currentSector = Math.floor(offset / this.state.sectorSize);
+    const currentSector = Math.floor(offset / this.state.sectorSize - 0.5);
     if (currentSector !== this.lastSector && time !== undefined) {
-      if (this.lastClickTime === undefined || time - this.lastClickTime > 15) {
+      if (this.lastClickTime === undefined || time - this.lastClickTime > MIN_FRAMES_BETWEEN_CLICKS) {
         this.refs.clickSound.currentTime = 0;
         this.refs.clickSound.play();
         this.lastClickTime = time;
@@ -230,9 +231,9 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
   spin = (delta) => {
     if (this.currentAnimationTime === undefined) {
       this.currentAnimationTime = 0;
+      this.lastClickTime = 0;
     }
     const time = this.currentAnimationTime += delta;
-    this.lastTime = time;
     let {selectedParticipant, targetAngle, rigExtra} = this.state;
     if (selectedParticipant.rigged)
       targetAngle += rigExtra;  // Overshoot because we'll go back to them
@@ -257,6 +258,7 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
     // Don't render at more than 60fps
     const time = (this.currentAnimationTime += delta) - RIGGING_PAUSE_FRAMES;
     if (time < 0)
+      this.lastClickTime = 0;
       return;
     const {targetAngle, rigExtra} = this.state;
     const currentAngle = linear(time, targetAngle + rigExtra, -rigExtra, LINEAR_FRAMES);
