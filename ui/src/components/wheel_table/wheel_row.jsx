@@ -39,26 +39,22 @@ export default class WheelRow extends Component<WheelRowProps, WheelRowState> {
       isWheelModalOpen: false,
       isConfirmationModalOpen: false,
     };
-    this.toggleWheelModal = this.toggleWheelModal.bind(this);
-    this.toggleConfirmationModal = this.toggleConfirmationModal.bind(this);
-    this.handleWheelEdit = this.handleWheelEdit.bind(this);
-    this.handleWheelDelete = this.handleWheelDelete.bind(this);
   }
 
-  toggleWheelModal() {
+  toggleWheelModal = () => {
     this.setState({isWheelModalOpen: !this.state.isWheelModalOpen});
   }
 
-  toggleConfirmationModal() {
+  toggleConfirmationModal = () => {
       this.setState({isConfirmationModalOpen: !this.state.isConfirmationModalOpen});
   }
 
-  handleWheelEdit(wheel: WheelType) {
+  handleWheelEdit = (wheel: WheelType) => {
     this.props.onEdit(wheel);
   };
 
-  handleWheelDelete(wheel: WheelType) {
-    this.props.onDelete(wheel);
+  handleWheelDelete = () => {
+    this.props.onDelete(this.props.wheel);
   };
 
   render() {
@@ -88,7 +84,7 @@ export default class WheelRow extends Component<WheelRowProps, WheelRowState> {
           <ConfirmationModal
               message={`This will delete \"${wheel.name}\" and the action can\'t be undone.`}
               isModalOpen={isConfirmationModalOpen}
-              onConfirm={() => this.handleWheelDelete(wheel)}
+              onConfirm={this.handleWheelDelete}
               closeModal={this.toggleConfirmationModal}
           />
           <ButtonToolbar>

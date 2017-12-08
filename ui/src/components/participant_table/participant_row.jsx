@@ -40,34 +40,28 @@ export default class ParticipantRow extends Component<ParticipantRowProps> {
       participationModalOpen: false,
       confirmationModalOpen: false,
     };
-    this.toggleParticipationModal = this.toggleParticipationModal.bind(this);
-    this.toggleConfirmationModal = this.toggleConfirmationModal.bind(this);
-    this.handleUpdateParticipant = this.handleUpdateParticipant.bind(this);
-    this.handleDeleteParticipant = this.handleDeleteParticipant.bind(this);
-    this.handleRigParticipant = this.handleRigParticipant.bind(this);
-    this.handleHiddenRigParticipant = this.handleHiddenRigParticipant.bind(this);
   }
 
-  toggleParticipationModal() {
+  toggleParticipationModal = () => {
     this.setState({participationModalOpen: !this.state.participationModalOpen});
   }
 
-  toggleConfirmationModal() {
+  toggleConfirmationModal = () => {
     this.setState({confirmationModalOpen: !this.state.confirmationModalOpen});
   }
 
-  handleUpdateParticipant(participant: ParticipantType) {
+  handleUpdateParticipant = (participant: ParticipantType) => {
     this.props.onEdit(participant);
   }
 
-  handleDeleteParticipant(participant: ParticipantType) {
-    this.props.onDelete(participant);
+  handleDeleteParticipant = () => {
+    this.props.onDelete(this.props.participant);
   }
 
-  handleRigParticipant() {
+  handleRigParticipant = () => {
     this.props.onRig(this.props.participant);
   }
-  handleHiddenRigParticipant() {
+  handleHiddenRigParticipant = () => {
     this.props.onHidden(this.props.participant);
   }
 
@@ -94,7 +88,7 @@ export default class ParticipantRow extends Component<ParticipantRowProps> {
                                  participantList={this.props.participantList}/>
           <ConfirmationModal isModalOpen={confirmationModalOpen}
                              message={`This will delete \"${participant.name}\" and the action can\'t be undone.`}
-                             onConfirm={() => this.handleDeleteParticipant(participant)}
+                             onConfirm={this.handleDeleteParticipant}
                              closeModal={this.toggleConfirmationModal} />
           <ButtonToolbar>
             <ButtonGroup>
@@ -116,12 +110,12 @@ export default class ParticipantRow extends Component<ParticipantRowProps> {
         <td key='public-rig'>
           <input type='radio'
                  checked={this.props.rig}
-                 onChange={() => this.handleRigParticipant()} />
+                 onChange={this.handleRigParticipant} />
         </td>
         <td key='hidden-unrig'>
           <input type='checkbox'
                  checked={this.props.hidden}
-                 onChange={() => this.handleHiddenRigParticipant()} />
+                 onChange={this.handleHiddenRigParticipant} />
         </td>
       </tr>
     );

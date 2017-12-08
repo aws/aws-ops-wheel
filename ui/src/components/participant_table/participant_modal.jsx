@@ -35,6 +35,11 @@ interface ParticipantModalProps {
   participantList: ParticipantType[];
 }
 
+interface ParticipantModalState {
+  participant: ParticipantType,
+  isAdd: boolean,
+}
+
 const defaultParticipant = {
   id: '',
   name: '',
@@ -42,7 +47,7 @@ const defaultParticipant = {
   weight: 1
 };
 
-export default class ParticipantModal extends Component<ParticipantModalProps, {}> {
+export default class ParticipantModal extends Component<ParticipantModalProps, ParticipantModalState> {
   constructor(props) {
     super(props);
     this.state = {
@@ -76,7 +81,7 @@ export default class ParticipantModal extends Component<ParticipantModalProps, {
 
   getErrors() {
     const {participantList} = this.props;
-    const {id, name, url} = this.state.participant;
+    const {name, url} = this.state.participant;
 
     const constraints = {
       name: {

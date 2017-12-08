@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+#  Copyright 2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License").
+#  You may not use this file except in compliance with the License.
+#  A copy of the License is located at
+#
+#      http://aws.amazon.com/apache2.0/
+#
+#  or in the "license" file accompanying this file. This file is distributed
+#  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+#  express or implied. See the License for the specific language governing
+#  permissions and limitations under the License.
+
+while read local_ref local_sha remote_ref remote_sha
+do
+  branch=$(git rev-parse --symbolic --abbrev-ref $remote_ref)
+  if [ "release" == "$branch" ]; then
+    # Ensure public github is set to external remote
+    if [ $(git remote | grep external | wc -l) == 0 ]; then
+      git remote add external https://github.com/aws/aws-ops-wheel.git
+    fi
+    # Check for release being in sync with most recent version of github repo
+    if [ $(git diff origin/release external/master -- . ':!hooks' | wc -l) -gt 0 ]; then
+      echo "release does not have the latest changes to the external repository."
+      echo "Please pull those changes in before trying to push anything else to this branch."
+      exit 1
+    fi
+    # Ensure a single commit is being pushed at a time
+    if [ $(git log --pretty=oneline @{u}.. | wc -l) -gt 1 ]; then
+      echo "You are trying to push multiple commits:"
+      git log --pretty=oneline @{u}..
+      echo "Please rebase and squash commits to continue."
+      exit 1
+    fi
+  fi
+done

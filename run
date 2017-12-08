@@ -75,13 +75,17 @@ TEMPLATE_DIRECTORY = os.path.join(SOURCE_DIRECTORY, 'cloudformation')
 DEPLOY_TEMPLATE_FILENAME = 'cloudformation-template.yml'
 TEMPLATE_COMPILE_ORDER = ['cognito.yml', 'lambda.yml', 'api_gateway.yml', 'api_gateway_lambda_roles.yml', 'aws-ops-wheel.yml']
 SOURCE_BUCKET_STACK_NAME = 'AWSOpsWheelSourceBucket'
+STACK_PREFIX = 'AWSOpsWheel'
 
 
 class DevManager:
     VALID_COMMANDS = ['build', 'deploy', 'build_ui', 'build_api', 'delete']
 
-    def __init__(self, stack_name, clean, email):
-        self.stack_name = stack_name
+    def __init__(self, suffix, clean, email):
+        if suffix is not None:
+            self.stack_name = '-'.join([STACK_PREFIX, suffix])
+        else:
+            self.stack_name = STACK_PREFIX
         self.clean = clean
         self.email = email
         self._s3_bucket = None
@@ -252,10 +256,8 @@ Default: 'build deploy'
 if __name__ == '__main__':
     check_dependencies()
     parser = argparse.ArgumentParser(description=DESCRIPTION)
-    parser.add_argument('-s', '--stack-name', default='AWSOpsWheel',
-                        help='Name of the base pipeline stack. '
-                             'The API stack will be the same but suffixed with "-API".  '
-                             'Default: AWSOpsWheel'
+    parser.add_argument('-s', '--suffix',
+                        help='Suffix on the name of the base pipeline stack.  By default, the stack will be named' 'AWSOpsWheel, but with a suffix it will be AWSOpsWheel-<suffix>'
                         )
     parser.add_argument('-e', '--email', help='Email address parameter for the template')
     parser.add_argument('commands', metavar='command', nargs='*', help="Commands to execute in order")
@@ -264,7 +266,7 @@ if __name__ == '__main__':
     parser.add_argument('-v', '--verbose', action='store_true', help='Increase Log Verbosity to debug level')
     args = parser.parse_args()
     LOG.setLevel(logging.DEBUG if args.verbose else logging.INFO)
-    manager = DevManager(stack_name=args.stack_name, clean=not args.no_clean, email=args.email)
+    manager = DevManager(suffix=args.suffix, clean=not args.no_clean, email=args.email)
     commands = args.commands or ['build', 'deploy']
     for command in commands:
         if command not in DevManager.VALID_COMMANDS:
