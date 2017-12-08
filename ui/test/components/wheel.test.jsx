@@ -171,6 +171,44 @@ describe('Wheel', function() {
     expect(wrapper.instance().currentAnimationTime).to.equal(testTime + 1);
   });
 
+  it('Should call appropriate methods and eventually spinTicker.remove upon calls to riggedSpin()', () => {
+    const testTime = 16;
+    const testProps = {
+      participantSuggestFetch: {
+        fulfilled: true,
+        rejected: false,
+        pending: false,
+        value: {
+          participant_id: participants[1].id,
+          rigged: true,
+        },
+      },
+    }
+    const wrapper = shallowWithStore(<Wheel {...Object.assign({}, props, shallowProps, dispatchProps, testProps)} />);
+    // Let's strip out the drawing and animation stuff
+    wrapper.instance().drawInitialWheel = sinon.spy();
+    wrapper.instance().drawWheel = sinon.spy();
+    wrapper.instance().componentDidUpdate();
+    wrapper.instance().spinTicker = {add: sinon.spy(), remove: sinon.spy(), stop: sinon.spy()};
+    wrapper.instance().setState({isSpinning: true});
+    wrapper.instance().componentDidUpdate();
+    wrapper.instance().currentAnimationTime = 0;
+    // First riggedSpin call should result in immediate exit due to not enough time elapsed
+    wrapper.instance().riggedSpin(0);
+    expect(wrapper.instance().lastClickTime).to.equal(0);
+    // Second riggedSpin call should result in a call to drawWheel
+    wrapper.instance().riggedSpin(50);
+    expect(wrapper.instance().drawWheel.calledOnce).to.be.true;
+    // Third riggedSpin call we add a ton of time so we can hit the base case
+    // This will call spinTicker.remove, drawWheel, and stop spinning
+    wrapper.instance().riggedSpin(1000);
+    expect(wrapper.instance().spinTicker.remove.calledOnce).to.be.true;
+    expect(wrapper.instance().drawWheel.calledTwice).to.be.true;
+    expect(wrapper.instance().state.isSpinning).to.be.false;
+    expect(wrapper.instance().state.targetAngle).to.equal(undefined);
+    expect(wrapper.instance().currentAnimationTime).to.equal(undefined);
+  });
+
   it('Should render loading message if wheel and participant fetches arent fulfilled', () => {
     const testProps = {
       wheelFetch: {
