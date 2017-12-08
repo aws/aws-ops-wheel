@@ -13,9 +13,16 @@
  * permissions and limitations under the License.
  */
 
-import React from "react";
+import * as React from 'react';
+import {expect} from 'chai';
+import {mount} from 'enzyme';
+import '../globals';
+import NotFound from '../../src/components/notFound';
 
-export default () =>
-  <div className="NotFound">
-    <h3>Sorry, page not found!</h3>
-  </div>;
+describe('NotFound', function() {
+
+  it('Should mount and render', () => {
+    const wrapper = mount(<NotFound/>);
+    expect(wrapper.html()).to.contain('Sorry, page not found!');
+  });
+});

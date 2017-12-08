@@ -1,7 +1,7 @@
 # Introduction
 The AWS Ops Wheel is a tool that simulates a random selection from a group participants that weights away from participants recently chosen. For any group, the selection can also be rigged to suggest a particular participant that can be in a blatantly obvious (and sometimes hilarious) way.
 
-Get your own in 3 clicks by starting here: [![Launch the Wheel](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-west-2.console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/create/review?filter=active&templateURL=https:%2F%2Fs3-us-west-2.amazonaws.com%2Faws-ops-wheel%2Fcloudformation-template.yml&stackName=AWSOpsWheel)
+Get your own in just a few clicks by starting here: [![Launch the Wheel](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-west-2.console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/create/review?filter=active&templateURL=https:%2F%2Fs3-us-west-2.amazonaws.com%2Faws-ops-wheel%2Fcloudformation-template.yml&stackName=AWSOpsWheel)
 
 Or, simply set up a CloudFormation stack using the S3 template url: https://s3-us-west-2.amazonaws.com/aws-ops-wheel/cloudformation-template.yml
 
@@ -99,18 +99,32 @@ def select_participant(chosen, wheel):
 - An AWS Account you have administrator privileges on
 
 
-### IAM User
-- You should create a dedicated IAM User for ``AWS Ops Wheel`` development.
-***Notes:***
-Make sure that you create the IAM User through [AWS Console - IAM](https://aws.amazon.com/iam/) interface
-- Grant Administrative access to the IAM User
+## A dedicated IAM User (Optional, but highly-recommended)
+- You should create a dedicated IAM User for ``AWS Ops Wheel`` development
+
+### Create a custom IAM Policy for the User
+
+- Go to the [AWS Create Policy Wizard](https://console.aws.amazon.com/iam/home?region=us-west-2#/policies$new?step=edit)
+- Go to the `JSON` tab and paste in the content of our [policy configuration](https://raw.githubusercontent.com/aws/aws-ops-wheel/master/cloudformation/awsopswheel-create-policy.json)
+- Click `Review Policy`
+- Give it an identifying name (we'll need it for the next step) like *AWSOpsWheelDevelopment*
+
+### Create an IAM user with the policy attached
+
+- Got to the [AWS Create User Wizard](https://console.aws.amazon.com/iam/home?region=us-west-2#/users$new?step=details)
+- Give it a descriptive name like *AWSOpsWheelDevelopmentUser* and check the `Programmatic access` checkbox.  **Note:** It doesn't need to be the same as the name of the policy, but it might help keep your things organized
+- Click `Next: Permissions`
+- Switch to the `Attach existing policies directly` tab and filter on the name you used during the *Create custom Policy* step
+- Click the checkbox next to the policy and click `Next: Review`
+- Click `Create user`
+- On the next page, save the Access key ID and the Secret access key (visible by clicking `Show`) for use in the `AWS Cli Configuration` step.  **Note**: This will be the only opportunity to copy the Secret Access Key for this Access Key ID.  if you don't copy the secret access key now, you'll need to create a new access-key, secret-key pair for the user.
 
 
 ## AWS Cli Configuration
 For the purpose of our work, we will use AWS Cli to simplify management of the resources.
 Later we will add support for the `Launch Stack` button which will be displayed on the GitHub Repo page.
 
-In `$HOME/.aws/config` put in the following, replacing with your IAM user's Admin credentials:
+In `$HOME/.aws/config` add in your credentials configuration and default region, replacing with your IAM user's credentials (or your own access key and secret key if you didn't follow our highly-recommended best-practice).  **Note**: The region can be whatever region you choose, but you should definitely set a default region.  We chose us-west-2 since we're in Seattle and it's close by.
 
 ```
 [default]
@@ -118,6 +132,8 @@ aws_access_key_id = ACCESS_KEY
 aws_secret_access_key = SECRET_KEY
 region = us-west-2
 ```
+
+
 
 ## Test the code
 
@@ -139,7 +155,7 @@ Go to the ``<PATH_TO_YOUR_WORKSPACE>`` directory and run:
 
 ```
 $ ./run \
-  --stack-name <NAME_OF_BASE_PIPELINE_STACK, optional with default value as "AWSOpsWheel"> \
+  --suffix <SUFFIX, optional with default value as no suffix, so stack name will be 'AWSOpsWheel'> \
   --email <EMAIL_ADDRESS, required only during initial stack creation> \
   --no-clean <CLEAN_BUILD_DIRECTORY, optional with default value as False. Note that do not clean the build directory before building or remove the deploy working directory>
 ```
@@ -189,5 +205,5 @@ $ aws cloudformation list-stacks
 To delete existing stack:
 
 ```
-$ aws cloudformation delete-stack --stack-name AWSOpsWheel
+$ aws cloudformation delete-stack [--suffix SUFFIX_NAME]
 ```

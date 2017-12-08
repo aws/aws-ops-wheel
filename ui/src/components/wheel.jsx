@@ -257,9 +257,10 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
   riggedSpin = (delta) => {
     // Don't render at more than 60fps
     const time = (this.currentAnimationTime += delta) - RIGGING_PAUSE_FRAMES;
-    if (time < 0)
+    if (time < 0) {
       this.lastClickTime = 0;
       return;
+    }
     const {targetAngle, rigExtra} = this.state;
     const currentAngle = linear(time, targetAngle + rigExtra, -rigExtra, LINEAR_FRAMES);
     if (currentAngle <= targetAngle) {
@@ -347,23 +348,28 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
             borderTop: '2vmin solid transparent',
             borderBottom: '2vmin solid transparent',
             borderLeft: '4vmin solid #FF9900',
-            top: 'calc(40vmin - 2vmin)',
-            right: 'calc(50vw + 40vmin)',
+            // Top position should always be wheel height * 0.5 - borderLeft size * 0.5
+            top: 'calc(37.5vmin - 2vmin)',
+            // Right position should always be 50vw - wheel width * 0.5
+            right: 'calc(50vw + 37.5vmin)',
            }}/>
           <canvas ref='canvas' width={CANVAS_SIZE} height={CANVAS_SIZE}
             style={{
               position: 'absolute',
               top: 0,
-              left: 'calc(50vw - 40vmin)',
-              height: '80vmin',
-              width: '80vmin',
+              // Left position should always be 50vw - wheel height / 2
+              left: 'calc(50vw - 37.5vmin)',
+              height: '75vmin',
+              width: '75vmin',
               overflow: 'hidden',
               borderRadius: '50%',
             }} />
           <Button bsStyle='primary' disabled={isSpinning || participants === undefined || participants.length === 0}
             style={{
             position: 'absolute',
-            top: 'calc(40vmin - 5vmin)',
+            // Top position should always be wheel height * 0.5 - button height * 0.5
+            top: 'calc(37.5vmin - 5vmin)',
+            // Left position should always be 50vw - button width * 0.5
             left: 'calc(50vw - 5vmin)',
             height: '10vmin',
             width: '10vmin',
