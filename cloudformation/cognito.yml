@@ -29,6 +29,10 @@ Resources:
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
         UnusedAccountValidityDays: 90
+        InviteMessageTemplate:
+          EmailMessage: 'Your AWS Ops Wheel username is {username} and the temporary password is {####}'
+          EmailSubject: 'Your temporary password for AWS Ops Wheel '
+          SMSMessage: 'Your AWS Ops Wheel username is {username} and the temporary password is {####}'
       AutoVerifiedAttributes:
         - email
       Policies:
