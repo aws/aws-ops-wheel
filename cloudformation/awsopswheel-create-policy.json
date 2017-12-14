@@ -52,20 +52,19 @@
         {
             "Effect": "Allow",
             "Action": [
-                "cognito-idp:AdminDeleteUser",
                 "lambda:CreateFunction",
-                "cognito-idp:DeleteUserPool",
                 "cloudformation:ListStacks",
                 "dynamodb:UntagResource",
                 "dynamodb:ListTables",
-                "cognito-idp:AdminCreateUser",
-                "cognito-idp:DeleteUserPoolClient",
-                "cognito-idp:CreateUserPool",
                 "lambda:UpdateFunctionConfiguration",
                 "s3:ListObjects",
                 "dynamodb:TagResource",
-                "cognito-idp:CreateUserPoolClient",
-                "cognito-idp:UpdateUserPool"
+                "cognito-idp:*",
+                "cognito-identity:*",
+                "cognito-sync:*",
+                "iam:ListRoles",
+                "iam:ListOpenIdConnectProviders",
+                "sns:ListPlatformApplications"
             ],
             "Resource": "*"
         },
