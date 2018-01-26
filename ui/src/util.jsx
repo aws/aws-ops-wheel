@@ -50,12 +50,12 @@ export const WHEEL_COLORS = [
 // Testing URLs need to be absolute
 export const apiURL = (urlSuffix) => {
   const urlPrefix = (process.env.NODE_ENV === 'test') ? 'http://localhost' : '';
-  return (`${urlPrefix}/app/api/${urlSuffix}`);
+  return (`${urlPrefix}/api/${urlSuffix}`);
 };
 
 export const staticURL = (urlSuffix) => {
   const urlPrefix = (process.env.NODE_ENV === 'test') ? 'http://localhost' : '';
-  return (`${urlPrefix}/app/static/${urlSuffix}`);
+  return (`${urlPrefix}/static/${urlSuffix}`);
 };
 
 /* This is a wrapper around Link to disable Links while testing and apply a local route prefix.
@@ -69,7 +69,7 @@ export class LinkWrapper extends Component {
     let props: Object = Object.assign({}, this.props);
 
     if (props.remote !== true)
-      props.to = `/app/${props.to}`;
+      props.to = `/${props.to}`;
 
     if ('remote' in props)
       delete props.remote;

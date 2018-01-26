@@ -35,7 +35,7 @@ class Navigation extends Component<NavigationProps> {
           </Navbar.Brand>
         </Navbar.Header>
         <Nav>
-          <LinkContainer to="/app">
+          <LinkContainer to="/">
             <NavItem eventKey={1}>Wheels</NavItem>
           </LinkContainer>
         </Nav>

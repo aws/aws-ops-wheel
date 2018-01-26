@@ -31,7 +31,7 @@ module.exports = {
     disableHostCheck: true,
     proxy: {
       // allows using local API endpoint when developing code
-      '/app/api': {
+      '/api': {
         target: DEV_SERVER,
         changeOrigin: true,
         secure: true
@@ -42,13 +42,13 @@ module.exports = {
             // allows to render index.development.html when the developer
             // accesses the development server using following URL
             // http://<ip>:<port/
-            { from: /^\/$/, to: '/app/static/index.development.html' },
+            { from: /^\/$/, to: '/static/index.development.html' },
 
             // in order to be able to support entry points to routes of the app
             // we need to render the same thing for whatever URL the developer
             // provides. Router will render 404 eventually if the Route does not
             // exist:
-            { from: /./, to: '/app/static/index.development.html' },
+            { from: /./, to: '/static/index.development.html' },
         ],
     },
   },
@@ -60,7 +60,7 @@ module.exports = {
   output: {
     filename: "[name]." + ENV + ".js",
     path: __dirname + "/../build/static",
-    publicPath: '/app/static/'
+    publicPath: '/static/'
   },
 
   devtool: (ENV === "production") ? "source-map" : "eval-cheap-module-source-map",
