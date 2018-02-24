@@ -13,11 +13,13 @@
 #  express or implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
+
 import requests
 import argparse
 import csv
 import json
 import getpass
+import sys
 
 try:
     import boto3
@@ -32,6 +34,131 @@ class CSVRowNumberOfElementsMismatch(Exception):
     pass
 
 
+class WheelMetadataProvider(object):
+    def __init__(self, stackname, region, wheel_name):
+        self.stackname = stackname
+        self.region = region
+        self.wheel_name = wheel_name
+
+        self._cognito_stack_arn = None
+        self._apigw_stack_arn = None
+        self._lambda_stack_arn = None
+        self._cognito_client_id = None
+        self._apigw_id = None
+        self._cognito_user_pool_id = None
+        self._wheel_table_name = None
+        self._participant_table_name = None
+        self._lambda_stack_arn = None
+        self._cognito_stack_arn = None
+        self._wheel_id = None
+
+    @property
+    def cognito_client_id(self):
+        if self._cognito_client_id is None:
+            self._get_stack_information()
+        return self._cognito_client_id
+
+    @property
+    def cognito_user_pool_id(self):
+        if self._cognito_user_pool_id is None:
+            self._get_stack_information()
+        return self._cognito_user_pool_id
+
+    @property
+    def wheel_table_name(self):
+        if self._wheel_table_name is None:
+            self._get_stack_information()
+        return self._wheel_table_name
+
+    @property
+    def cognito_stack_arn(self):
+        if self._cognito_stack_arn is None:
+            self._get_stack_information()
+        return self._cognito_stack_arn
+
+    @property
+    def apigw_stack_arn(self):
+        if self._apigw_stack_arn is None:
+            self._get_stack_information()
+        return self._apigw_stack_arn
+
+    @property
+    def apigw_id(self):
+        if self._apigw_id is None:
+            self._get_stack_information()
+        return self._apigw_id
+
+    @property
+    def wheel_url(self):
+        return "https://%s.execute-api.%s.amazonaws.com" % (self.apigw_id, self.region)
+
+    @property
+    def lambda_stack_arn(self):
+        if self._lambda_stack_arn is None:
+            self._get_stack_information()
+        return self._lambda_stack_arn
+
+    @property
+    def wheel_id(self):
+        if self._wheel_id is None:
+            self._get_wheel_id()
+        return self._wheel_id
+
+    def _get_stack_information(self):
+        # find the cognito stack arn
+        cf = boto3.client('cloudformation', region_name=self.region)
+
+        res = cf.list_stack_resources(StackName=self.stackname)
+        for p in res['StackResourceSummaries']:
+            if p['ResourceType'] == 'AWS::CloudFormation::Stack' and \
+                p['ResourceStatus'] == 'CREATE_COMPLETE' and \
+                    'CognitoStack' in p['PhysicalResourceId']:
+                self._cognito_stack_arn = p['PhysicalResourceId']
+
+            if p['ResourceType'] == 'AWS::CloudFormation::Stack' and \
+                p['ResourceStatus'] == 'CREATE_COMPLETE' and \
+                    'ApiGatewayStack' in p['PhysicalResourceId']:
+                self._apigw_stack_arn = p['PhysicalResourceId']
+
+            if p['ResourceType'] == 'AWS::CloudFormation::Stack' and \
+                p['ResourceStatus'] == 'CREATE_COMPLETE' and \
+                    'LambdaStack' in p['PhysicalResourceId']:
+                self._lambda_stack_arn = p['PhysicalResourceId']
+
+        # find the cognito resources created
+        res = cf.list_stack_resources(StackName=self._cognito_stack_arn)
+        for p in res['StackResourceSummaries']:
+            if p['ResourceType'] == 'AWS::Cognito::UserPoolClient':
+                self._cognito_client_id = p['PhysicalResourceId']
+            if p['ResourceType'] == 'AWS::Cognito::UserPool':
+                self._cognito_user_pool_id = p['PhysicalResourceId']
+
+        # find the apigw resources created
+        res = cf.list_stack_resources(StackName=self._apigw_stack_arn)
+        for p in res['StackResourceSummaries']:
+            if p['ResourceType'] == 'AWS::ApiGateway::RestApi':
+                self._apigw_id = p['PhysicalResourceId']
+
+        # find the dynamodb tables created (via lambda stack)
+        res = cf.list_stack_resources(StackName=self._lambda_stack_arn)
+        for p in res['StackResourceSummaries']:
+            if p['ResourceType'] == 'AWS::DynamoDB::Table':
+                if 'wheelDynamoDBTable' in p['PhysicalResourceId']:
+                    self._wheel_table_name = p['PhysicalResourceId']
+                if 'participantDynamoDBTable' in p['PhysicalResourceId']:
+                    self._participant_table_name = p['PhysicalResourceId']
+
+    def _get_wheel_id(self):
+        dynamodb = boto3.resource('dynamodb', region_name=self.region)
+        wheel_table = dynamodb.Table(self.wheel_table_name)
+        # note: this assumes the table is small
+        # if you have a lot of wheels, querying against
+        # a secondary index would be prudent
+        for item in wheel_table.scan()['Items']:
+            if item['name'] == self.wheel_name:
+                self._wheel_id = item['id']
+
+
 class WheelFeederAuthentication:
 
     """
@@ -39,7 +166,7 @@ class WheelFeederAuthentication:
     using Cognito User Pool that gets created using Cloudformation Template during deployment of the Wheel.
     """
 
-    def __init__(self, cognito_user_pool_id, cognito_client_id):
+    def __init__(self, cognito_user_pool_id, cognito_client_id, region):
         """
         :param cognito_user_pool_id: Cognito User Pool Id which the Wheel uses to authenticate the Users
         :type cognito_user_pool_id: str
@@ -48,12 +175,12 @@ class WheelFeederAuthentication:
         """
         self._username = None
         self._password = None
+        self.region = region
         self._cognito_user_pool_id = cognito_user_pool_id
         self._cognito_client_id = cognito_client_id
 
         # stores object returned by warrant
         self._cognito_user_obj = None
-
 
     def build(self):
         """
@@ -78,7 +205,8 @@ class WheelFeederAuthentication:
         self._cognito_user_obj = Cognito(
             self._cognito_user_pool_id,
             self._cognito_client_id,
-            username=self._username
+            username=self._username,
+            user_pool_region=self.region
         )
 
         try:
@@ -97,6 +225,7 @@ class WheelFeederAuthentication:
         self._username = input('Username: ')
         self._password = getpass.getpass('Password: ')
 
+
 class WheelFeeder:
 
     STAGE_IDENTIFIER = 'app'
@@ -107,7 +236,7 @@ class WheelFeeder:
     Requires authentication with one of the Users configured in the Cognito User Pool used by the Wheel.
     """
 
-    def __init__(self, wheel_url, wheel_id, csv_file_path, cognito_user_pool_id, cognito_client_id):
+    def __init__(self, wheel_url, wheel_id, csv_file_path, cognito_user_pool_id, cognito_client_id, region):
         """
         :param wheel_url: URL of the Wheel
         :type wheel_url: str
@@ -115,14 +244,17 @@ class WheelFeeder:
         :type wheel_id: str
         :param csv_file_path: Path of the CSV File
         :type csv_file_path: str
+        :param region: Region of the wheel
         """
         self._wheel_url = wheel_url
         self._wheel_id = wheel_id
+        self._region = region
         self._csv_file_path = csv_file_path
         self._csv_file = open(self._csv_file_path)
         self._authentication = WheelFeederAuthentication(
             cognito_user_pool_id,
-            cognito_client_id
+            cognito_client_id,
+            self._region
         ).build()
 
     def execute(self):
@@ -191,7 +323,7 @@ class WheelFeeder:
             if r.status_code in self.STATUS_CODES_SUCCESS:
                 print('Upload successful')
             else:
-                print(f'Upload was not successful. Status Code: {r.status_code}')
+                print(f'Upload was not successful. Status Code: {r.status_code} {r.text}')
         except Exception as e:
             print(f'There was an error during upload of the participant:')
             print(f' - name: {participant_name}')
@@ -206,9 +338,10 @@ class WheelFeeder:
         :type csv_reader: obj
         """
         for row in csv_reader:
-            if len(row) != 2:
+            nr_cols = len(row)
+            if nr_cols != 2:
                 raise CSVRowNumberOfElementsMismatch(
-                    f'Row: {row} is not valid.'
+                    f'Row: {row} is not valid, has {nr_cols} columns'
                 )
 
         # Rewind the reader to the beginning of the file
@@ -228,44 +361,88 @@ def main():
     print("Initializing the Wheel Feeder...")
     parser = argparse.ArgumentParser(
         description=DESCRIPTION,
-        formatter_class=argparse.RawTextHelpFormatter
+        formatter_class=argparse.RawTextHelpFormatter,
+        epilog="""
+
+%(program)s -r <region> -s <stack name> -n <wheel name> -c <csv file path>
+
+%(program)s -r <region> -u <wheel url> -w <wheel uuid> -p <cognito group id> -i <cognito client id> -c <csv file path>
+""" % {"program": sys.argv[0]}
     )
 
     parser.add_argument(
-        '-u', '--wheel-url', required=True,
+        '-u', '--wheel-url', required=False,
         help='Full URL of the Wheel\'s API Gateway endpoint. \n'
         'Example: https://<API_ID>.execute-api.us-west-2.amazonaws.com'
     )
     parser.add_argument(
-        '-w', '--wheel-id', required=True,
+        '-w', '--wheel-id', required=False,
         help='UUID of the Wheel which you want to feed. \n'
         'Example: 57709419-17c9-4b77-ac99-77fb0d7c7c51'
     )
     parser.add_argument(
-        '-c', '--csv-file-path', required=True,
+        '-c', '--csv-file-path', required=False,
         help='Path to the CSV file. \n'
         'Example: /home/foo/participants.csv'
     )
     parser.add_argument(
-        '-p', '--cognito-user-pool-id', required=True,
+        '-p', '--cognito-user-pool-id', required=False,
         help='Cognito User Pool Id. \n'
         'Example: us-west-2_K4oiNOTREAL'
     )
     parser.add_argument(
-        '-i', '--cognito-client-id', required=True,
+        '-i', '--cognito-client-id', required=False,
         help='Cognito Client Id (get it by visiting your Cognito User Pool). \n'
         'Example: 6e6p1k4qaNOTREAL'
     )
+    parser.add_argument(
+        '-s', '--stack-name', required=False,
+        help='The CloudFormation stack name used to set up your wheel.\n'
+        'Example: MyAWSWheel Stack'
+    )
+    parser.add_argument(
+        '-r', '--region', required=False, default="us-west-2",
+        help='The AWS Region in which your Wheel stack lives, defaults to us-west-2\n'
+        'Example: us-west-2'
+    )
+    parser.add_argument(
+        '-n', '--wheel-name', required=False,
+        help='The name of your Wheel\n'
+        'Example: MyOrganizationWheel'
+    )
     args = parser.parse_args()
 
-    # Initialize the Feeder and execute it.
-    wheel_feeder = WheelFeeder(
-        args.wheel_url,
-        args.wheel_id,
-        args.csv_file_path,
-        args.cognito_user_pool_id,
-        args.cognito_client_id
-    )
+    if args.wheel_name and args.stack_name and args.region:
+        metadata = WheelMetadataProvider(args.stack_name,
+                                         args.region,
+                                         args.wheel_name)
+        print("url=%s id=%s userpoolid=[%s] clientid=[%s]" % (metadata.wheel_url,
+                                                              metadata.wheel_id,
+                                                              metadata.cognito_user_pool_id,
+                                                              metadata.cognito_client_id))
+
+        wheel_feeder = WheelFeeder(metadata.wheel_url,
+                                   metadata.wheel_id,
+                                   args.csv_file_path,
+                                   metadata.cognito_user_pool_id,
+                                   metadata.cognito_client_id,
+                                   args.region)
+
+    elif args.wheel_url and args.wheel_id and \
+            args.cognito_user_pool_id and args.cognito_client_id:
+        # Initialize the Feeder and execute it.
+        wheel_feeder = WheelFeeder(
+            args.wheel_url,
+            args.wheel_id,
+            args.csv_file_path,
+            args.cognito_user_pool_id,
+            args.cognito_client_id,
+            args.region
+        )
+    else:
+        parser.print_usage()
+        raise SystemExit("FIXME: need usage")
+
     wheel_feeder.execute()
 
 
