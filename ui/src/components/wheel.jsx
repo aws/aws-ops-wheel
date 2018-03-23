@@ -300,7 +300,7 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
     this.setState({isMuted: newMuted});
     this.storage.setItem('isMuted', newMuted);
   
-    this.refs.clickSound.volume = !newMuted;
+    this.refs.clickSound.volume = (!newMuted ? 1 : 0);
   }
 
   render() {
@@ -347,8 +347,9 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
           }}
         >
           <Button
+            id='btnSoundToggle'
             onClick={this.toggleSound}
-           ref='btnSoundToggle'
+            ref='btnSoundToggle'
           >
             {isMuted ? '🔇' : '🔊'}
           </Button>

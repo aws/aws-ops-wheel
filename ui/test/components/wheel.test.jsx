@@ -297,4 +297,25 @@ describe('Wheel', function() {
     expect(dispatchProps.dispatchParticipantSelectPost.called).to.be.false;
     expect(window.open.called).to.be.false;
   });
+
+  it('Should mute audio when the mute button is pressed', () => {
+    const wrapper = shallowWithStore(<Wheel {...Object.assign({}, props, shallowProps, dispatchProps)} />);
+
+    // stub the audio control since refs don't work in the test
+    wrapper.instance().refs = {clickSound: {volume:1}};
+
+    const clickSound = wrapper.instance().refs.clickSound;
+    let btnSoundToggle = wrapper.find('#btnSoundToggle').first();
+    
+    btnSoundToggle.simulate('click');
+    expect(clickSound.volume).to.equal(0);
+  
+    btnSoundToggle.simulate('click');
+    expect(clickSound.volume).to.equal(1);
+  
+    btnSoundToggle.simulate('click');
+    expect(clickSound.volume).to.equal(0);
+  });
+  
 });
+
