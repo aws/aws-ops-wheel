@@ -81,7 +81,7 @@
     "es6-promise": "^4.1.1",
     "font-awesome": "^4.7.0",
     "isomorphic-fetch": "^2.2.1",
-    "moment": "^2.19.2",
+    "moment": "^2.19.3",
     "moment-timezone": "^0.5.14",
     "pixi.js": "^4.6.2",
     "react": "^16.2.0",
