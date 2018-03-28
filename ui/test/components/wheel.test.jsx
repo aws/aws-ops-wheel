@@ -27,6 +27,16 @@ describe('Wheel', function() {
   const wheelId = 'wheel_id_0';
   const participants = shimData.participants.filter((e) => e.wheel_id === shimData.wheels[0].id);
 
+  // Wheel uses localStorage which doesn't exist in tests. Mock it
+  // Open Question: do we want to test localStorage logic? If so, need to create a basic 
+  // implementation and add tests
+  if (!global.window.localStorage) {
+    global.window.localStorage = {
+      getItem() { return ''; },
+      setItem() {}
+    };
+  }
+
   console.log('participants: ', participants);
 
   const props = {
@@ -142,7 +152,7 @@ describe('Wheel', function() {
     // Let's strip out the drawing and animation stuff
     wrapper.instance().drawInitialWheel = sinon.spy();
     wrapper.instance().componentDidUpdate();
-    wrapper.find(Button).at(2).simulate('click');
+    wrapper.find('#btnSpin').first().simulate('click');
     expect(wrapper.instance().state.isSpinning).to.be.true;
     expect(wrapper.instance().state.selectedParticipant).to.be.undefined;
     expect(dispatchProps.dispatchParticipantSuggestGet.calledWith(wheelId)).to.be.true;
@@ -287,4 +297,25 @@ describe('Wheel', function() {
     expect(dispatchProps.dispatchParticipantSelectPost.called).to.be.false;
     expect(window.open.called).to.be.false;
   });
+
+  it('Should mute audio when the mute button is pressed', () => {
+    const wrapper = shallowWithStore(<Wheel {...Object.assign({}, props, shallowProps, dispatchProps)} />);
+
+    // stub the audio control since refs don't work in the test
+    wrapper.instance().refs = {clickSound: {volume:1}};
+
+    const clickSound = wrapper.instance().refs.clickSound;
+    let btnSoundToggle = wrapper.find('#btnSoundToggle').first();
+    
+    btnSoundToggle.simulate('click');
+    expect(clickSound.volume).to.equal(0);
+  
+    btnSoundToggle.simulate('click');
+    expect(clickSound.volume).to.equal(1);
+  
+    btnSoundToggle.simulate('click');
+    expect(clickSound.volume).to.equal(0);
+  });
+  
 });
+
