@@ -19,4 +19,4 @@ Resources:
     Properties:
       VersioningConfiguration:
         Status: Enabled
-      AccessControl: AuthenticatedRead
+      AccessControl: BucketOwnerRead
