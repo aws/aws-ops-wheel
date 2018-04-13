@@ -24,7 +24,6 @@ import '../static_content/wheel_click.mp3';
 import 'isomorphic-fetch';
 import * as PIXI from 'pixi.js';
 
-
 interface WheelDispatchProps {
   dispatchWheelGet: PropTypes.func.isRequired,
   wheelFetch: PropTypes.object,
@@ -83,7 +82,7 @@ const TEXT_RADIUS = OUTER_RADIUS - 15;
 const EASE_OUT_FRAMES = 300;
 const LINEAR_FRAMES = 300;
 const RIGGING_PAUSE_FRAMES = 50;
-const MIN_FRAMES_BETWEEN_CLICKS = 9;
+const MIN_FRAMES_BETWEEN_CLICKS = 5;
 
 
 /**
@@ -92,13 +91,17 @@ const MIN_FRAMES_BETWEEN_CLICKS = 9;
 export class Wheel extends PureComponent<WheelProps, WheelState> {
   constructor(props: WheelProps) {
     super(props);
+    
+    this.storage = global.window.localStorage;
+    
     this.state = {
       wheel: undefined,
       participants: undefined,
       isSpinning: false,
       fetching: true,
       rigExtra: undefined,
-    };
+      isMuted: (this.storage.getItem('isMuted') === 'true' ? true : false),
+    };  
     this.lastSector = 0;
   }
 
@@ -208,6 +211,7 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
     const currentSector = Math.floor(offset / this.state.sectorSize - 0.5);
     if (currentSector !== this.lastSector && time !== undefined) {
       if (this.lastClickTime === undefined || time - this.lastClickTime > MIN_FRAMES_BETWEEN_CLICKS) {
+        this.refs.clickSound.volume = !this.state.isMuted;
         this.refs.clickSound.currentTime = 0;
         this.refs.clickSound.play();
         this.lastClickTime = time;
@@ -289,11 +293,22 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
     window.open(this.state.selectedParticipant.url);
   }
 
+  toggleSound = () => {
+
+    var newMuted = !this.state.isMuted;
+
+    this.setState({isMuted: newMuted});
+    this.storage.setItem('isMuted', newMuted);
+  
+    this.refs.clickSound.volume = (!newMuted ? 1 : 0);
+  }
+
   render() {
     const {wheelFetch, allParticipantsFetch, participantSuggestFetch} = this.props;
-    const {wheel, participants, isSpinning, selectedParticipant} = this.state;
+    const {wheel, participants, isSpinning, selectedParticipant, isMuted} = this.state;
 
     let participantName;
+
     if (selectedParticipant !== undefined && !isSpinning) {
       participantName = selectedParticipant.name;
     }
@@ -325,6 +340,20 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
                src={this.state.clickUrl}
                type='audio/mpeg' />
         {header}
+        <div style={{
+            float: 'left',
+            display: 'inline',
+            'padding-left': '1em',
+          }}
+        >
+          <Button
+            id='btnSoundToggle'
+            onClick={this.toggleSound}
+            ref='btnSoundToggle'
+          >
+            {isMuted ? '🔇' : '🔊'}
+          </Button>
+        </div>
         <div style={{textAlign: 'center', display: 'flex', justifyContent: 'space-around'}}>
           <LinkWrapper to={`wheel/${this.props.match.params.wheel_id}/participant`} style={{
             margin: '5px'
@@ -365,6 +394,7 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
               borderRadius: '50%',
             }} />
           <Button bsStyle='primary' disabled={isSpinning || participants === undefined || participants.length === 0}
+            id='btnSpin'
             style={{
             position: 'absolute',
             // Top position should always be wheel height * 0.5 - button height * 0.5

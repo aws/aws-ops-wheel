@@ -39,7 +39,7 @@ class WheelFeederAuthentication:
     using Cognito User Pool that gets created using Cloudformation Template during deployment of the Wheel.
     """
 
-    def __init__(self, cognito_user_pool_id, cognito_client_id):
+    def __init__(self, cognito_user_pool_id, cognito_client_id, region_name=None):
         """
         :param cognito_user_pool_id: Cognito User Pool Id which the Wheel uses to authenticate the Users
         :type cognito_user_pool_id: str
@@ -50,6 +50,7 @@ class WheelFeederAuthentication:
         self._password = None
         self._cognito_user_pool_id = cognito_user_pool_id
         self._cognito_client_id = cognito_client_id
+        self.region_name = region_name
 
         # stores object returned by warrant
         self._cognito_user_obj = None
@@ -78,7 +79,8 @@ class WheelFeederAuthentication:
         self._cognito_user_obj = Cognito(
             self._cognito_user_pool_id,
             self._cognito_client_id,
-            username=self._username
+            username=self._username,
+            user_pool_region=self.region_name
         )
 
         try:
@@ -99,7 +101,6 @@ class WheelFeederAuthentication:
 
 class WheelFeeder:
 
-    STAGE_IDENTIFIER = 'app'
     STATUS_CODES_SUCCESS = [200]
 
     """
@@ -107,7 +108,7 @@ class WheelFeeder:
     Requires authentication with one of the Users configured in the Cognito User Pool used by the Wheel.
     """
 
-    def __init__(self, wheel_url, wheel_id, csv_file_path, cognito_user_pool_id, cognito_client_id):
+    def __init__(self, wheel_url, wheel_id, csv_file_path, cognito_user_pool_id, cognito_client_id, region_name=None):
         """
         :param wheel_url: URL of the Wheel
         :type wheel_url: str
@@ -122,7 +123,8 @@ class WheelFeeder:
         self._csv_file = open(self._csv_file_path)
         self._authentication = WheelFeederAuthentication(
             cognito_user_pool_id,
-            cognito_client_id
+            cognito_client_id,
+            region_name=region_name
         ).build()
 
     def execute(self):
@@ -150,9 +152,8 @@ class WheelFeeder:
         :param csv_reader: CSV Reader Object
         :type csv_reader: obj
         """
-        wheel_full_url = "{}/{}/api/wheel/{}/participant".format(
+        wheel_full_url = "{}/api/wheel/{}/participant".format(
             self._wheel_url,
-            self.STAGE_IDENTIFIER,
             self._wheel_id
         )
         print(f'Full URL of the Wheel: {wheel_full_url}')
@@ -219,6 +220,8 @@ DESCRIPTION = """
 The Wheel Feeder is a script that allows you
 to add participants from a CSV File.
 
+You must specify either --stack-name and --wheel-name OR --wheel-url, --wheel-id, --cognito-client-id, and --cognito-user-pool-id
+
 The format of the file is:
 <participant-name>,<target-url>
 """
@@ -232,13 +235,13 @@ def main():
     )
 
     parser.add_argument(
-        '-u', '--wheel-url', required=True,
-        help='Full URL of the Wheel\'s API Gateway endpoint. \n'
-        'Example: https://<API_ID>.execute-api.us-west-2.amazonaws.com'
+        '-u', '--wheel-url',
+        help='Full URL of the Wheel\'s API Gateway endpoint and stage. \n'
+        'Example: https://<API_ID>.execute-api.us-west-2.amazonaws.com/app'
     )
     parser.add_argument(
-        '-w', '--wheel-id', required=True,
-        help='UUID of the Wheel which you want to feed. \n'
+        '-w', '--wheel-id',
+        help='UUID of the Wheel which you want to feed. Alternatively you can use --wheel-name and --stack-name\n'
         'Example: 57709419-17c9-4b77-ac99-77fb0d7c7c51'
     )
     parser.add_argument(
@@ -247,16 +250,48 @@ def main():
         'Example: /home/foo/participants.csv'
     )
     parser.add_argument(
-        '-p', '--cognito-user-pool-id', required=True,
+        '-p', '--cognito-user-pool-id',
         help='Cognito User Pool Id. \n'
         'Example: us-west-2_K4oiNOTREAL'
     )
     parser.add_argument(
-        '-i', '--cognito-client-id', required=True,
+        '-i', '--cognito-client-id',
         help='Cognito Client Id (get it by visiting your Cognito User Pool). \n'
         'Example: 6e6p1k4qaNOTREAL'
     )
+    parser.add_argument(
+        '-sn', '--stack-name',
+        help='Cloudformation stack name used during initial Wheel creation'
+    )
+    parser.add_argument(
+        '-wn', '--wheel-name',
+        help='Wheel name.  An alternative to wheel-id but requires you also specify the stack_name parameter'
+    )
+    parser.add_argument(
+        '-r', '--region',
+        help='Region the stack is deployed in.  E.G: us-east-1.  Defaults to the default region in your boto/awscli configuration'
+    )
     args = parser.parse_args()
+    if args.stack_name:
+        cf_client = boto3.client('cloudformation', region_name=args.region)
+        stack = cf_client.describe_stacks(StackName=args.stack_name)['Stacks'][0]
+        stack_outputs = {output['OutputKey']: output['OutputValue'] for output in stack['Outputs']}
+        args.cognito_client_id = args.cognito_client_id or stack_outputs['CognitoUserPoolClient']
+        args.cognito_user_pool_id = args.cognito_user_pool_id or stack_outputs['CognitoUserPool']
+        args.wheel_url = args.wheel_url or stack_outputs['Endpoint']
+
+        if args.wheel_name:
+            ddb_client = boto3.resource('dynamodb', region_name=args.region)
+            for item in ddb_client.Table(stack_outputs['wheelDynamoDBTable']).scan()['Items']:
+                if item['name'] == args.wheel_name:
+                    args.wheel_id = item['id']
+                    break
+            else:
+                raise SystemExit("ERROR: Could not find a wheel with the name '%s'" % args.wheel_name)
+
+    if not (args.wheel_url and args.wheel_id and args.cognito_user_pool_id and args.cognito_client_id):
+        raise SystemExit("Error:  You must specify either --stack-name and --wheel-name parameters or "
+                         "--wheel-url, --wheel-id, --cognito-user-pool-id, and --cognito-client-id parameters")
 
     # Initialize the Feeder and execute it.
     wheel_feeder = WheelFeeder(
@@ -264,7 +299,8 @@ def main():
         args.wheel_id,
         args.csv_file_path,
         args.cognito_user_pool_id,
-        args.cognito_client_id
+        args.cognito_client_id,
+        region_name=args.region
     )
     wheel_feeder.execute()
 
