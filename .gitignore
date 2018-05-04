@@ -6,5 +6,11 @@
 /ui/development_app_location.js
 /ui/.nyc_output
 /deploy
+.env
+.venv
+env/
+venv/
 __pycache__
 *.pyc
+.coverage
+.pytest_cache/
