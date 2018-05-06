@@ -207,3 +207,33 @@ To delete existing stack:
 ```
 $ aws cloudformation delete-stack [--suffix SUFFIX_NAME]
 ```
+
+## Set up continuous deployment
+
+Create continuous deployment resources:
+```
+aws cloudformation create-stack --stack-name AWSOpsWheel --template-body file://cloudformation/continuous-deployment.yml --parameters ParameterKey=AdminEmail,ParameterValue=example@example.com --capabilities CAPABILITY_NAMED_IAM
+
+aws cloudformation wait stack-create-complete --stack-name AWSOpsWheel
+```
+
+Push to the newly created git repository:
+```
+git config --global credential.helper '!aws codecommit credential-helper $@'
+
+git config --global credential.UseHttpPath true
+
+git remote add app `aws cloudformation describe-stacks --stack-name AWSOpsWheel --query 'Stacks[0].Outputs[?OutputKey==\`RepositoryCloneUrl\`].OutputValue' --output text`
+
+git push app master
+```
+
+Wait for the pipeline to finish deploying:
+```
+aws cloudformation describe-stacks --stack-name AWSOpsWheel --query 'Stacks[0].Outputs[?OutputKey==`PipelineConsoleUrl`].OutputValue' --output text
+```
+
+Get the URL of the newly deployed application:
+```
+aws cloudformation describe-stacks --stack-name AWSOpsWheel-application --query 'Stacks[0].Outputs[?OutputKey==`Endpoint`].OutputValue' --output text
+```
