@@ -14,6 +14,7 @@
 import json
 import os
 import pytest
+import utils
 from utils import add_extended_table_functions
 from boto3.session import Session
 from moto import mock_dynamodb2
@@ -91,6 +92,7 @@ def mock_dynamodb():
 def mock_wheel_table(mock_dynamodb):
     Wheel = mock_dynamodb.Table(WHEEL_TABLE_NAME)
     add_extended_table_functions(Wheel)
+    utils.Wheel = Wheel
     yield Wheel
     wheels = Wheel.scan({})['Items']
     with Wheel.batch_writer() as batch:
@@ -102,6 +104,7 @@ def mock_wheel_table(mock_dynamodb):
 def mock_participant_table(mock_dynamodb):
     WheelParticipant = mock_dynamodb.Table(PARTICIPANT_TABLE_NAME)
     add_extended_table_functions(WheelParticipant)
+    utils.WheelParticipant = WheelParticipant
     yield WheelParticipant
     participants = WheelParticipant.scan({})['Items']
     with WheelParticipant.batch_writer() as batch:

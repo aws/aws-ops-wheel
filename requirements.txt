@@ -1,0 +1,6 @@
+awscli
+boto3
+pyaml
+pytest
+pytest-cov
+moto
