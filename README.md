@@ -89,7 +89,7 @@ def select_participant(chosen, wheel):
 ## Development Dependencies
 
 - NodeJS 6.10+
-- Python 3.6
+- Python 3
 	- boto3
 	- pyaml
   - pytest

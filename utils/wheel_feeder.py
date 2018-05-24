@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.6
+#!/usr/bin/env python3
 
 #  Copyright 2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
@@ -24,7 +24,7 @@ try:
     # required for easy Cognito Authentication
     from warrant import Cognito
 except ImportError:
-    print(f'Missing Python dependencies.  Install by running:  pip3.6 install boto3 warrant')
+    print(f'Missing Python dependencies.  Install by running:  pip3 install boto3 warrant')
     raise SystemExit(1)
 
 
