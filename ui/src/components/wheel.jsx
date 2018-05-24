@@ -91,9 +91,9 @@ const MIN_FRAMES_BETWEEN_CLICKS = 5;
 export class Wheel extends PureComponent<WheelProps, WheelState> {
   constructor(props: WheelProps) {
     super(props);
-    
+
     this.storage = global.window.localStorage;
-    
+
     this.state = {
       wheel: undefined,
       participants: undefined,
@@ -101,7 +101,7 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
       fetching: true,
       rigExtra: undefined,
       isMuted: (this.storage.getItem('isMuted') === 'true' ? true : false),
-    };  
+    };
     this.lastSector = 0;
   }
 
@@ -173,7 +173,7 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
     const {participants, sectorSize} = this.state;
     const fontSize = 16 + (80 / participants.length);
     const renderelement = ReactDOM.findDOMNode(this.refs.canvas);
-    
+
     this.application = new PIXI.Application({
        width: CANVAS_SIZE,
        height: CANVAS_SIZE,
@@ -309,7 +309,7 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
 
     this.setState({isMuted: newMuted});
     this.storage.setItem('isMuted', newMuted);
-  
+
     this.refs.clickSound.volume = (!newMuted ? 1 : 0);
   }
 
