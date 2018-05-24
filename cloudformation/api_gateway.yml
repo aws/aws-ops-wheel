@@ -23,7 +23,7 @@ Resources:
   AWSOpsWheelAPIApp:
     Type: AWS::ApiGateway::Deployment
     Properties:
-      Description: Initial deployment of the AWS Ops Wheel API
+      Description: Deployment of the AWS Ops Wheel API
       RestApiId: {Ref: AWSOpsWheelAPI}
       StageName: app
   AWSOpsWheelS3Role:
