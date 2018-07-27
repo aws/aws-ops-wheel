@@ -205,11 +205,6 @@ class DevManager:
         api_resources = list_stack_resources(self.stack_name, 'ApiGatewayStack')
         api_id = api_resources['AWSOpsWheelAPI']['PhysicalResourceId']
 
-        if action == 'update':
-            LOG.info(f'Deploying updated APIGateway to app endpoint')
-            # Deploy to the app stack
-            aws('apigateway', 'create-deployment', '--rest-api-id', api_id, '--stage-name', 'app')
-
         with open(os.path.join(UI_DIRECTORY, 'development_app_location.js'), 'w') as f:
             f.write(f"module.exports = 'https://{api_id}.execute-api.{self.region}.amazonaws.com';")
 
