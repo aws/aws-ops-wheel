@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.6
+#!/usr/bin/env python3
 #
 #  Copyright 2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
@@ -205,11 +205,6 @@ class DevManager:
         api_resources = list_stack_resources(self.stack_name, 'ApiGatewayStack')
         api_id = api_resources['AWSOpsWheelAPI']['PhysicalResourceId']
 
-        if action == 'update':
-            LOG.info(f'Deploying updated APIGateway to app endpoint')
-            # Deploy to the app stack
-            aws('apigateway', 'create-deployment', '--rest-api-id', api_id, '--stage-name', 'app')
-
         with open(os.path.join(UI_DIRECTORY, 'development_app_location.js'), 'w') as f:
             f.write(f"module.exports = 'https://{api_id}.execute-api.{self.region}.amazonaws.com';")
 
@@ -223,7 +218,7 @@ class DevManager:
 
 def check_dependencies():
     missing_dependencies = []
-    for dependency in ['npm', 'python3.6', 'aws']:
+    for dependency in ['npm', 'python3', 'aws']:
         try:
             if f'{dependency} not found' in run('which', dependency).decode():
                 missing_dependencies.append(dependency)
@@ -238,7 +233,7 @@ def check_dependencies():
         import yaml
         import boto3
     except ImportError:
-        LOG.error(f'Missing Python dependencies.  Install by running:  pip3.6 install pyyaml boto3')
+        LOG.error(f'Missing Python dependencies.  Install by running:  pip3 install pyyaml boto3')
         raise SystemExit(1)
 
 

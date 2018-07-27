@@ -24,7 +24,6 @@ import '../static_content/wheel_click.mp3';
 import 'isomorphic-fetch';
 import * as PIXI from 'pixi.js';
 
-
 interface WheelDispatchProps {
   dispatchWheelGet: PropTypes.func.isRequired,
   wheelFetch: PropTypes.object,
@@ -92,12 +91,16 @@ const MIN_FRAMES_BETWEEN_CLICKS = 5;
 export class Wheel extends PureComponent<WheelProps, WheelState> {
   constructor(props: WheelProps) {
     super(props);
+
+    this.storage = global.window.localStorage;
+
     this.state = {
       wheel: undefined,
       participants: undefined,
       isSpinning: false,
       fetching: true,
       rigExtra: undefined,
+      isMuted: (this.storage.getItem('isMuted') === 'true' ? true : false),
     };
     this.lastSector = 0;
   }
@@ -170,6 +173,7 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
     const {participants, sectorSize} = this.state;
     const fontSize = 16 + (80 / participants.length);
     const renderelement = ReactDOM.findDOMNode(this.refs.canvas);
+
     this.application = new PIXI.Application({
        width: CANVAS_SIZE,
        height: CANVAS_SIZE,
@@ -177,14 +181,14 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
        antialias: true,
        backgroundColor: 0xFAFAFA,
     });
+
     this.spinTicker = this.application.ticker;
     this.wheelGraphic = new PIXI.Container();
     const graphics = new PIXI.Graphics();
     this.wheelGraphic.x = CANVAS_SIZE / 2;
     this.wheelGraphic.y = CANVAS_SIZE / 2;
     this.wheelGraphic.addChild(graphics);
-    // ctx.translate(this.refs.canvas.width / 2, this.refs.canvas.width / 2);
-    // ctx.font = `bold ${16 + 80 / participants.length}px Helvetica`;
+
     for (let i in participants) {
       i = parseInt(i);
       graphics.moveTo(0, 0);
@@ -192,13 +196,22 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
       graphics.arc(0, 0, OUTER_RADIUS, (i - 0.5) * sectorSize + Math.PI, (i + 0.5) * sectorSize + Math.PI);
       graphics.endFill();
       graphics.closePath();
+
       let textPositionAngle = sectorSize * i - Math.atan(-0.5 * fontSize / OUTER_RADIUS) + Math.PI;
       let basicText = new PIXI.Text(participants[i].name, {fontSize});
+
       basicText.x = TEXT_RADIUS * Math.cos(textPositionAngle);
       basicText.y = TEXT_RADIUS * Math.sin(textPositionAngle);
       basicText.rotation = sectorSize * i;
+
       this.wheelGraphic.addChild(basicText);
     }
+
+    // random start location so that specific projects don't always see their name at the starting point
+    // Note that this does not change the selection of the project (i.e. the project that the wheel
+    // points to at first load is still not selected)
+    this.wheelGraphic.rotation = (Math.random() * 360) * Math.PI / 180;
+
     this.application.stage.addChild(this.wheelGraphic);
   }
 
@@ -208,6 +221,7 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
     const currentSector = Math.floor(offset / this.state.sectorSize - 0.5);
     if (currentSector !== this.lastSector && time !== undefined) {
       if (this.lastClickTime === undefined || time - this.lastClickTime > MIN_FRAMES_BETWEEN_CLICKS) {
+        this.refs.clickSound.volume = !this.state.isMuted;
         this.refs.clickSound.currentTime = 0;
         this.refs.clickSound.play();
         this.lastClickTime = time;
@@ -289,11 +303,22 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
     window.open(this.state.selectedParticipant.url);
   }
 
+  toggleSound = () => {
+
+    var newMuted = !this.state.isMuted;
+
+    this.setState({isMuted: newMuted});
+    this.storage.setItem('isMuted', newMuted);
+
+    this.refs.clickSound.volume = (!newMuted ? 1 : 0);
+  }
+
   render() {
     const {wheelFetch, allParticipantsFetch, participantSuggestFetch} = this.props;
-    const {wheel, participants, isSpinning, selectedParticipant} = this.state;
+    const {wheel, participants, isSpinning, selectedParticipant, isMuted} = this.state;
 
     let participantName;
+
     if (selectedParticipant !== undefined && !isSpinning) {
       participantName = selectedParticipant.name;
     }
@@ -325,6 +350,20 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
                src={this.state.clickUrl}
                type='audio/mpeg' />
         {header}
+        <div style={{
+            float: 'left',
+            display: 'inline',
+            'padding-left': '1em',
+          }}
+        >
+          <Button
+            id='btnSoundToggle'
+            onClick={this.toggleSound}
+            ref='btnSoundToggle'
+          >
+            {isMuted ? '🔇' : '🔊'}
+          </Button>
+        </div>
         <div style={{textAlign: 'center', display: 'flex', justifyContent: 'space-around'}}>
           <LinkWrapper to={`wheel/${this.props.match.params.wheel_id}/participant`} style={{
             margin: '5px'
@@ -365,6 +404,7 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
               borderRadius: '50%',
             }} />
           <Button bsStyle='primary' disabled={isSpinning || participants === undefined || participants.length === 0}
+            id='btnSpin'
             style={{
             position: 'absolute',
             // Top position should always be wheel height * 0.5 - button height * 0.5

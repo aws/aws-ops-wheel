@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.6
+#!/usr/bin/env python3
 #
 #  Copyright 2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
@@ -22,6 +22,7 @@ import os
 import wheel
 import wheel_participant
 
+import time
 
 class Ref(str): pass
 class GetAtt(str): pass
@@ -116,14 +117,20 @@ class TemplateCompiler:
                         config.setdefault('Parameters', {})
                         config['Parameters'][ref] = {'Type': 'String'}
 
-                for resource in config['Resources'].keys():
-                    config['Outputs'][resource] = {'Value': Ref(resource)}
+                for resource in list(config['Resources'].keys()):
+                    if config['Resources'][resource]['Type'] == 'AWS::ApiGateway::Deployment':
+                        # Unique-ify the logical ID to force a new deployment for each stack update
+                        unique_resource_name = f"{resource}{str(int(time.time()))}"
+                        config['Resources'][unique_resource_name] = config['Resources'].pop(resource)
+                        config['Outputs'][resource] = {'Value': Ref(unique_resource_name)}
+                    else:
+                        config['Outputs'][resource] = {'Value': Ref(resource)}
 
                 for output in config['Outputs']:
                     global_resources[output] = stack_name
 
                 with open(os.path.join(self.out_dir, template_filename), 'w') as f:
-                    f.write(yaml.dump(config))
+                    f.write(yaml.dump(config, default_flow_style=False))
 
             # Compile the overall configuration
             overall_config = yaml.load(open(os.path.join(self.in_dir, 'aws-ops-wheel.yml')))
