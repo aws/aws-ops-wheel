@@ -14,7 +14,7 @@
  */
 const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
-const ExtractTextPlugin = require('extract-text-webpack-plugin');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 
 const ENV = process.env.NODE_ENV || 'development';
 let DEV_SERVER = '';
@@ -73,7 +73,13 @@ module.exports = {
     rules: [
       { test: /\.jsx?$/, exclude: /node_modules/, use: ['babel-loader']},
       { test: /\.html$/, use: ['html-loader'] },
-      { test: /\.css$/, use: ExtractTextPlugin.extract({fallback: 'style-loader', use: {loader: 'css-loader', options: {minimize: true}}})},
+      { test: /\.css$/,
+      use: [
+        {
+            'loader': MiniCssExtractPlugin.loader
+        },
+        'css-loader'
+      ]},
       { test: /\.(ttf|eot|otf|svg|woff(2)?)(\?[a-z0-9]+)?$/, use: {loader: 'file-loader'}},
       { test: /\.mp3$|\.ico$/, use: {loader: 'file-loader', query: {name: '[name].[ext]'}}}
     ],
@@ -84,6 +90,6 @@ module.exports = {
           template: 'src/index.html',
           filename: `index.${ENV}.html`
       }),
-      new ExtractTextPlugin({filename: '[contenthash].css'})
+      new MiniCssExtractPlugin({filename: '[contenthash].css'})
   ]
 };

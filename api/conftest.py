@@ -11,13 +11,13 @@
 #  express or implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
-import json
 import os
 import pytest
-import utils
-from utils import add_extended_table_functions
 from boto3.session import Session
 from moto import mock_dynamodb2
+with mock_dynamodb2():
+    from utils import add_extended_table_functions
+    import utils
 
 WHEEL_TABLE_NAME = os.environ.get('WHEEL_TABLE', 'DevOpsWheel-Wheels')
 PARTICIPANT_TABLE_NAME = os.environ.get('PARTICIPANT_TABLE', 'DevOpsWheel-Participants')
@@ -28,7 +28,9 @@ def mock_dynamodb():
 
     mock_dynamodb2().start()
 
-    session = Session(aws_access_key_id='<ACCESS_KEY_ID>', aws_secret_access_key='<SECRET_KEY>', region_name='us-west-2')
+    session = Session(aws_access_key_id='<ACCESS_KEY_ID>',
+                      aws_secret_access_key='<SECRET_KEY>',
+                      region_name='us-west-2')
     dynamodb = session.resource('dynamodb')
 
     wheel_table = dynamodb.create_table(
@@ -79,7 +81,7 @@ def mock_dynamodb():
         }
     )
 
-    #Wait on table creation
+    #  Wait on table creation
     wheel_table.meta.client.get_waiter('table_exists').wait(TableName=WHEEL_TABLE_NAME)
     participant_table.meta.client.get_waiter('table_exists').wait(TableName=PARTICIPANT_TABLE_NAME)
 
