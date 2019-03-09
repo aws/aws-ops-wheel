@@ -4,18 +4,23 @@
         {
             "Effect": "Allow",
             "Action": [
+                "codepipeline:CreatePipeline",
                 "s3:CreateBucket",
                 "iam:CreateRole",
+                "s3:ListBucket",
                 "iam:AttachRolePolicy",
-                "codecommit:CreateRepository",
                 "iam:PutRolePolicy",
                 "dynamodb:DeleteTable",
+                "codepipeline:DeletePipeline",
+                "s3:GetBucketPolicy",
                 "iam:PassRole",
                 "iam:DetachRolePolicy",
                 "dynamodb:DescribeTable",
                 "iam:DeleteRolePolicy",
-                "cloudformation:UpdateStack",
+                "codepipeline:GetPipeline",
                 "s3:PutBucketAcl",
+                "cloudformation:UpdateStack",
+                "events:RemoveTargets",
                 "lambda:DeleteFunction",
                 "iam:ListRolePolicies",
                 "s3:DeleteBucket",
@@ -25,37 +30,43 @@
                 "events:DescribeRule",
                 "apigateway:*",
                 "iam:UpdateRoleDescription",
-                "iam:ListRoles",
                 "iam:DeleteRole",
+                "s3:DeleteBucketPolicy",
                 "codebuild:CreateProject",
                 "cloudformation:DescribeStacks",
                 "dynamodb:CreateTable",
+                "events:PutTargets",
+                "events:DeleteRule",
                 "lambda:UpdateFunctionCode",
+                "codecommit:*",
                 "lambda:AddPermission",
-                "cloudformation:CreateStack",
                 "s3:PutBucketLogging",
-                "codecommit:GetRepository",
+                "cloudformation:CreateStack",
                 "cloudformation:DeleteStack",
-                "lambda:RemovePermission",
+                "s3:PutBucketPolicy",
+                "codebuild:DeleteProject",
+                "codepipeline:GetPipelineState",
                 "s3:GetBucketLocation",
                 "iam:GetRolePolicy",
+                "lambda:RemovePermission",
                 "dynamodb:UpdateTable"
             ],
             "Resource": [
-                "arn:aws:apigateway:*::/restapis",
-                "arn:aws:apigateway:*::/restapis/*",
+                "arn:aws:s3:::awsopswheelsourcebucket-*",
+                "arn:aws:s3:::awsopswheel-*",
+                "arn:aws:dynamodb:*:*:table/AWSOpsWheel-*",
+                "arn:aws:iam::*:role/AWSOpsWheel-*",
+                "arn:aws:iam::*:role/service-role/AWSOpsWheel-*",
+                "arn:aws:codecommit:*:*:AWSOpsWheel*",
+                "arn:aws:codebuild:*:*:project/AWSOpsWheel*",
+                "arn:aws:events:*:*:rule/AWSOpsWheel-*",
                 "arn:aws:cloudformation:*:*:stack/AWSOpsWheelSourceBucket/*",
                 "arn:aws:cloudformation:*:*:stack/AWSOpsWheel/*",
                 "arn:aws:cloudformation:*:*:stack/AWSOpsWheel-*/*",
-                "arn:aws:lambda:*:*:function:AWSOpsWheel-*",
-                "arn:aws:dynamodb:*:*:table/AWSOpsWheel-*",
-                "arn:aws:s3:::awsopswheelsourcebucket-*",
-                "arn:aws:s3:::awsopswheel-*",
-                "arn:aws:iam::*:role/AWSOpsWheel-*",
-                "arn:aws:iam::*:role/service-role/AWSOpsWheel-*",
-                "arn:aws:events:*:*:rule/AWSOpsWheel-*",
-                "arn:aws:codebuild:*:*:project/AWSOpsWheel*",
-                "arn:aws:codecommit:*:*:AWSOpsWheel*"
+                "arn:aws:apigateway:*::/restapis",
+                "arn:aws:apigateway:*::/restapis/*",
+                "arn:aws:codepipeline:*:*:AWSOpsWheel*",
+                "arn:aws:lambda:*:*:function:AWSOpsWheel-*"
             ]
         },
         {
@@ -69,9 +80,9 @@
                 "events:PutRule",
                 "lambda:UpdateFunctionConfiguration",
                 "iam:ListRoles",
+                "codecommit:CreateRepository",
                 "codecommit:ListRepositories",
                 "cognito-sync:*",
-                "s3:ListObjects",
                 "dynamodb:TagResource",
                 "iam:ListOpenIDConnectProviders",
                 "cognito-idp:*",
@@ -83,6 +94,7 @@
         {
             "Effect": "Allow",
             "Action": [
+                "codebuild:BatchGetProjects",
                 "s3:PutObject",
                 "s3:GetObject",
                 "s3:DeleteObjectVersion",
@@ -90,8 +102,17 @@
                 "s3:PutObjectAcl"
             ],
             "Resource": [
+                "arn:aws:codebuild:*:*:project/AWSOpsWheel*",
                 "arn:aws:s3:::awsopswheelsourcebucket-*/*",
                 "arn:aws:s3:::awsopswheel-*/*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": "iam:ListRoles",
+            "Resource": [
+                "arn:aws:iam::*:role/AWSOpsWheel-*",
+                "arn:aws:iam::*:role/service-role/AWSOpsWheel-*"
             ]
         }
     ]
