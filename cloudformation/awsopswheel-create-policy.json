@@ -4,50 +4,58 @@
         {
             "Effect": "Allow",
             "Action": [
-                "iam:CreateRole",
                 "s3:CreateBucket",
+                "iam:CreateRole",
                 "iam:AttachRolePolicy",
+                "codecommit:CreateRepository",
                 "iam:PutRolePolicy",
                 "dynamodb:DeleteTable",
                 "iam:PassRole",
                 "iam:DetachRolePolicy",
                 "dynamodb:DescribeTable",
                 "iam:DeleteRolePolicy",
-                "s3:PutBucketAcl",
                 "cloudformation:UpdateStack",
+                "s3:PutBucketAcl",
                 "lambda:DeleteFunction",
                 "iam:ListRolePolicies",
                 "s3:DeleteBucket",
                 "s3:PutBucketVersioning",
                 "cloudformation:ListStackResources",
                 "iam:GetRole",
+                "events:DescribeRule",
                 "apigateway:*",
                 "iam:UpdateRoleDescription",
                 "iam:ListRoles",
                 "iam:DeleteRole",
+                "codebuild:CreateProject",
                 "cloudformation:DescribeStacks",
                 "dynamodb:CreateTable",
                 "lambda:UpdateFunctionCode",
                 "lambda:AddPermission",
-                "s3:PutBucketLogging",
                 "cloudformation:CreateStack",
+                "s3:PutBucketLogging",
+                "codecommit:GetRepository",
                 "cloudformation:DeleteStack",
-                "iam:GetRolePolicy",
-                "s3:GetBucketLocation",
                 "lambda:RemovePermission",
+                "s3:GetBucketLocation",
+                "iam:GetRolePolicy",
                 "dynamodb:UpdateTable"
             ],
             "Resource": [
-                "arn:aws:iam::*:role/AWSOpsWheel-*",
-                "arn:aws:iam::*:role/service-role/AWSOpsWheel-*",
                 "arn:aws:apigateway:*::/restapis",
                 "arn:aws:apigateway:*::/restapis/*",
-                "arn:aws:s3:::awsopswheelsourcebucket-*",
                 "arn:aws:cloudformation:*:*:stack/AWSOpsWheelSourceBucket/*",
                 "arn:aws:cloudformation:*:*:stack/AWSOpsWheel/*",
                 "arn:aws:cloudformation:*:*:stack/AWSOpsWheel-*/*",
+                "arn:aws:lambda:*:*:function:AWSOpsWheel-*",
                 "arn:aws:dynamodb:*:*:table/AWSOpsWheel-*",
-                "arn:aws:lambda:*:*:function:AWSOpsWheel-*"
+                "arn:aws:s3:::awsopswheelsourcebucket-*",
+                "arn:aws:s3:::awsopswheel-*",
+                "arn:aws:iam::*:role/AWSOpsWheel-*",
+                "arn:aws:iam::*:role/service-role/AWSOpsWheel-*",
+                "arn:aws:events:*:*:rule/AWSOpsWheel-*",
+                "arn:aws:codebuild:*:*:project/AWSOpsWheel*",
+                "arn:aws:codecommit:*:*:AWSOpsWheel*"
             ]
         },
         {
@@ -55,16 +63,19 @@
             "Action": [
                 "lambda:CreateFunction",
                 "cloudformation:ListStacks",
+                "cognito-identity:*",
                 "dynamodb:UntagResource",
                 "dynamodb:ListTables",
+                "events:PutRule",
                 "lambda:UpdateFunctionConfiguration",
+                "iam:ListRoles",
+                "codecommit:ListRepositories",
+                "cognito-sync:*",
                 "s3:ListObjects",
                 "dynamodb:TagResource",
+                "iam:ListOpenIDConnectProviders",
                 "cognito-idp:*",
-                "cognito-identity:*",
-                "cognito-sync:*",
-                "iam:ListRoles",
-                "iam:ListOpenIdConnectProviders",
+                "codebuild:ListProjects",
                 "sns:ListPlatformApplications"
             ],
             "Resource": "*"
@@ -78,7 +89,10 @@
                 "s3:DeleteObject",
                 "s3:PutObjectAcl"
             ],
-            "Resource": "arn:aws:s3:::awsopswheelsourcebucket-*/*"
+            "Resource": [
+                "arn:aws:s3:::awsopswheelsourcebucket-*/*",
+                "arn:aws:s3:::awsopswheel-*/*"
+            ]
         }
     ]
 }
