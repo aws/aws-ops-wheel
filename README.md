@@ -216,6 +216,9 @@ aws cloudformation create-stack --stack-name AWSOpsWheel --template-body file://
 
 aws cloudformation wait stack-create-complete --stack-name AWSOpsWheel
 ```
+Make sure you have your preferred [CodeCommit access](https://docs.aws.amazon.com/codecommit/latest/userguide/setting-up.html) configured.
+
+The following assumes that you are using the AWS CLI Credential Helper.
 
 Push to the newly created git repository:
 ```
