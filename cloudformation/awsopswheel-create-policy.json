@@ -38,6 +38,7 @@
                 "dynamodb:UpdateTable"
             ],
             "Resource": [
+                "arn:aws:iam::*:role/AWSOpsWheel-*",
                 "arn:aws:iam::*:role/service-role/AWSOpsWheel-*",
                 "arn:aws:apigateway:*::/restapis",
                 "arn:aws:apigateway:*::/restapis/*",
