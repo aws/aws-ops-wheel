@@ -12,11 +12,11 @@
 #  permissions and limitations under the License.
 
 import pytest
-import json
 import wheel
 from moto import mock_dynamodb2
 
 
+@mock_dynamodb2
 def test_no_dynamodb_available():
     response = wheel.create_wheel({'body': {'name': 'DDB not available'}})
     assert response['statusCode'] == 500
