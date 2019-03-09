@@ -12,7 +12,8 @@ phases:
       - npm run test
       - cd ../
       # Run API tests
-      - pip install -r requirements.txt
+      - pip install --upgrade pip
+      - pip install --upgrade -r requirements.txt
       - cd api/
       - AWS_ACCESS_KEY_ID=None AWS_SECRET_ACCESS_KEY=None AWS_DEFAULT_REGION=us-west-2 pytest --verbose --cov-report term-missing --cov ./ -s
       - cd ../
