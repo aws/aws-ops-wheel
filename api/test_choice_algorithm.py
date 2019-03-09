@@ -32,7 +32,8 @@ def setup_data(mock_dynamodb):
         }
     } for name in ['Dan', 'Alexa', 'Jeff']]
 
-    created_participants = [json.loads(wheel_participant.create_participant(event)['body']) for event in create_participant_events]
+    created_participants = [json.loads(wheel_participant.create_participant(event)['body']) for event in
+                            create_participant_events]
 
     # Reloads the wheel with updated participant count
     return {
