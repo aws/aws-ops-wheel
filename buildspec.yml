@@ -1,0 +1,41 @@
+version: 0.2
+
+phases:
+  build:
+    commands:
+      # Install node
+      - curl -sL https://deb.nodesource.com/setup_8.x | bash -
+      - apt-get install -y nodejs
+      # Run UI tests
+      - cd ui/
+      - npm install
+      - npm run test
+      - cd ../
+      # Run API tests
+      - pip install --upgrade pip
+      - pip install --upgrade -r requirements.txt
+      - cd api/
+      - AWS_ACCESS_KEY_ID=None AWS_SECRET_ACCESS_KEY=None AWS_DEFAULT_REGION=us-west-2 pytest --verbose --cov-report term-missing --cov ./ -s
+      - cd ../
+      # Compile the application
+      - ./run build
+      # Upload static website assets
+      - mkdir deploy
+      - export BUILD_ID=`echo $CODEBUILD_BUILD_ARN | awk -F':' '{print $NF}'`
+      - aws s3 mv --recursive --acl public-read build/static_* s3://$WEBSITE_ASSETS_BUCKET/$BUILD_ID
+      # Compile CloudFormation templates
+      - cp -vRL build deploy/build
+      - cp _compile_cloudformation_template.py build
+      - ./build/_compile_cloudformation_template.py ./cloudformation deploy "https://s3-$AWS_REGION.amazonaws.com/$WEBSITE_ASSETS_BUCKET/$BUILD_ID"
+      # Package CloudFormation templates
+      - mkdir deploy/compiled_templates
+      - aws cloudformation package --template-file deploy/cognito.yml --s3-bucket $ARTIFACTS_BUCKET --output-template-file deploy/compiled_templates/cognito.yml
+      - aws cloudformation package --template-file deploy/lambda.yml --s3-bucket $ARTIFACTS_BUCKET --output-template-file deploy/compiled_templates/lambda.yml
+      - aws cloudformation package --template-file deploy/api_gateway.yml --s3-bucket $ARTIFACTS_BUCKET --output-template-file deploy/compiled_templates/api_gateway.yml
+      - aws cloudformation package --template-file deploy/api_gateway_lambda_roles.yml --s3-bucket $ARTIFACTS_BUCKET --output-template-file deploy/compiled_templates/api_gateway_lambda_roles.yml
+      - aws cloudformation package --template-file deploy/aws-ops-wheel.yml --s3-bucket $ARTIFACTS_BUCKET --output-template-file deploy/compiled_templates/aws-ops-wheel.yml
+
+artifacts:
+  files:
+    - 'deploy/compiled_templates/aws-ops-wheel.yml'
+  discard-paths: yes
