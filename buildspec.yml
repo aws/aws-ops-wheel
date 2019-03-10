@@ -17,6 +17,9 @@ phases:
       - cd api/
       - AWS_ACCESS_KEY_ID=None AWS_SECRET_ACCESS_KEY=None AWS_DEFAULT_REGION=us-west-2 pytest --verbose --cov-report term-missing --cov ./ -s
       - cd ../
+      # Fix permissions for broken ZIP process from GitHub
+      - chmod a+x run
+      - chmod a+x _compile_cloudformation_template.py
       # Compile the application
       - ./run build
       # Upload static website assets
