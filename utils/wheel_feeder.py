@@ -55,7 +55,6 @@ class WheelFeederAuthentication:
         # stores object returned by warrant
         self._cognito_user_obj = None
 
-
     def build(self):
         """
         Drives the process of getting credentials from the User and initializing valid session with Cognito.
@@ -98,6 +97,7 @@ class WheelFeederAuthentication:
         print("Provide credentials of one of the valid users stored in Cognito User Pool")
         self._username = input('Username: ')
         self._password = getpass.getpass('Password: ')
+
 
 class WheelFeeder:
 
@@ -220,7 +220,8 @@ DESCRIPTION = """
 The Wheel Feeder is a script that allows you
 to add participants from a CSV File.
 
-You must specify either --stack-name and --wheel-name OR --wheel-url, --wheel-id, --cognito-client-id, and --cognito-user-pool-id
+You must specify either:
+--stack-name and --wheel-name OR --wheel-url, --wheel-id, --cognito-client-id, and --cognito-user-pool-id
 
 The format of the file is:
 <participant-name>,<target-url>
@@ -269,7 +270,8 @@ def main():
     )
     parser.add_argument(
         '-r', '--region',
-        help='Region the stack is deployed in.  E.G: us-east-1.  Defaults to the default region in your boto/awscli configuration'
+        help='Region the stack is deployed in.  E.G: us-east-1.  '
+             'Defaults to the default region in your boto/awscli configuration'
     )
     args = parser.parse_args()
     if args.stack_name:

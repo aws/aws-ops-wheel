@@ -51,7 +51,13 @@ def test_create_participant(mock_dynamodb, mock_participant_table):
 
 
 def test_invalid_create_participant(mock_dynamodb):
-    response = wheel_participant.create_participant({'body': {'name': '', 'url': ''}, 'pathParameters': {'wheel_id': WHEEL_ID}})
+    response = wheel_participant.create_participant({
+        'body': {
+            'name': '', 'url': ''
+            },
+        'pathParameters': {
+            'wheel_id': WHEEL_ID}
+    })
 
     assert response['statusCode'] == 400
     assert 'Participants require a name and url which must be at least 1 character in length' in response['body']
@@ -193,13 +199,19 @@ def test_suggest_participant_comical_rig(mock_dynamodb, mock_participant_table, 
     with mock_participant_table.batch_writer() as batch:
         for participant in participants:
             batch.put_item(Item=participant)
-    mock_wheel_table.update_item(Key={'id': WHEEL_ID}, **to_update_kwargs({'rigging': {'hidden': False, 'participant_id': participants[0]['id']}}))
+    mock_wheel_table.update_item(Key={'id': WHEEL_ID}, **to_update_kwargs({
+        'rigging': {
+            'hidden': False,
+            'participant_id': participants[0]['id']
+        }
+    }))
 
     response = wheel_participant.suggest_participant({'body': {}, 'pathParameters': {'wheel_id': WHEEL_ID}})
     body = json.loads(response['body'])
     assert response['statusCode'] == 200
     assert body['participant_id'] == participants[0]['id']
     assert 'rigged' in body
+
 
 def test_suggest_participant_hidden_rig(mock_dynamodb, mock_participant_table, mock_wheel_table):
     participants = [{
@@ -211,7 +223,12 @@ def test_suggest_participant_hidden_rig(mock_dynamodb, mock_participant_table, m
     with mock_participant_table.batch_writer() as batch:
         for participant in participants:
             batch.put_item(Item=participant)
-    mock_wheel_table.update_item(Key={'id': WHEEL_ID}, **to_update_kwargs({'rigging': {'hidden': True, 'participant_id': participants[0]['id']}}))
+    mock_wheel_table.update_item(Key={'id': WHEEL_ID}, **to_update_kwargs({
+        'rigging': {
+            'hidden': True,
+            'participant_id': participants[0]['id']
+        }
+    }))
 
     response = wheel_participant.suggest_participant({'body': {}, 'pathParameters': {'wheel_id': WHEEL_ID}})
     body = json.loads(response['body'])
