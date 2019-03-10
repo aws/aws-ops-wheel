@@ -13,7 +13,9 @@
 
 import pytest
 import json
-import choice_algorithm, wheel, wheel_participant
+import choice_algorithm
+import wheel
+import wheel_participant
 from boto3.dynamodb.conditions import Key
 from base import BadRequestError
 
@@ -57,9 +59,12 @@ def test_select_participant(mock_dynamodb, setup_data, mock_participant_table):
     participant_to_select = setup_data['participants'][0]
     choice_algorithm.select_participant(setup_data['wheel'], participant_to_select)
 
-    updated_participants = mock_participant_table.query(KeyConditionExpression=Key('wheel_id').eq(setup_data['wheel']['id']))['Items']
-    selected_participant = [participant for participant in updated_participants if participant['id'] == participant_to_select['id']][0]
-    other_participants_weights = [participant['weight'] for participant in updated_participants if participant['id'] != participant_to_select['id']]
+    updated_participants = mock_participant_table.query(
+        KeyConditionExpression=Key('wheel_id').eq(setup_data['wheel']['id']))['Items']
+    selected_participant = [participant for participant in updated_participants
+                            if participant['id'] == participant_to_select['id']][0]
+    other_participants_weights = [participant['weight'] for participant in updated_participants
+                                  if participant['id'] != participant_to_select['id']]
 
     assert selected_participant['weight'] == 0
     for weight in other_participants_weights:
@@ -70,7 +75,8 @@ def test_reset_wheel(mock_dynamodb, setup_data, mock_participant_table):
     choice_algorithm.select_participant(setup_data['wheel'], setup_data['participants'][0])
     choice_algorithm.reset_wheel(setup_data['wheel'])
 
-    updated_participants = mock_participant_table.query(KeyConditionExpression=Key('wheel_id').eq(setup_data['wheel']['id']))['Items']
+    updated_participants = mock_participant_table.query(
+        KeyConditionExpression=Key('wheel_id').eq(setup_data['wheel']['id']))['Items']
     participant_weights = [participant['weight'] for participant in updated_participants]
 
     for weight in participant_weights:

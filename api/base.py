@@ -92,7 +92,7 @@ class route:
                 return response.to_response()
             except ClientError as e:
                 return Response(body=str(e), status_code=e.status_code).to_response()
-            except Exception as e:
+            except Exception:
                 return Response(
                     body=f"Internal Service Exception: {traceback.format_exc()}",
                     status_code=500
