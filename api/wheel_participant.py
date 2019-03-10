@@ -13,7 +13,8 @@
 
 from boto3.dynamodb.conditions import Key
 from utils import get_utc_timestamp, get_uuid, Wheel, WheelParticipant, check_string, to_update_kwargs
-import base, choice_algorithm
+import base
+import choice_algorithm
 
 
 @base.route('/wheel/{wheel_id}/participant', methods=['PUT', 'POST'])
