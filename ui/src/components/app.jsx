@@ -82,6 +82,14 @@ class App extends Component<AppProps, AppState> {
     this.setState({cognitoUserPool: undefined, cognitoSession: undefined});
   }
 
+  handleClickCapture = () => {
+    if(this.state.cognitoUserPool!== undefined){
+      this.refreshSession()
+    }else{
+      this.componentDidUpdate()
+    }
+  }
+
   render() {
     if (!this.props.configFetch.fulfilled) {
       return (<div>Loading ...</div>);
@@ -99,7 +107,7 @@ class App extends Component<AppProps, AppState> {
     if (this.state.cognitoSession !== undefined && this.state.cognitoSession.isValid()) {
       return (
           <BrowserRouter>
-            <div>
+            <div id="grandparent" onClickCapture={this.handleClickCapture}>
               <Navigation {...childProps} />
               <Switch>
                 <Route path='/app' exact={true} component={WheelTable} />
