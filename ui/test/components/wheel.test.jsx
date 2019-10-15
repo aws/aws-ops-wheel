@@ -79,7 +79,7 @@ describe('Wheel', function() {
     },
   };
 
-  const sandbox = sinon.sandbox.create();
+  const sandbox = sinon.createSandbox();
   const dispatchProps = {
     dispatchWheelGet: sandbox.spy(),
     dispatchAllParticipantsGet: sandbox.spy(),
@@ -102,7 +102,7 @@ describe('Wheel', function() {
     }, 50);
   });
 
-  it('Should update state appropriately upon initial update with suggested participant', () => {
+  it(' appropriately upon initial update with suggested participant', () => {
     const testSelectedParticipant = Object.assign({}, shallowProps.participantSuggestFetch.value, participants[1]);
     const wrapper = shallowWithStore(<Wheel {...Object.assign({}, props, shallowProps, dispatchProps)} />);
     // Let's strip out the drawing and animation stuff
@@ -148,9 +148,21 @@ describe('Wheel', function() {
   });
 
   it('Should update state appropriately and call dispatchParticipantSuggestGet when Spin is clicked', () => {
-    const wrapper = shallowWithStore(<Wheel {...Object.assign({}, props, shallowProps, dispatchProps)} />);
+    const testProps = {
+      participantSuggestFetch: {
+        fulfilled: false,
+        rejected: false,
+        pending: false,
+        value: {
+          participant_id: participants[1].id,
+          rigged: true,
+        },
+      },
+    }
+    const wrapper = shallowWithStore(<Wheel {...Object.assign({}, props, shallowProps, dispatchProps, testProps)} />);
     // Let's strip out the drawing and animation stuff
     wrapper.instance().drawInitialWheel = sinon.spy();
+    wrapper.instance().spinTicker = {add: sinon.spy(), remove: sinon.spy(), stop: sinon.spy()};
     wrapper.instance().componentDidUpdate();
     wrapper.find('#btnSpin').first().simulate('click');
     expect(wrapper.instance().state.isSpinning).to.be.true;

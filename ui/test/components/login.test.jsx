@@ -25,7 +25,7 @@ import {Button} from 'react-bootstrap';
 
 describe('Login', function() {
 
-  const sandbox = sinon.sandbox.create();
+  const sandbox = sinon.createSandbox();
 
   afterEach(() => {
     sandbox.reset();

@@ -24,7 +24,7 @@ import {mount, shallow} from 'enzyme';
 
 describe('ConfirmationModal', function() {
   // sinon.sandbox lets us group these spies together and reset them after every test
-  const sandbox = sinon.sandbox.create();
+  const sandbox = sinon.createSandbox();
   afterEach(() =>{
     sandbox.reset();
   });

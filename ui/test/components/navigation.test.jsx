@@ -22,7 +22,7 @@ import '../globals';
 
 describe('Navigation', function() {
 
-  const sandbox = sinon.sandbox.create();
+  const sandbox = sinon.createSandbox();
 
   afterEach(() => {
     sandbox.reset();

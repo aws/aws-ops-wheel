@@ -33,7 +33,7 @@ describe('WheelTable', function() {
     },
   };
 
-  const sandbox = sinon.sandbox.create();
+  const sandbox = sinon.createSandbox();
   const dispatchProps = {
     dispatchWheelsGet: sandbox.spy(),
     dispatchCreateWheelPost: sandbox.spy(),
@@ -72,7 +72,7 @@ describe('WheelTable', function() {
       }
       const postProps = {
         createWheelFetch: {
-          fulfilled: true,
+          fulfilled: false,
           pending: false,
           rejected: false,
         }
@@ -84,6 +84,8 @@ describe('WheelTable', function() {
       wrapper.instance().handleWheelAdd(testCreateWheel);
       expect(dispatchProps.dispatchCreateWheelPost.calledWith(testCreateWheel)).to.be.true;
       expect(wrapper.instance().state.create).to.be.true;
+
+      wrapper.setProps({createWheelFetch: {fulfilled: true}})
       wrapper.instance().componentDidUpdate();
       expect(dispatchProps.dispatchWheelsGet.calledTwice).to.be.true;
       expect(wrapper.instance().state.create).to.be.false;
@@ -96,7 +98,7 @@ describe('WheelTable', function() {
       }
       const postProps = {
         createWheelFetch: {
-          fulfilled: true,
+          fulfilled: false,
           pending: false,
           rejected: false,
         }
@@ -108,6 +110,8 @@ describe('WheelTable', function() {
       wrapper.instance().handleWheelAdd(testWheel);
       expect(dispatchProps.dispatchCreateWheelPost.calledWith(testWheel)).to.be.true;
       expect(wrapper.instance().state.create).to.be.true;
+
+      wrapper.setProps({createWheelFetch: {fulfilled: true}})
       wrapper.instance().componentDidUpdate();
       expect(dispatchProps.dispatchWheelsGet.calledTwice).to.be.true;
       expect(wrapper.instance().state.create).to.be.false;
@@ -121,7 +125,7 @@ describe('WheelTable', function() {
       }
       const postProps = {
         updateWheelFetch: {
-          fulfilled: true,
+          fulfilled: false,
           pending: false,
           rejected: false,
         }
@@ -133,6 +137,8 @@ describe('WheelTable', function() {
       wrapper.instance().handleWheelEdit(testWheel);
       expect(dispatchProps.dispatchUpdateWheelPut.calledWith(testWheel)).to.be.true;
       expect(wrapper.instance().state.edit).to.be.true;
+
+      wrapper.setProps({updateWheelFetch: {fulfilled: true}})
       wrapper.instance().componentDidUpdate();
       expect(dispatchProps.dispatchWheelsGet.calledTwice).to.be.true;
       expect(wrapper.instance().state.edit).to.be.false;
@@ -146,7 +152,7 @@ describe('WheelTable', function() {
       }
       const postProps = {
         deleteWheelFetch: {
-          fulfilled: true,
+          fulfilled: false,
           pending: false,
           rejected: false,
         }
@@ -158,6 +164,8 @@ describe('WheelTable', function() {
       wrapper.instance().handleWheelDelete(testWheel);
       expect(dispatchProps.dispatchDeleteWheelDelete.calledWith(testWheel.id)).to.be.true;
       expect(wrapper.instance().state.delete).to.be.true;
+
+      wrapper.setProps({deleteWheelFetch: {fulfilled: true}})
       wrapper.instance().componentDidUpdate();
       expect(dispatchProps.dispatchWheelsGet.calledTwice).to.be.true;
       expect(wrapper.instance().state.delete).to.be.false;

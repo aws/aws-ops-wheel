@@ -1,9 +1,4 @@
 {
-  "presets": ["react", "env"],
-  "plugins": ["transform-class-properties"],
-  "env": {
-    "test": {
-        "plugins": ["transform-class-properties", "istanbul"]
-    }
-  }
+  "presets": ["@babel/preset-env", "@babel/preset-react", "@babel/preset-flow"],
+  "plugins": ["@babel/plugin-proposal-class-properties"]
 }

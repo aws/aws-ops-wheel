@@ -59,7 +59,7 @@ describe('ParticipantTable', function() {
   };
 
   // sinon.sandbox lets us group these spies together and reset them after every test
-  const sandbox = sinon.sandbox.create();
+  const sandbox = sinon.createSandbox();
   const dispatchProps = {
     dispatchWheelGet: sandbox.spy(),
     dispatchListParticipantsGet: sandbox.spy(),
@@ -113,7 +113,7 @@ describe('ParticipantTable', function() {
     () => {
     const postProps = {
       createParticipantFetch: {
-        fulfilled: true,
+        fulfilled: false,
         pending: false,
         rejected: false,
       }
@@ -127,6 +127,8 @@ describe('ParticipantTable', function() {
     wrapper.instance().handleCreateParticipant(testParticipant);
     expect(dispatchProps.dispatchCreateParticipantPost.calledWith(testWheelId, testParticipant)).to.be.true;
     expect(wrapper.instance().state.createPending).to.be.true;
+
+    wrapper.setProps({createParticipantFetch: {fulfilled: true}})
     wrapper.instance().componentDidUpdate();
     expect(wrapper.instance().state.createPending).to.be.false;
     expect(wrapper.instance().state.fetchPending).to.be.false;
@@ -136,7 +138,7 @@ describe('ParticipantTable', function() {
     () => {
       const postProps = {
         updateParticipantFetch: {
-          fulfilled: true,
+          fulfilled: false,
           pending: false,
           rejected: false,
         }
@@ -150,6 +152,8 @@ describe('ParticipantTable', function() {
       wrapper.instance().handleUpdateParticipant(testParticipant);
       expect(dispatchProps.dispatchUpdateParticipantPut.calledWith(testWheelId, testParticipant)).to.be.true;
       expect(wrapper.instance().state.updatePending).to.be.true;
+
+      wrapper.setProps({updateParticipantFetch: {fulfilled: true}})
       wrapper.instance().componentDidUpdate();
       expect(wrapper.instance().state.updatePending).to.be.false;
       expect(wrapper.instance().state.fetchPending).to.be.false;
@@ -159,7 +163,7 @@ describe('ParticipantTable', function() {
     () => {
       const postProps = {
         deleteParticipantFetch: {
-          fulfilled: true,
+          fulfilled: false,
           pending: false,
           rejected: false,
         }
@@ -173,6 +177,8 @@ describe('ParticipantTable', function() {
       wrapper.instance().handleDeleteParticipant(testParticipant);
       expect(dispatchProps.dispatchDeleteParticipantDelete.calledWith(testWheelId, testParticipant.id)).to.be.true;
       expect(wrapper.instance().state.deletePending).to.be.true;
+
+      wrapper.setProps({deleteParticipantFetch: {fulfilled: true}})
       wrapper.instance().componentDidUpdate();
       expect(wrapper.instance().state.deletePending).to.be.false;
       expect(wrapper.instance().state.fetchPending).to.be.false;
@@ -182,7 +188,7 @@ describe('ParticipantTable', function() {
     () => {
       const postProps = {
         resetWheelFetch: {
-          fulfilled: true,
+          fulfilled: false,
           pending: false,
           rejected: false,
         }
@@ -193,6 +199,8 @@ describe('ParticipantTable', function() {
       wrapper.instance().handleResetWheel();
       expect(dispatchProps.dispatchResetWheelPost.calledWith(testWheelId)).to.be.true;
       expect(wrapper.instance().state.resetPending).to.be.true;
+
+      wrapper.setProps({resetWheelFetch: {fulfilled: true}})
       wrapper.instance().componentDidUpdate();
       expect(wrapper.instance().state.resetPending).to.be.false;
       expect(wrapper.instance().state.fetchPending).to.be.false;

@@ -1,6 +1,6 @@
 --require ./test/setup.js
 --require core-js/stage/4
---require babel-core/register
+--require @babel/register
 --require ./test/globals.jsx
 --require source-map-support/register
 --require ignore-styles
