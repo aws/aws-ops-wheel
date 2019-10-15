@@ -24,7 +24,7 @@ import {mount} from 'enzyme';
 
 
 describe('ParticipantRow', function() {
-  const sandbox = sinon.sandbox.create();
+  const sandbox = sinon.createSandbox();
   afterEach(() => {
     sandbox.reset();
   });

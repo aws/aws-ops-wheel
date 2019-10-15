@@ -14,6 +14,7 @@
  */
 
 let nock = require('nock');
+const { JSDOM } = require('jsdom');
 import {shimData} from './shim_data';
 import {createStore, applyMiddleware, combineReducers, compose} from 'redux';
 import {middleware as fetchMiddleware, reducer as repository} from 'react-redux-fetch';
@@ -80,6 +81,9 @@ export function mountWithRoute(component: any, router: any = {
 }) {
   const childContextTypes = Object.assign(Router.childContextTypes, Provider.childContextTypes);
   const store = createMockStore();
+  const { document } = (
+    new JSDOM('<!doctype html><html><head><meta charset="utf-8"></head><body><div id="app"></div></body></html>')
+  ).window;
   return (
     mount(component, {
       context: {store, router},
