@@ -28,9 +28,7 @@ def mock_dynamodb():
 
     mock_dynamodb2().start()
 
-    session = Session(aws_access_key_id='<ACCESS_KEY_ID>',
-                      aws_secret_access_key='<SECRET_KEY>',
-                      region_name='us-west-2')
+    session = Session(aws_access_key_id='<ACCESS_KEY_ID>', aws_secret_access_key='<SECRET_KEY>')
     dynamodb = session.resource('dynamodb')
 
     wheel_table = dynamodb.create_table(
