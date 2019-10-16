@@ -57,7 +57,7 @@ Resources:
       KeySchema:
       - {AttributeName: wheel_id, KeyType: HASH}
       - {AttributeName: id, KeyType: RANGE}
-      ProvisionedThroughput: {ReadCapacityUnits: '5', WriteCapacityUnits: '5'}
+      BillingMode: PAY_PER_REQUEST
     Type: AWS::DynamoDB::Table
   wheelDynamoDBTable:
     Properties:
@@ -65,5 +65,5 @@ Resources:
       - {AttributeName: id, AttributeType: S}
       KeySchema:
       - {AttributeName: id, KeyType: HASH}
-      ProvisionedThroughput: {ReadCapacityUnits: '1', WriteCapacityUnits: '1'}
+      BillingMode: PAY_PER_REQUEST
     Type: AWS::DynamoDB::Table
