@@ -110,11 +110,14 @@ class DevManager:
             self._region = aws(
                 's3api', 'get-bucket-location', '--bucket', self.s3_bucket
             )['LocationConstraint']
+        # LocationConstraint is null if bucket is in us-east-1
+        if self._region is None:
+            self._region = 'us-east-1'
         return self._region
 
     @property
     def s3_bucket_public_url(self):
-        return f'https://s3-{self.region}.amazonaws.com/{self.s3_bucket}'
+        return f'https://s3.{self.region}.amazonaws.com/{self.s3_bucket}'
 
     def build(self):
         if self.clean and os.path.exists(BUILD_DIRECTORY):
