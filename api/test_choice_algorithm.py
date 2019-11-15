@@ -17,7 +17,8 @@ import choice_algorithm
 import wheel
 import wheel_participant
 
-from utils import WheelParticipant
+from decimal import Decimal
+from utils import  Wheel, WheelParticipant, to_update_kwargs
 from boto3.dynamodb.conditions import Key
 from base import BadRequestError
 import random
@@ -83,7 +84,7 @@ def test_selection_cycle(mock_dynamodb, setup_data, mock_participant_table):
         return None
 
     rngstate = random.getstate()
-    random.seed(0) # Make the (otherwise pseudorandom) test repeatable.
+    random.seed(0)  # Make the (otherwise pseudorandom) test repeatable.
 
     participants = WheelParticipant.scan({})['Items']
     wheel = setup_data['wheel']
@@ -114,15 +115,18 @@ def test_selection_cycle(mock_dynamodb, setup_data, mock_participant_table):
         assert chosen_now_weight == 0
         total_weight_of_chosens += chosen_was_weight
 
-        assert abs(sum([participant['weight'] for participant in participants]) - len(participants)) < epsilon
+        total_weight = sum([participant['weight'] for participant in participants])
+        assert abs(total_weight - len(participants)) < epsilon
 
-    # Must match human-inspected reasonable values for the RNG seed defined above for number of times
-    # each participant was chosen, and the total weight of participants selected. These are a rough
-    # equivalent to ensuring that the sequence of chosen participants matches the observed test run.
+    # Must match human-inspected reasonable values for the RNG seed defined
+    # above for number of times each participant was chosen, and the total
+    # weight of participants selected. These are a rough equivalent to
+    # ensuring that the sequence of chosen participants matches the observed
+    #  test run.
     dv = list(distro.values())
     list.sort(dv)
-    human_observed_selection_counts = [23, 25, 26, 28, 29, 33, 36]
-    human_observed_total_weight = 319.4813047089203
+    human_observed_selection_counts = [26, 27, 27, 29, 29, 31, 31]
+    human_observed_total_weight = 317.8786415239279
     assert dv == human_observed_selection_counts
     assert abs(float(total_weight_of_chosens) - human_observed_total_weight) < epsilon
 
@@ -140,3 +144,126 @@ def test_reset_wheel(mock_dynamodb, setup_data, mock_participant_table):
 
     for weight in participant_weights:
         assert weight == 1
+
+
+def test_rebalance_wheel(setup_data, mock_participant_table):
+    def set_up_test(setup_data, mock_participant_table):
+        #  Select a participant to take everyone off their 1.0 scores.
+        choice_algorithm.select_participant(setup_data['wheel'], setup_data['participants'][0])
+
+        # Adjust participants to different weights to take the wheel out of balance.
+        participants = mock_participant_table.query(
+            KeyConditionExpression=Key('wheel_id').eq(setup_data['wheel']['id']))['Items']
+        with WheelParticipant.batch_writer() as batch:
+            for p in participants:
+                p['weight'] += Decimal(.15)
+                batch.put_item(Item=p)
+
+        # Confirm that the wheel is out of balance.
+        participants = mock_participant_table.query(
+            KeyConditionExpression=Key('wheel_id').eq(setup_data['wheel']['id']))['Items']
+        participant_weights = [participant['weight'] for participant in participants]
+
+        total_weight = Decimal(0)
+        for weight in participant_weights:
+            total_weight += weight
+        assert abs(total_weight-Decimal(8.05)) < epsilon
+
+    def complete_test(setup_data, mock_participant_table):
+        # Confirm that rebalancing has taken place.
+        participants = mock_participant_table.query(
+            KeyConditionExpression=Key('wheel_id').eq(setup_data['wheel']['id']))['Items']
+
+        participant_weights = [participant['weight'] for participant in participants]
+
+        total_weight = Decimal(0)
+        for weight in participant_weights:
+            total_weight += weight
+
+        assert abs(total_weight-len(participants)) < epsilon
+
+    set_up_test(setup_data, mock_participant_table)
+    # Select a participant to cause rebalancing to take place.
+    participants = mock_participant_table.query(
+        KeyConditionExpression=Key('wheel_id').eq(setup_data['wheel']['id']))['Items']
+    choice_algorithm.select_participant(setup_data['wheel'], participants[3])
+    complete_test(setup_data, mock_participant_table)
+
+
+def test_fix_incorrect_participant_count(mock_dynamodb, setup_data, mock_wheel_table):
+    out_of_whack = 999
+    wheel = setup_data['wheel']
+    wheel_id = wheel['id']
+    proper_participant_count = wheel['participant_count']
+
+    # # # # We will first test this on a select_participant operation.
+
+    #  Throw the participant count way out of whack.
+    mock_wheel_table.update_item(
+        Key={'id': wheel['id']},
+        **to_update_kwargs({'participant_count': out_of_whack})
+    )
+
+    participant_count = mock_wheel_table.query(
+        KeyConditionExpression=Key('id').eq(wheel['id']))['Items'][0].get('participant_count')
+
+    # #  Ensure it's out of whack.
+    assert abs(out_of_whack - participant_count) < epsilon
+
+    #  Select a participant to cause correction of participant count.
+    wheel = Wheel.get_existing_item(Key={'id': wheel_id})
+    choice_algorithm.select_participant(wheel, setup_data['participants'][0])
+
+    #  ...and ensure it's back into whack.
+    participant_count = mock_wheel_table.query(
+        KeyConditionExpression=Key('id').eq(wheel['id']))['Items'][0].get('participant_count')
+
+    assert abs(Decimal(proper_participant_count) - participant_count) < epsilon
+
+    # # # # We will next test this on a delete_participant operation.
+
+    #  Throw the participant count way out of whack.
+    mock_wheel_table.update_item(
+        Key={'id': wheel['id']},
+        **to_update_kwargs({'participant_count': out_of_whack})
+    )
+
+    participant_count = mock_wheel_table.query(
+        KeyConditionExpression=Key('id').eq(wheel['id']))['Items'][0].get('participant_count')
+
+    # #  Ensure it's out of whack.
+    assert abs(out_of_whack - participant_count) < epsilon
+
+    #  Delete a participant to cause correction of participant count.
+    event = {'body': {}, 'pathParameters': {'wheel_id': wheel_id, 'participant_id': setup_data['participants'][0]['id']}}
+    wheel_participant.delete_participant(event)
+
+    # #  ...and ensure it's back into whack.
+    participant_count = mock_wheel_table.query(
+        KeyConditionExpression=Key('id').eq(wheel['id']))['Items'][0].get('participant_count')
+
+    assert abs((Decimal(proper_participant_count)-1) - participant_count) < epsilon
+
+    # # # # We will next test this on a create_participant operation.
+
+    #  Throw the participant count way out of whack.
+    mock_wheel_table.update_item(
+        Key={'id': wheel['id']},
+        **to_update_kwargs({'participant_count': out_of_whack})
+    )
+
+    participant_count = mock_wheel_table.query(
+        KeyConditionExpression=Key('id').eq(wheel['id']))['Items'][0].get('participant_count')
+
+    # #  Ensure it's out of whack.
+    assert abs(out_of_whack - participant_count) < epsilon
+
+    #  Add a participant to cause correction of participant count.
+    event = {'pathParameters': {'wheel_id': wheel_id},'body': {'name': 'Ishmael-on-the-Sea','url': 'https://amazon.com'}}
+    wheel_participant.create_participant(event)
+
+    # #  ...and ensure it's back into whack.
+    participant_count = mock_wheel_table.query(
+        KeyConditionExpression=Key('id').eq(wheel['id']))['Items'][0].get('participant_count')
+
+    assert abs((Decimal(proper_participant_count)) - participant_count) < epsilon

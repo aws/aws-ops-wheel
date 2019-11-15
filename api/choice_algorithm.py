@@ -22,8 +22,8 @@ from decimal import Decimal
 def suggest_participant(wheel):
     """
     Suggest a participant given weights of all participants with randomization.
-    This is weighted selection where all participants start with a weight of 1, so the sum of the weights will always
-    equal the number of participants
+    This is weighted selection where all participants start with a weight of 1,
+    so the sum of the weights will always equal the number of participants
     :param wheel: Wheel dictionary:
     {
       "id": string ID of the wheel (DDB Hash Key),
@@ -37,11 +37,10 @@ def suggest_participant(wheel):
 
     query_params = {'KeyConditionExpression': Key('wheel_id').eq(wheel['id'])}
 
-    # selected_total_weight = random.random() * float(wheel['participant_count'])
     participants = WheelParticipant.iter_query(**query_params)
     selected_total_weight = random.random() * float(sum([participant['weight'] for participant in participants]))
 
-    # We do potentially want to return the last participant just as a safe-guard for rounding errors
+    # We do potentially want to return the last participant just as a safeguard for rounding errors
     participant = None
     for participant in WheelParticipant.iter_query(**query_params):
         selected_total_weight -= float(participant['weight'])
@@ -69,24 +68,32 @@ def select_participant(wheel, participant):
     }
     :return: None
     """
-    participant_count = wheel['participant_count']
 
+    num_participants = 0
     total_weight = Decimal(0)
     for p in WheelParticipant.iter_query(KeyConditionExpression=Key('wheel_id').eq(wheel['id'])):
+        num_participants = num_participants+1
         total_weight += p['weight']
-    factor = Decimal(participant_count) / total_weight
 
-    if participant_count > 1:
-        weight_share = participant['weight'] / Decimal(participant_count - 1)
+    # Factor is the number by which all weights must be multiplied
+    # so total weight will be equal to the number of participants.
+    factor = Decimal(num_participants) / total_weight
+
+    if num_participants > 1:
+        weight_share = participant['weight'] / Decimal(num_participants - 1)
         with WheelParticipant.batch_writer() as batch:
+            # Redistribute and normalize the weights.
             for p in WheelParticipant.iter_query(KeyConditionExpression=Key('wheel_id').eq(wheel['id'])):
                 if p['id'] == participant['id']:
                     p['weight'] = 0
                 else:
                     p['weight'] += Decimal(weight_share)
-                    p['weight'] *= factor  # This normalizes any imbalanced wheel back to an average of 1.0
+                    p['weight'] *= factor
                 batch.put_item(Item=p)
-
+    Wheel.update_item(
+        Key={'id': wheel['id']},
+        **to_update_kwargs({'participant_count': num_participants})
+    )
 
 def reset_wheel(wheel):
     """
@@ -118,9 +125,13 @@ def wrap_wheel_creation(wheel):
 def wrap_participant_creation(wheel, participant):
     participant['weight'] = 1
     yield
+    count = 0
+    with WheelParticipant.batch_writer() as batch:
+        for p in WheelParticipant.iter_query(KeyConditionExpression=Key('wheel_id').eq(wheel['id'])):
+            count += 1
     Wheel.update_item(
         Key={'id': wheel['id']},
-        **to_update_kwargs({'participant_count': wheel['participant_count'] + 1})
+        **to_update_kwargs({'participant_count': count})
     )
 
 
@@ -154,14 +165,16 @@ def on_participant_deletion(wheel, participant):
     weight = participant['weight']
     remaining_weight = total_weight - weight  # <-- no longer presumes existing weight balance via 'int(participant_count)'
     ratio = (1 + ((weight - 1) / remaining_weight)) if (remaining_weight != 0) else 1
+    num_participants = Decimal(0)
     with WheelParticipant.batch_writer() as batch:
         for p in WheelParticipant.iter_query(KeyConditionExpression=Key('wheel_id').eq(wheel['id'])):
             if p['id'] != participant['id']:
                 # This is cast to a string before turning into a decimal because of rounding/inexact guards in boto3
                 p['weight'] = Decimal(str(float(p['weight']) * float(ratio))) if (remaining_weight != 0) else 1
                 batch.put_item(Item=p)
+                num_participants = num_participants+1
 
     Wheel.update_item(
         Key={'id': wheel['id']},
-        **to_update_kwargs({'participant_count': Decimal(wheel['participant_count'] - 1)})
+        **to_update_kwargs({'participant_count': num_participants})
     )
