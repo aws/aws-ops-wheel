@@ -20,6 +20,7 @@ import tempfile
 import glob
 import os
 import uuid
+import re
 import logging
 
 LOG = logging.getLogger()
@@ -63,7 +64,6 @@ def list_stack_resources(initial_stack, *stacks):
 
 def format_important_message(message):
     return '\n'.join(['=' * len(message), message, '=' * len(message)])
-
 
 SOURCE_DIRECTORY = os.path.abspath(os.path.dirname(__file__))
 BUILD_DIRECTORY = os.path.join(SOURCE_DIRECTORY, 'build')
@@ -159,7 +159,7 @@ class DevManager:
         run('cp', '-vRL', BUILD_DIRECTORY, os.path.join(deploy_directory, 'build'))
         resource_directory = glob.glob(os.path.join(deploy_directory, 'build', 'static_*'))[0]
         build_id = os.path.basename(resource_directory)
-        run('aws', 's3', 'mv', '--recursive', '--acl', 'bucket-owner-full-control', resource_directory, f's3://{self.s3_bucket}/{build_id}')
+        run('aws', 's3', 'mv', '--recursive', '--acl', 'public-read', resource_directory, f's3://{self.s3_bucket}/{build_id}')
 
         LOG.info("Compiling the Cloudformation templates for the API")
         template_compile_script = os.path.join(deploy_directory, 'build', os.path.basename(TEMPLATE_COMPILE_SCRIPT))
