@@ -16,12 +16,19 @@ import json
 import choice_algorithm
 import wheel
 import wheel_participant
+
+from utils import WheelParticipant
 from boto3.dynamodb.conditions import Key
 from base import BadRequestError
+import random
+
+epsilon = 1E-6
 
 
 @pytest.fixture(autouse=True)
 def setup_data(mock_dynamodb):
+    names = ['Dan', 'Bob', 'Steve', 'Jerry', 'Frank', 'Alexa', 'Jeff']
+
     created_wheel = json.loads(wheel.create_wheel({'body': {'name': 'Test Wheel'}})['body'])
 
     create_participant_events = [{
@@ -32,7 +39,7 @@ def setup_data(mock_dynamodb):
             'name': name,
             'url': 'https://amazon.com'
         }
-    } for name in ['Dan', 'Alexa', 'Jeff']]
+    } for name in names]
 
     created_participants = [json.loads(wheel_participant.create_participant(event)['body']) for event in
                             create_participant_events]
@@ -59,16 +66,68 @@ def test_select_participant(mock_dynamodb, setup_data, mock_participant_table):
     participant_to_select = setup_data['participants'][0]
     choice_algorithm.select_participant(setup_data['wheel'], participant_to_select)
 
-    updated_participants = mock_participant_table.query(
+    participants = mock_participant_table.query(
         KeyConditionExpression=Key('wheel_id').eq(setup_data['wheel']['id']))['Items']
-    selected_participant = [participant for participant in updated_participants
+    selected_participant = [participant for participant in participants
                             if participant['id'] == participant_to_select['id']][0]
-    other_participants_weights = [participant['weight'] for participant in updated_participants
-                                  if participant['id'] != participant_to_select['id']]
 
     assert selected_participant['weight'] == 0
-    for weight in other_participants_weights:
-        assert weight == 1.5
+    assert abs(sum([participant['weight'] for participant in participants]) - len(participants)) < epsilon
+
+
+def test_selection_cycle(mock_dynamodb, setup_data, mock_participant_table):
+    def get_participant_with_id(participants, target_id):
+        for p in participants:
+            if p['id'] == target_id:
+                return p
+        return None
+
+    rngstate = random.getstate()
+    random.seed(0) # Make the (otherwise pseudorandom) test repeatable.
+
+    participants = WheelParticipant.scan({})['Items']
+    wheel = setup_data['wheel']
+    total_weight_of_chosens = 0
+    num_iterations = 200
+
+    distro = {}
+    for participant in participants:
+        distro[participant['name']] = 0
+
+    for _ in range(0, num_iterations):
+
+        chosen_id = choice_algorithm.suggest_participant(wheel)
+
+        chosen_was = get_participant_with_id(participants, chosen_id)
+        chosen_was_weight = chosen_was['weight']
+
+        distro[chosen_was['name']] = distro[chosen_was['name']] + 1
+
+        choice_algorithm.select_participant(wheel, chosen_was)
+
+        participants = WheelParticipant.scan({})['Items']
+
+        chosen_now = get_participant_with_id(participants, chosen_id)
+        chosen_now_weight = chosen_now['weight']
+
+        assert chosen_was_weight > 0.0
+        assert chosen_now_weight == 0
+        total_weight_of_chosens += chosen_was_weight
+
+        assert abs(sum([participant['weight'] for participant in participants]) - len(participants)) < epsilon
+
+    # Must match human-inspected reasonable values for the RNG seed defined above for number of times
+    # each participant was chosen, and the total weight of participants selected. These are a rough
+    # equivalent to ensuring that the sequence of chosen participants matches the observed test run.
+    dv = list(distro.values())
+    list.sort(dv)
+    human_observed_selection_counts = [23, 25, 26, 28, 29, 33, 36]
+    human_observed_total_weight = 319.4813047089203
+    assert dv == human_observed_selection_counts
+    assert abs(float(total_weight_of_chosens) - human_observed_total_weight) < epsilon
+
+    # Put things back the way they were.
+    random.setstate(rngstate)
 
 
 def test_reset_wheel(mock_dynamodb, setup_data, mock_participant_table):

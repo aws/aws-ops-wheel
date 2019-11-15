@@ -35,9 +35,12 @@ def suggest_participant(wheel):
     if wheel['participant_count'] == 0:
         raise BadRequestError("Cannot suggest a participant when the wheel doesn't have any!")
 
-    selected_total_weight = random.random() * float(wheel['participant_count'])
-
     query_params = {'KeyConditionExpression': Key('wheel_id').eq(wheel['id'])}
+
+    # selected_total_weight = random.random() * float(wheel['participant_count'])
+    participants = WheelParticipant.iter_query(**query_params)
+    selected_total_weight = random.random() * float(sum([participant['weight'] for participant in participants]))
+
     # We do potentially want to return the last participant just as a safe-guard for rounding errors
     participant = None
     for participant in WheelParticipant.iter_query(**query_params):
@@ -67,15 +70,21 @@ def select_participant(wheel, participant):
     :return: None
     """
     participant_count = wheel['participant_count']
-    # All other participants get a slice of that participant's weight while the participant is weighted to 0
+
+    total_weight = Decimal(0)
+    for p in WheelParticipant.iter_query(KeyConditionExpression=Key('wheel_id').eq(wheel['id'])):
+        total_weight += p['weight']
+    factor = Decimal(participant_count) / total_weight
+
     if participant_count > 1:
-        weight_share = participant['weight'] / (participant_count - 1)
+        weight_share = participant['weight'] / Decimal(participant_count - 1)
         with WheelParticipant.batch_writer() as batch:
             for p in WheelParticipant.iter_query(KeyConditionExpression=Key('wheel_id').eq(wheel['id'])):
                 if p['id'] == participant['id']:
                     p['weight'] = 0
                 else:
                     p['weight'] += Decimal(weight_share)
+                    p['weight'] *= factor  # This normalizes any imbalanced wheel back to an average of 1.0
                 batch.put_item(Item=p)
 
 
@@ -133,21 +142,23 @@ def on_participant_deletion(wheel, participant):
     {
       "id": string ID of the wheel (DDB Hash Key),
       "name": string name of the wheel,
-      "url": Participant"s URL,
+      "url": Participant's URL,
       "wheel_id": string ID of the wheel the participant belongs to,
     }
     :return: None
     """
+    total_weight = participant['weight']
+    for p in WheelParticipant.iter_query(KeyConditionExpression=Key('wheel_id').eq(wheel['id'])):
+        total_weight += p['weight']
 
-    weight = float(participant['weight'])
-    participant_count = wheel['participant_count']
-    remaining_weight = int(participant_count) - weight
-    ratio = (1 + (weight - 1) / remaining_weight) if (remaining_weight != 0) else 1
+    weight = participant['weight']
+    remaining_weight = total_weight - weight  # <-- no longer presumes existing weight balance via 'int(participant_count)'
+    ratio = (1 + ((weight - 1) / remaining_weight)) if (remaining_weight != 0) else 1
     with WheelParticipant.batch_writer() as batch:
         for p in WheelParticipant.iter_query(KeyConditionExpression=Key('wheel_id').eq(wheel['id'])):
             if p['id'] != participant['id']:
                 # This is cast to a string before turning into a decimal because of rounding/inexact guards in boto3
-                p['weight'] = Decimal(str(float(p['weight']) * ratio)) if (remaining_weight != 0) else 1
+                p['weight'] = Decimal(str(float(p['weight']) * float(ratio))) if (remaining_weight != 0) else 1
                 batch.put_item(Item=p)
 
     Wheel.update_item(
