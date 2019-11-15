@@ -1,4 +1,4 @@
-*Issue #, if available:*
+*Github Issue #, if in response to a github-tracked issue:*
 
 *Description of changes:*
 
