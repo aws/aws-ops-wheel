@@ -14,7 +14,8 @@
     "unit-test": "mocha --opts mocha.opts",
     "test-watch": "mocha --opts mocha.opts --watch",
     "start": "webpack-dev-server --compress --host 0.0.0.0 --public --content-base ./ -d --devtool source-map --inline --hot",
-    "flow": "flow"
+    "flow": "flow",
+    "preinstall": "npx npm-force-resolutions"
   },
   "nyc": {
     "include": [
@@ -66,6 +67,7 @@
     "jsdom": "^15.1.1",
     "jsdom-global": "^3.0.2",
     "mini-css-extract-plugin": "^0.5.0",
+    "minimist": "^1.2.5",
     "mocha": "^6.1.4",
     "nock": "^9.1.0",
     "nyc": "^14.1.1",
@@ -106,5 +108,8 @@
     "sshpk": "^1.13.2",
     "url-parse": "^1.4.3",
     "validate.js": "^0.12.0"
+  },
+  "resolutions": {
+    "minimist": "^1.2.5"
   }
 }
