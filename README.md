@@ -1,13 +1,13 @@
 # Introduction
-The AWS Ops Wheel is a tool that simulates a random selection from a group participants that weights away from participants recently chosen. For any group, the selection can also be rigged to suggest a particular participant that can be in a blatantly obvious (and sometimes hilarious) way.
+The AWS Ops Wheel is a tool that simulates a random selection from a group of participants that weights away from participants recently chosen. For any group, the selection can also be rigged to suggest a particular participant that will be selected in a blatantly obvious (and sometimes hilarious) way.
 
 Get your own in just a few clicks by starting here: [![Launch the Wheel](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-west-2.console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/create/review?filter=active&templateURL=https:%2F%2Fs3-us-west-2.amazonaws.com%2Faws-ops-wheel%2Fcloudformation-template.yml&stackName=AWSOpsWheel)
 
 Or, simply set up a CloudFormation stack using the S3 template url: https://s3-us-west-2.amazonaws.com/aws-ops-wheel/cloudformation-template.yml
 
-**We are aware of an issue where you can only run this stack in us-west-2 if you launch from this template, we are working on removing this limitation. This limitation does not apply if you build your own stack using the Development Guide below.**
+**We are aware of an [issue](/../../issues/3) where you can only run this stack in us-west-2 if you launch from this template, we are working on removing this limitation. This limitation does not apply if you build your own stack using the Development Guide below.**
 
-The endpoint will then be in the Cloudformation Stack Output messages.
+The endpoint will then be in the CloudFormation Stack Output messages.
 
 ## ScreenShots
 ### Wheels Table
