@@ -83,6 +83,12 @@ const EASE_OUT_FRAMES = 300;
 const LINEAR_FRAMES = 300;
 const RIGGING_PAUSE_FRAMES = 50;
 const MIN_FRAMES_BETWEEN_CLICKS = 5;
+const MAX_PARTICIPANT_NAME_LENGTH = 32;
+const MIN_PARTICIPANT_NAME_LENGTH = 4;
+// Dynamically truncate participant name length if number of participants crosses this number
+const FIXED_TRUNCATION_MAX_PARTICIPANTS = 50;
+// Number of characters to truncate at a time by
+const TRUNCATION_INCREMENT = 2;
 
 
 /**
@@ -189,6 +195,16 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
     this.wheelGraphic.y = CANVAS_SIZE / 2;
     this.wheelGraphic.addChild(graphics);
 
+    // If the wheel is too crowded, dynamically truncate the participant names based on the number of participants
+    let maxParticipantNameLength = MAX_PARTICIPANT_NAME_LENGTH;
+    if(participants.length > FIXED_TRUNCATION_MAX_PARTICIPANTS) {
+      for (let i = participants.length; i > FIXED_TRUNCATION_MAX_PARTICIPANTS; i -= 5) {
+        maxParticipantNameLength -= TRUNCATION_INCREMENT;
+        if(maxParticipantNameLength <= MIN_PARTICIPANT_NAME_LENGTH)
+          break;
+      }
+    }
+
     for (let i in participants) {
       i = parseInt(i);
       graphics.moveTo(0, 0);
@@ -198,7 +214,12 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
       graphics.closePath();
 
       let textPositionAngle = sectorSize * i - Math.atan(-0.5 * fontSize / OUTER_RADIUS) + Math.PI;
-      let basicText = new PIXI.Text(participants[i].name, {fontSize});
+      let participantName = participants[i].name;
+      if(participantName.length > maxParticipantNameLength) {
+        // Name should not exceed maximum length (minus 3 characters for the ellipsis)
+        participantName = participantName.substring(0, (maxParticipantNameLength - 3)) + '...';
+      }
+      let basicText = new PIXI.Text(participantName, {fontSize});
 
       basicText.x = TEXT_RADIUS * Math.cos(textPositionAngle);
       basicText.y = TEXT_RADIUS * Math.sin(textPositionAngle);
