@@ -220,6 +220,9 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
         participantName = participantName.substring(0, (maxParticipantNameLength - 3)) + '...';
       }
       let basicText = new PIXI.Text(participantName, {fontSize});
+      basicText.style.wordWrap = true;
+      basicText.style.wordWrapWidth = TEXT_RADIUS * 0.8;
+      basicText.style.align = 'center';
 
       basicText.x = TEXT_RADIUS * Math.cos(textPositionAngle);
       basicText.y = TEXT_RADIUS * Math.sin(textPositionAngle);
