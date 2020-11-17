@@ -22,7 +22,7 @@ import {LinkWrapper} from '../../util';
 
 interface ParticipantRowProps {
   participant: ParticipantType;
-  numParticipants: number;
+  totalParticipantWeight: number;
   rig: boolean;
   hidden: boolean;
   onEdit: Function;
@@ -66,7 +66,7 @@ export default class ParticipantRow extends Component<ParticipantRowProps> {
   }
 
   render(){
-    const {participant, numParticipants} = this.props;
+    const {participant, totalParticipantWeight} = this.props;
     const {participationModalOpen, confirmationModalOpen} = this.state;
 
     return (
@@ -78,7 +78,7 @@ export default class ParticipantRow extends Component<ParticipantRowProps> {
           <LinkWrapper to={participant.url} remote={true} target='_blank'>{participant.url}</LinkWrapper>
         </td>
         <td>
-          {(participant.weight / numParticipants * 100).toFixed(2)}%
+          {(participant.weight / totalParticipantWeight * 100).toFixed(2)}%
         </td>
         <td>
           <ParticipantModal isOpen={participationModalOpen}

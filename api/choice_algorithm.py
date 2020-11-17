@@ -109,10 +109,19 @@ def reset_wheel(wheel):
     count = 0
     with WheelParticipant.batch_writer() as batch:
         for p in WheelParticipant.iter_query(KeyConditionExpression=Key('wheel_id').eq(wheel['id'])):
-            p['weight'] = 1
+            p['weight'] = get_sub_wheel_size(p['name'])
             batch.put_item(Item=p)
             count += 1
     Wheel.update_item(Key={'id': wheel['id']}, **to_update_kwargs({'participant_count': count}))
+
+def get_sub_wheel_size(wheel_name):
+    resp = Wheel.query(
+              IndexName='name_index',
+              KeyConditionExpression=Key('name').eq(wheel_name)
+           )
+    if len(resp['Items']):  # if a matching wheel is found
+        return int(resp['Items'][0]['participant_count']) or 1  # if wheel size is 0, default to 1
+    return 1 # default to 1 if no matching wheel is found
 
 
 @contextlib.contextmanager
@@ -123,7 +132,7 @@ def wrap_wheel_creation(wheel):
 
 @contextlib.contextmanager
 def wrap_participant_creation(wheel, participant):
-    participant['weight'] = 1
+    participant['weight'] = get_sub_wheel_size(participant['name'])
     yield
     count = 0
     with WheelParticipant.batch_writer() as batch:
@@ -170,7 +179,8 @@ def on_participant_deletion(wheel, participant):
         for p in WheelParticipant.iter_query(KeyConditionExpression=Key('wheel_id').eq(wheel['id'])):
             if p['id'] != participant['id']:
                 # This is cast to a string before turning into a decimal because of rounding/inexact guards in boto3
-                p['weight'] = Decimal(str(float(p['weight']) * float(ratio))) if (remaining_weight != 0) else 1
+                p['weight'] = Decimal(str(float(p['weight']) * float(ratio))) if (remaining_weight != 0) else \
+                    get_sub_wheel_size(p['name'])
                 batch.put_item(Item=p)
                 num_participants = num_participants+1
 

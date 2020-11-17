@@ -37,8 +37,6 @@ describe('Wheel', function() {
     };
   }
 
-  console.log('participants: ', participants);
-
   const props = {
     location: H.createLocation('/'),
     match: {

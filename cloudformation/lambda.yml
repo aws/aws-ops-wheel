@@ -38,9 +38,9 @@ Resources:
             Fn::Join:
             - ''
             - - 'arn:aws:dynamodb:'
-              - {Ref: 'AWS::Region'}
+              - { Ref: 'AWS::Region' }
               - ':'
-              - {Ref: 'AWS::AccountId'}
+              - { Ref: 'AWS::AccountId' }
               - ':'
               - table/*
         Version: '2012-10-17'
@@ -52,18 +52,26 @@ Resources:
   participantDynamoDBTable:
     Properties:
       AttributeDefinitions:
-      - {AttributeName: id, AttributeType: S}
-      - {AttributeName: wheel_id, AttributeType: S}
+      - { AttributeName: id, AttributeType: S }
+      - { AttributeName: wheel_id, AttributeType: S }
       KeySchema:
-      - {AttributeName: wheel_id, KeyType: HASH}
-      - {AttributeName: id, KeyType: RANGE}
-      ProvisionedThroughput: {ReadCapacityUnits: '5', WriteCapacityUnits: '5'}
+      - { AttributeName: wheel_id, KeyType: HASH }
+      - { AttributeName: id, KeyType: RANGE }
+      ProvisionedThroughput: { ReadCapacityUnits: '5', WriteCapacityUnits: '5' }
     Type: AWS::DynamoDB::Table
   wheelDynamoDBTable:
     Properties:
       AttributeDefinitions:
-      - {AttributeName: id, AttributeType: S}
+        - { AttributeName: id, AttributeType: S }
+        - { AttributeName: name, AttributeType: S }
       KeySchema:
-      - {AttributeName: id, KeyType: HASH}
-      ProvisionedThroughput: {ReadCapacityUnits: '1', WriteCapacityUnits: '1'}
+        - { AttributeName: id, KeyType: HASH }
+      ProvisionedThroughput: { ReadCapacityUnits: '1', WriteCapacityUnits: '1' }
+      GlobalSecondaryIndexes:
+        - IndexName: name_index
+          KeySchema:
+          - { AttributeName: name, KeyType: HASH }
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput: { ReadCapacityUnits: '1', WriteCapacityUnits: '1' }
     Type: AWS::DynamoDB::Table

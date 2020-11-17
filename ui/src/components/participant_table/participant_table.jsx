@@ -194,12 +194,13 @@ export class ParticipantTable extends Component<ParticipantTableProps, Participa
       participantRows.push(<tr key='fetching'><td colSpan={6}>Loading...</td></tr>);
       participantModal = (<div style={{padding: '15px'}}>Loading...</div>);
     } else {
+      let totalParticipantWeight = participants.reduce((total, p) => (total + p.weight), 0)
       for (let participant of participants) {
         let isRig = rigging.participant_id === participant.id;
         let isHidden = isRig && rigging.hidden;
 
         participantRows.push(<ParticipantRow key={participant.id} participant={participant}
-                                                       numParticipants={participants.length}
+                                                       totalParticipantWeight={totalParticipantWeight}
                                                        rig={isRig}
                                                        hidden={isHidden}
                                                        onEdit={this.handleUpdateParticipant}
