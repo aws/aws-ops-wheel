@@ -240,3 +240,7 @@ Get the URL of the newly deployed application:
 ```
 aws cloudformation describe-stacks --stack-name AWSOpsWheel-application --query 'Stacks[0].Outputs[?OutputKey==`Endpoint`].OutputValue' --output text
 ```
+
+## Wheel Customization
+To change how fast wheels spin, modify `EASE_OUT_FRAMES` and `LINEAR_FRAMES` in `wheel.jsx`. 
+Lower values correspond to faster spinning.
