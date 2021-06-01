@@ -91,7 +91,7 @@
     "hoek": "^6.1.2",
     "isomorphic-fetch": "^3.0.0",
     "just-extend": "^4.0.0",
-    "lodash": "^4.17.19",
+    "lodash": "^4.17.21",
     "moment": "^2.19.3",
     "moment-timezone": "^0.5.14",
     "node-fetch": ">=2.6.1",
