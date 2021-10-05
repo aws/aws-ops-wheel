@@ -26,9 +26,11 @@ try {
 
 module.exports = {
   cache: true,
-
+  mode: 'development',
   devServer: {
-    disableHostCheck: true,
+    static: './',
+    hot: true,
+    allowedHosts: 'all',
     proxy: {
       // allows using local API endpoint when developing code
       '/app/api': {
@@ -66,7 +68,12 @@ module.exports = {
   devtool: (ENV === "production") ? "source-map" : "eval-cheap-module-source-map",
 
   resolve: {
-    extensions: [".jsx", ".js", ".json", ".css"]
+    extensions: [".jsx", ".js", ".json", ".css"],
+    fallback: {
+      "util": false,
+      "path": false
+    },
+
   },
 
   module: {
@@ -81,7 +88,7 @@ module.exports = {
         'css-loader'
       ]},
       { test: /\.(ttf|eot|otf|svg|woff(2)?)(\?[a-z0-9]+)?$/, use: {loader: 'file-loader'}},
-      { test: /\.mp3$|\.ico$/, use: {loader: 'file-loader', query: {name: '[name].[ext]'}}}
+      { test: /\.mp3$|\.ico$/, use: {loader: 'file-loader', options: {name: '[name].[ext]'}}}
     ],
   },
 

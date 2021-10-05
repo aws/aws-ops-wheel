@@ -18,7 +18,7 @@ import {Modal, Button, Form} from 'react-bootstrap';
 import {WheelType} from '../../types';
 
 export interface WheelModalProps {
-  isModalOpen: PropTypes.boolean;
+  isModalOpen: bool;
   wheel: WheelType | undefined;
   onClose: PropTypes.func;
   onSubmit: PropTypes.func;
@@ -26,7 +26,7 @@ export interface WheelModalProps {
 
 interface WheelModalState {
   wheel: WheelType;
-  isAdd: PropTypes.boolean;
+  isAdd: bool;
 }
 
 const defaultWheel: WheelType = {
