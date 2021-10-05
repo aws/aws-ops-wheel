@@ -23,7 +23,7 @@ import '../../static_content/favicon.ico';
 import {apiURL} from '../../util';
 
 interface WheelTableState {
-  isWheelModalOpen: PropTypes.boolean;
+  isWheelModalOpen: bool;
 }
 
 interface WheelTableProps {

@@ -22,8 +22,8 @@ import {formatDateTime} from '../../util';
 import {WheelType} from '../../types';
 
 export interface WheelRowState {
-  isWheelModalOpen: PropTypes.boolean;
-  isConfirmationModalOpen: PropTypes.boolean;
+  isWheelModalOpen: bool;
+  isConfirmationModalOpen: bool;
 }
 
 export interface WheelRowProps {

@@ -4,7 +4,7 @@ phases:
   build:
     commands:
       # Install node
-      - curl -sL https://deb.nodesource.com/setup_8.x | bash -
+      - curl -sL https://deb.nodesource.com/setup_14.x | bash -
       - apt-get install -y nodejs
       # Run UI tests
       - cd ui/
