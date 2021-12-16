@@ -542,6 +542,10 @@ Resources:
           - ArtifactsBucket
       VersioningConfiguration:
         Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
     Type: AWS::S3::Bucket
 
   SourceEvent:
@@ -628,4 +632,8 @@ Resources:
           - WebsiteAssetsBucket
       VersioningConfiguration:
         Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
     Type: AWS::S3::Bucket
