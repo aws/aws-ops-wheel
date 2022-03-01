@@ -1,0 +1,15 @@
+{
+  "full-trace": true,
+  "exit": true,
+  "extension": ["js", "jsx"],
+  "recursive": true,
+  "require": [
+    "./test/setup.js",
+    "core-js/stage/4",
+    "@babel/register",
+    "./test/globals.jsx",
+    "source-map-support/register",
+    "ignore-styles"
+  ],
+  "watch-files": ["test/*.test.js*", "test/**/*.test.js*"]
+}
