@@ -201,7 +201,7 @@ def main():
                     'Handler': f"{func.__module__}.{func.__name__}",
                     'MemorySize': 128,
                     'Role': GetAtt('AWSOpsWheelLambdaRole.Arn'),
-                    'Runtime': 'python3.6',
+                    'Runtime': 'python3.9',
                     'Timeout': 3
                 }
             }

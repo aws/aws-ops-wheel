@@ -64,6 +64,7 @@ export default class Login extends Component<LoginProps, LoginState> {
 
     // the api doesn't accept this field back
     delete userAttributes.email_verified;
+    delete userAttributes.email;
     this.setState({passwordChangeAttributes: userAttributes, error: undefined, password: '', isInFlight: false});
   };
 
