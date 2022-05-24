@@ -57,7 +57,7 @@ Resources:
       KeySchema:
       - { AttributeName: wheel_id, KeyType: HASH }
       - { AttributeName: id, KeyType: RANGE }
-      ProvisionedThroughput: { ReadCapacityUnits: '5', WriteCapacityUnits: '5' }
+      BillingMode: PAY_PER_REQUEST
     Type: AWS::DynamoDB::Table
   wheelDynamoDBTable:
     Properties:
@@ -66,12 +66,11 @@ Resources:
         - { AttributeName: name, AttributeType: S }
       KeySchema:
         - { AttributeName: id, KeyType: HASH }
-      ProvisionedThroughput: { ReadCapacityUnits: '1', WriteCapacityUnits: '1' }
+      BillingMode: PAY_PER_REQUEST
       GlobalSecondaryIndexes:
         - IndexName: name_index
           KeySchema:
           - { AttributeName: name, KeyType: HASH }
           Projection:
             ProjectionType: ALL
-          ProvisionedThroughput: { ReadCapacityUnits: '1', WriteCapacityUnits: '1' }
     Type: AWS::DynamoDB::Table

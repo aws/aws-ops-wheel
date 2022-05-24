@@ -49,10 +49,7 @@ def mock_dynamodb():
                 'AttributeType': 'S'
             }
         ],
-        ProvisionedThroughput={
-            'ReadCapacityUnits': 1,
-            'WriteCapacityUnits': 1
-        },
+        BillingMode='PAY_PER_REQUEST',
         GlobalSecondaryIndexes=[{
             'IndexName': 'name_index',
             'KeySchema': [{
@@ -61,10 +58,6 @@ def mock_dynamodb():
             }],
             'Projection': {
                 'ProjectionType': 'ALL'
-            },
-            'ProvisionedThroughput': {
-                'ReadCapacityUnits': 1,
-                'WriteCapacityUnits': 1
             }
           }]
     )
@@ -91,10 +84,7 @@ def mock_dynamodb():
                 'AttributeType': 'S'
             }
         ],
-        ProvisionedThroughput={
-            'ReadCapacityUnits': 5,
-            'WriteCapacityUnits': 5
-        }
+        BillingMode='PAY_PER_REQUEST'
     )
 
     #  Wait on table creation
