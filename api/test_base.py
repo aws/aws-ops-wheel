@@ -13,10 +13,10 @@
 
 import pytest
 import wheel
-from moto import mock_dynamodb2
+from moto import mock_dynamodb
 
 
-@mock_dynamodb2
+@mock_dynamodb
 def test_no_dynamodb_available():
     response = wheel.create_wheel({'body': {'name': 'DDB not available'}})
     assert response['statusCode'] == 500

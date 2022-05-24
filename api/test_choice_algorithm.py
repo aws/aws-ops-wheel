@@ -86,7 +86,7 @@ def test_selection_cycle(mock_dynamodb, setup_data, mock_participant_table):
     rngstate = random.getstate()
     random.seed(0)  # Make the (otherwise pseudorandom) test repeatable.
 
-    participants = WheelParticipant.scan({})['Items']
+    participants = WheelParticipant.scan()['Items']
     wheel = setup_data['wheel']
     total_weight_of_chosens = 0
     num_iterations = 200
@@ -106,7 +106,7 @@ def test_selection_cycle(mock_dynamodb, setup_data, mock_participant_table):
 
         choice_algorithm.select_participant(wheel, chosen_was)
 
-        participants = WheelParticipant.scan({})['Items']
+        participants = WheelParticipant.scan()['Items']
 
         chosen_now = get_participant_with_id(participants, chosen_id)
         chosen_now_weight = chosen_now['weight']

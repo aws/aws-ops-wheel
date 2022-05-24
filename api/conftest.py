@@ -14,8 +14,8 @@
 import os
 import pytest
 from boto3.session import Session
-from moto import mock_dynamodb2
-with mock_dynamodb2():
+from moto import mock_dynamodb as ddb_mock
+with ddb_mock():
     from utils import add_extended_table_functions
     import utils
 
@@ -23,10 +23,10 @@ WHEEL_TABLE_NAME = os.environ.get('WHEEL_TABLE', 'DevOpsWheel-Wheels')
 PARTICIPANT_TABLE_NAME = os.environ.get('PARTICIPANT_TABLE', 'DevOpsWheel-Participants')
 
 
-@pytest.yield_fixture(scope='session')
+@pytest.fixture(scope='session')
 def mock_dynamodb():
 
-    mock_dynamodb2().start()
+    ddb_mock().start()
 
     session = Session(aws_access_key_id='<ACCESS_KEY_ID>', aws_secret_access_key='<SECRET_KEY>')
     dynamodb = session.resource('dynamodb')
@@ -43,12 +43,30 @@ def mock_dynamodb():
             {
                 'AttributeName': 'id',
                 'AttributeType': 'S'
+            },
+            {
+                'AttributeName': 'name',
+                'AttributeType': 'S'
             }
         ],
         ProvisionedThroughput={
             'ReadCapacityUnits': 1,
             'WriteCapacityUnits': 1
-        }
+        },
+        GlobalSecondaryIndexes=[{
+            'IndexName': 'name_index',
+            'KeySchema': [{
+                'AttributeName': 'name',
+                'KeyType': 'HASH'
+            }],
+            'Projection': {
+                'ProjectionType': 'ALL'
+            },
+            'ProvisionedThroughput': {
+                'ReadCapacityUnits': 1,
+                'WriteCapacityUnits': 1
+            }
+          }]
     )
 
     participant_table = dynamodb.create_table(
@@ -85,7 +103,7 @@ def mock_dynamodb():
 
     yield dynamodb
 
-    mock_dynamodb2().stop()
+    ddb_mock().stop()
 
 
 @pytest.fixture
@@ -94,7 +112,7 @@ def mock_wheel_table(mock_dynamodb):
     add_extended_table_functions(Wheel)
     utils.Wheel = Wheel
     yield Wheel
-    wheels = Wheel.scan({})['Items']
+    wheels = Wheel.scan()['Items']
     with Wheel.batch_writer() as batch:
         for wheel in wheels:
             batch.delete_item(Key={'id': wheel['id']})
@@ -106,7 +124,7 @@ def mock_participant_table(mock_dynamodb):
     add_extended_table_functions(WheelParticipant)
     utils.WheelParticipant = WheelParticipant
     yield WheelParticipant
-    participants = WheelParticipant.scan({})['Items']
+    participants = WheelParticipant.scan()['Items']
     with WheelParticipant.batch_writer() as batch:
         for participant in participants:
             batch.delete_item(Key={'id': participant['id'], 'wheel_id': participant['wheel_id']})
