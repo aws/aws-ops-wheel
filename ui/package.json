@@ -59,7 +59,7 @@
     "enzyme-adapter-react-16": "^1.15.1",
     "file-loader": "^3.0.1",
     "flow-bin": "0.59.0",
-    "flow-typed": "^3.3.1",
+    "flow-typed": "^3.8.0",
     "glob-parent": "^5.1.2",
     "history": "^4.7.2",
     "html-loader": "^0.5.5",
