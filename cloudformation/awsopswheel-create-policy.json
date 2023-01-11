@@ -49,7 +49,10 @@
                 "s3:GetBucketLocation",
                 "iam:GetRolePolicy",
                 "lambda:RemovePermission",
-                "dynamodb:UpdateTable"
+                "dynamodb:UpdateTable",
+                "lambda:GetFunction",
+                "s3:GetEncryptionConfiguration",
+                "s3:PutEncryptionConfiguration"
             ],
             "Resource": [
                 "arn:aws:s3:::awsopswheelsourcebucket-*",
