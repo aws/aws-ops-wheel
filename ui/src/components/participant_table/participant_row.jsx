@@ -81,6 +81,9 @@ export default class ParticipantRow extends Component<ParticipantRowProps> {
           {(participant.weight / totalParticipantWeight * 100).toFixed(2)}%
         </td>
         <td>
+          {participant.selection_count || 0}
+        </td>
+        <td>
           <ParticipantModal isOpen={participationModalOpen}
                                  onSubmit={this.handleUpdateParticipant}
                                  onClose={this.toggleParticipationModal}
