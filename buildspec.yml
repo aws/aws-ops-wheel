@@ -25,7 +25,7 @@ phases:
       # Upload static website assets
       - mkdir deploy
       - export BUILD_ID=`echo $CODEBUILD_BUILD_ARN | awk -F':' '{print $NF}'`
-      - aws s3 mv --recursive --acl public-read build/static_* s3://$WEBSITE_ASSETS_BUCKET/$BUILD_ID
+      - aws s3 mv --recursive build/static_* s3://$WEBSITE_ASSETS_BUCKET/$BUILD_ID
       # Compile CloudFormation templates
       - cp -vRL build deploy/build
       - cp _compile_cloudformation_template.py build

@@ -137,11 +137,19 @@ region = us-west-2
 
 ## Test the code
 
-Currently we have unit tests for the API and the UI. To run the API unit tests, go to the ``<PATH_TO_YOUR_WORKSPACE>/api`` directory and run:
+Currently we have unit tests for the API and the UI. 
 
-```
-pytest --verbose --cov-report term-missing --cov ./ -s
-```
+To run the API unit tests: 
+* If you haven't already, go to the ``<PATH_TO_YOUR_WORKSPACE>`` directory and install the required dependencies using:
+  ```
+  pip install -r requirements.txt
+  ```
+* Go to the ``<PATH_TO_YOUR_WORKSPACE>/api`` directory and run:
+  ```
+  pytest --verbose --cov-report term-missing --cov ./ -s
+  ```
+  * If you see this error `NoRegionError: You must specify a region. `, export the region environment variable as follows:
+    `export AWS_DEFAULT_REGION=us-west-2`
 
 To run the UI unit tests, go to the ``<PATH_TO_YOUR_WORKSPACE>/ui`` directory and run:
 
