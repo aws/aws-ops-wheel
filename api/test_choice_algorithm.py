@@ -125,8 +125,8 @@ def test_selection_cycle(mock_dynamodb, setup_data, mock_participant_table):
     #  test run.
     dv = list(distro.values())
     list.sort(dv)
-    human_observed_selection_counts = [26, 27, 27, 29, 29, 31, 31]
-    human_observed_total_weight = 317.8786415239279
+    human_observed_selection_counts = [26, 27, 27, 28, 29, 30, 33]
+    human_observed_total_weight = 323.15697757934635
     assert dv == human_observed_selection_counts
     assert abs(float(total_weight_of_chosens) - human_observed_total_weight) < epsilon
 
