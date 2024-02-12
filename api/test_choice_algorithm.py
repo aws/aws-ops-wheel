@@ -64,16 +64,26 @@ def test_suggest_participant_no_participants(mock_dynamodb):
 
 
 def test_select_participant(mock_dynamodb, setup_data, mock_participant_table):
+    def get_participants(participant_to_select):
+        participants = mock_participant_table.query(
+            KeyConditionExpression=Key('wheel_id').eq(setup_data['wheel']['id']))['Items']
+        selected_participant = [participant for participant in participants
+                                if participant['id'] == participant_to_select['id']][0]
+        return participants, selected_participant
+    
     participant_to_select = setup_data['participants'][0]
     choice_algorithm.select_participant(setup_data['wheel'], participant_to_select)
 
-    participants = mock_participant_table.query(
-        KeyConditionExpression=Key('wheel_id').eq(setup_data['wheel']['id']))['Items']
-    selected_participant = [participant for participant in participants
-                            if participant['id'] == participant_to_select['id']][0]
-
+    participants, selected_participant = get_participants(participant_to_select)
     assert selected_participant['weight'] == 0
+    assert selected_participant['selection_count'] == 1
     assert abs(sum([participant['weight'] for participant in participants]) - len(participants)) < epsilon
+
+    # Select the same participant again to ensure selection_count was incremented
+
+    choice_algorithm.select_participant(setup_data['wheel'], participant_to_select)
+    _, selected_participant = get_participants(participant_to_select)
+    assert selected_participant['selection_count'] == 2
 
 
 def test_selection_cycle(mock_dynamodb, setup_data, mock_participant_table):
@@ -110,9 +120,11 @@ def test_selection_cycle(mock_dynamodb, setup_data, mock_participant_table):
 
         chosen_now = get_participant_with_id(participants, chosen_id)
         chosen_now_weight = chosen_now['weight']
+        chosen_now_selection_count = chosen_now['selection_count']
 
         assert chosen_was_weight > 0.0
         assert chosen_now_weight == 0
+        assert chosen_now_selection_count == distro[chosen_now['name']]
         total_weight_of_chosens += chosen_was_weight
 
         total_weight = sum([participant['weight'] for participant in participants])
@@ -141,9 +153,13 @@ def test_reset_wheel(mock_dynamodb, setup_data, mock_participant_table):
     updated_participants = mock_participant_table.query(
         KeyConditionExpression=Key('wheel_id').eq(setup_data['wheel']['id']))['Items']
     participant_weights = [participant['weight'] for participant in updated_participants]
+    participant_selection_counts = [participant['selection_count'] for participant in updated_participants]
 
     for weight in participant_weights:
         assert weight == 1
+
+    for selection_count in participant_selection_counts:
+        assert selection_count == 0
 
 
 def test_rebalance_wheel(setup_data, mock_participant_table):

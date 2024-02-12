@@ -32,4 +32,5 @@ export type ParticipantType = {
   wheel_id: string;
   created_at?: string;
   updated_at?: string;
+  selection_count?: number;
 }

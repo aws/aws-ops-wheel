@@ -86,6 +86,7 @@ def select_participant(wheel, participant):
             for p in WheelParticipant.iter_query(KeyConditionExpression=Key('wheel_id').eq(wheel['id'])):
                 if p['id'] == participant['id']:
                     p['weight'] = 0
+                    p['selection_count'] = p.get('selection_count', 0) + 1
                 else:
                     p['weight'] += Decimal(weight_share)
                     p['weight'] *= factor
@@ -110,6 +111,7 @@ def reset_wheel(wheel):
     with WheelParticipant.batch_writer() as batch:
         for p in WheelParticipant.iter_query(KeyConditionExpression=Key('wheel_id').eq(wheel['id'])):
             p['weight'] = get_sub_wheel_size(p['name'])
+            p['selection_count'] = 0
             batch.put_item(Item=p)
             count += 1
     Wheel.update_item(Key={'id': wheel['id']}, **to_update_kwargs({'participant_count': count}))

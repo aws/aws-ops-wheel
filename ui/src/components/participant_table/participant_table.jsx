@@ -263,7 +263,10 @@ export class ParticipantTable extends Component<ParticipantTableProps, Participa
     return (
       <div className='pageRoot'>
         <ConfirmationModal isModalOpen={resetModalOpen}
-                           message={'Are you sure you want to reset this wheel\'s weights? This action can\'t be undone.'}
+                           message={
+                            'Are you sure you want to reset this wheel\'s weights and selection count? ' +
+                            'This action can\'t be undone.'
+                           }
                            onConfirm={this.handleResetWheel}
                            closeModal={this.toggleResetModal}/>
         <h1 className='title'>
@@ -309,6 +312,7 @@ export class ParticipantTable extends Component<ParticipantTableProps, Participa
                   <th>Name</th>
                   <th>URL</th>
                   <th>Chance of Selection</th>
+                  <th>Selection Count</th>
                   <th>Operations</th>
                   <th>Rig</th>
                   <th>Hidden Rig</th>
