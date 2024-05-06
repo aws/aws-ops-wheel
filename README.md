@@ -236,7 +236,7 @@ git config --global credential.UseHttpPath true
 
 git remote add app `aws cloudformation describe-stacks --stack-name AWSOpsWheel --query 'Stacks[0].Outputs[?OutputKey==\`RepositoryCloneUrl\`].OutputValue' --output text`
 
-git push app master
+git push app main
 ```
 
 Wait for the pipeline to finish deploying:
