@@ -34,7 +34,7 @@ The endpoint will then be in the CloudFormation Stack Output messages.
 - Delete a wheel
 - Spin the wheel and suggest a participant
   - ***Notes:*** This does not adjust weighting, so if you're unhappy with the result, you can spin again.
-- Proceed: Accept the suggested participant
+- Choose: Accept the suggested participant
 - Reset: Restart all participants to equal weights as 1.0
 
 ### Participant Operations
