@@ -76,7 +76,7 @@
     "source-map-loader": "^0.2.3",
     "ssri": ">=8.0.1",
     "style-loader": "^3.3.1",
-    "webpack": "^5.76.0",
+    "webpack": "^5.95.0",
     "webpack-dev-server": "^4.3.1",
     "y18n": ">=3.2.2"
   },
