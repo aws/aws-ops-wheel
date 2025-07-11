@@ -14,7 +14,7 @@
 import os
 import pytest
 from boto3.session import Session
-from moto import mock_dynamodb as ddb_mock
+from moto import mock_aws as ddb_mock
 with ddb_mock():
     from utils import add_extended_table_functions
     import utils
