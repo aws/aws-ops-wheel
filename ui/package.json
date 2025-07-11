@@ -13,7 +13,7 @@
     "build-prod": "NODE_ENV=production webpack --progress --color --mode production",
     "unit-test": "mocha --config .mocharc.json",
     "test-watch": "mocha --config .mocharc.json --watch",
-    "start": "webpack-dev-server --compress --host 0.0.0.0",
+    "start": "webpack serve",
     "flow": "flow",
     "preinstall": "npx npm-force-resolutions"
   },
@@ -48,12 +48,13 @@
     "@babel/preset-flow": "^7.0.0",
     "@babel/preset-react": "^7.6.3",
     "@babel/register": "^7.6.2",
+    "ajv-keywords": "^5.1.0",
     "babel-loader": "^8.0.6",
     "babel-plugin-istanbul": "^5.1.4",
     "canvas": "^2.9.0",
     "chai": "^4.1.2",
     "chai-enzyme": "^1.0.0-beta.1",
-    "cheerio": "^1.0.0-rc.10",
+    "cheerio": "^1.1.0",
     "css-loader": "^6.8.1",
     "enzyme": "^3.10.0",
     "enzyme-adapter-react-16": "^1.15.1",
@@ -70,14 +71,14 @@
     "mini-css-extract-plugin": "^2.6.1",
     "minimist": "^1.2.6",
     "mocha": "^9.2.2",
-    "nock": "^9.1.0",
+    "nock": "^14.0.5",
     "nyc": "^15.1.0",
     "sinon": "^7.3.2",
     "source-map-loader": "^0.2.3",
     "ssri": ">=8.0.1",
     "style-loader": "^3.3.1",
     "webpack": "^5.95.0",
-    "webpack-dev-server": "^4.3.1",
+    "webpack-dev-server": "^5.2.2",
     "y18n": ">=3.2.2"
   },
   "dependencies": {
@@ -94,6 +95,7 @@
     "moment": "^2.29.4",
     "moment-timezone": "^0.5.35",
     "node-fetch": ">=3.2.10",
+    "nth-check": "^2.1.1",
     "pixi.js": "^4.6.2",
     "randomatic": "^3.0.0",
     "react": "^16.13.1",
@@ -111,9 +113,12 @@
     "url": "^0.11.0",
     "url-parse": "^1.5.8",
     "validate.js": "^0.12.0",
-    "webpack-cli": "^4.8.0",
+    "webpack-cli": "^6.0.1",
     "yargs-parser": "^20.2.7"
   },
   "name": "ui",
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "resolutions": {
+    "cheerio": "1.0.0-rc.3"
+  }
 }

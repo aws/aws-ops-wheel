@@ -28,17 +28,25 @@ module.exports = {
   cache: true,
   mode: 'development',
   devServer: {
-    static: './',
+    static: {
+      directory: './'
+    },
+    devMiddleware: {
+      writeToDisk: false
+    },
     hot: true,
     allowedHosts: 'all',
-    proxy: {
-      // allows using local API endpoint when developing code
-      '/app/api': {
+    host: '0.0.0.0',
+    port: 8080,
+    compress: true,
+    proxy: [
+      {
+        context: ['/app/api'],
         target: DEV_SERVER,
         changeOrigin: true,
         secure: true
-      },
-    },
+      }
+    ],
     historyApiFallback: {
         rewrites: [
             // allows to render index.development.html when the developer

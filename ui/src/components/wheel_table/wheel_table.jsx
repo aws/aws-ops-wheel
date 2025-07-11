@@ -19,7 +19,7 @@ import WheelRow from './wheel_row';
 import WheelModal from './wheel_modal';
 import {Well, Table, PageHeader, Button} from 'react-bootstrap';
 import {WheelType} from '../../types';
-import '../../static_content/favicon.ico';
+// import '../../static_content/favicon.ico'; // Favicon handled by HTML template
 import {apiURL} from '../../util';
 
 interface WheelTableState {
