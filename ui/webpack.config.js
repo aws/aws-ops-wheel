@@ -35,10 +35,13 @@ module.exports = {
       writeToDisk: false
     },
     hot: true,
-    allowedHosts: 'all',
-    host: '0.0.0.0',
+    allowedHosts: ['localhost', '127.0.0.1'],
+    host: 'localhost',
     port: 8080,
     compress: true,
+    client: {
+      webSocketURL: 'ws://localhost:8080/ws'
+    },
     proxy: [
       {
         context: ['/app/api'],
