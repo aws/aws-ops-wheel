@@ -54,7 +54,7 @@
     "canvas": "^2.9.0",
     "chai": "^4.1.2",
     "chai-enzyme": "^1.0.0-beta.1",
-    "cheerio": "^1.1.0",
+    "cheerio": "1.0.0-rc.12",
     "css-loader": "^6.8.1",
     "enzyme": "^3.10.0",
     "enzyme-adapter-react-16": "^1.15.1",
