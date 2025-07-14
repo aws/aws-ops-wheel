@@ -60,7 +60,7 @@
     "enzyme-adapter-react-16": "^1.15.1",
     "file-loader": "^6.1.1",
     "flow-bin": "0.59.0",
-    "flow-typed": "^3.8.0",
+    "flow-typed": "^4.1.1",
     "glob-parent": "^5.1.2",
     "history": "^4.7.2",
     "html-loader": "^5.0.0",
@@ -119,6 +119,9 @@
   "name": "ui",
   "version": "1.0.0",
   "resolutions": {
-    "cheerio": "1.0.0-rc.12"
+    "cheerio": "1.0.0-rc.12",
+    "@octokit/request": "8.4.1",
+    "@octokit/plugin-paginate-rest": "9.2.2",
+    "@octokit/request-error": "5.1.1"
   }
 }
