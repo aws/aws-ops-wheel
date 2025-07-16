@@ -21,7 +21,6 @@ import {createLogger} from 'redux-logger';
 import {createStore, applyMiddleware, combineReducers, compose} from 'redux';
 import {middleware as fetchMiddleware, reducer as repository} from 'react-redux-fetch';
 import 'bootstrap/dist/css/bootstrap.css';
-import 'bootstrap/dist/css/bootstrap-theme.css';
 import 'font-awesome/css/font-awesome.css';
 
 import App from './components/app';

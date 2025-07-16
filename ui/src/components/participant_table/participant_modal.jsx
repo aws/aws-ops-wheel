@@ -112,36 +112,31 @@ export default class ParticipantModal extends Component<ParticipantModalProps, P
 
     const heading = isAdd ? 'Add a new participant' : 'Edit an existing participant';
     const submitText = isAdd ? 'Add Participant' : 'Update Participant';
-    const modalStyle = {
-      position: 'fixed',
-      zIndex: 1040,
-      top: 0, bottom: 0, left: 0, right: 0
-    };
 
     const errors = isOpen ? this.getErrors() : [<div key='closedModal'>Modal is closed.</div>];
     const isDisabled = errors.length > 0;
 
     return (
       <div>
-        <Modal show={isOpen} onEntering={this.modalAfterOpen} onHide={this.modalOnClose} style={modalStyle}>
+        <Modal show={isOpen} onEntering={this.modalAfterOpen} onHide={this.modalOnClose} size="lg">
           <Form>
             <Modal.Header closeButton>
               <Modal.Title>{heading}</Modal.Title>
             </Modal.Header>
-            <Modal.Body className='form-group'>
-              <div className='form-group'>
-                <label htmlFor='participant-name' className='control-label'>Participant Name</label>
-                <input type='text' name='name' className='form-control' value={participant.name} onChange={this.onChange} />
-              </div>
-              <div className='form-group'>
-                <label htmlFor='participant-url' className='control-label'>Participant URL</label>
-                <input type='text' name='url' className='form-control' value={participant.url} onChange={this.onChange} />
-              </div>
+            <Modal.Body>
+              <Form.Group className='mb-3'>
+                <Form.Label htmlFor='participant-name'>Participant Name</Form.Label>
+                <Form.Control type='text' name='name' value={participant.name} onChange={this.onChange} />
+              </Form.Group>
+              <Form.Group className='mb-3'>
+                <Form.Label htmlFor='participant-url'>Participant URL</Form.Label>
+                <Form.Control type='text' name='url' value={participant.url} onChange={this.onChange} />
+              </Form.Group>
             </Modal.Body>
             <Modal.Footer>
               <div>{errors}</div>
               <Button onClick={this.modalOnClose}>Cancel</Button>
-              <Button type='submit' onClick={this.onSubmit} className='btn btn-success' disabled={isDisabled}>{submitText}</Button>
+              <Button type='submit' onClick={this.onSubmit} variant='success' disabled={isDisabled}>{submitText}</Button>
             </Modal.Footer>
           </Form>
         </Modal>

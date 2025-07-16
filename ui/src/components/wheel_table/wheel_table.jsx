@@ -17,7 +17,7 @@ import React, {PropTypes, Component} from 'react';
 import connect from 'react-redux-fetch';
 import WheelRow from './wheel_row';
 import WheelModal from './wheel_modal';
-import {Well, Table, PageHeader, Button} from 'react-bootstrap';
+import {Card, Table, Button} from 'react-bootstrap';
 import {WheelType} from '../../types';
 // import '../../static_content/favicon.ico'; // Favicon handled by HTML template
 import {apiURL} from '../../util';
@@ -111,21 +111,21 @@ export class WheelTable extends Component<WheelTableProps, WheelTableState> {
 
     return (
       <div className='pageRoot'>
-        <div className='container-fluid'>
-          <Well>
-            <PageHeader>
+        <div className='container-fluid' style={{marginTop: '1rem'}}>
+          <Card>
+            <Card.Header>
               <div className='tableHeader'>
                 List of available Wheels
                 <Button
-                  bsStyle='primary'
-                  bsSize='small'
+                  variant='primary'
+                  size='sm'
                   onClick={this.toggleWheelModal}
-                  className='pull-right'>
+                  className='float-end'>
                   Add New Wheel
                 </Button>
               </div>
-            </PageHeader>
-            <Table striped condensed hover>
+            </Card.Header>
+            <Table striped hover>
               <thead>
                 <tr>
                   <th>Wheel Name</th>
@@ -139,7 +139,7 @@ export class WheelTable extends Component<WheelTableProps, WheelTableState> {
                 {wheelRows}
               </tbody>
             </Table>
-          </Well>
+          </Card>
         </div>
         <WheelModal
           isModalOpen={isWheelModalOpen}

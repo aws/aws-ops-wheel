@@ -14,7 +14,7 @@
  */
 
 import React, {Component, PropTypes} from 'react';
-import {Navbar, Nav, NavItem} from 'react-bootstrap';
+import {Navbar, Nav} from 'react-bootstrap';
 import {LinkContainer} from 'react-router-bootstrap';
 import {CognitoUserPool} from 'amazon-cognito-identity-js';
 
@@ -28,23 +28,21 @@ class Navigation extends Component<NavigationProps> {
     const username = this.props.userPool.getCurrentUser().getUsername();
 
     return(
-      <Navbar fluid={true}>
-        <Navbar.Header>
-          <Navbar.Brand>
+      <Navbar expand="lg" className="px-3" style={{backgroundColor: '#EFEFEF', minHeight: '56px'}}>
+        <Nav style={{height: '100%'}}>
+          <Navbar.Brand className="me-3">
             The Wheel
           </Navbar.Brand>
-        </Navbar.Header>
-        <Nav>
-          <LinkContainer to="/app">
-            <NavItem eventKey={1}>Wheels</NavItem>
+          <LinkContainer to="/app" className="navbar-tab-active">
+            <Nav.Link eventKey={1}>Wheels</Nav.Link>
           </LinkContainer>
         </Nav>
-        <Nav pullRight>
-            <NavItem eventKey={3} onClick={this.props.userLogout}>Logout</NavItem>
+        <Nav className="ms-auto">
+          <Navbar.Text className="me-3">
+            Signed in as: <strong>{username}</strong>
+          </Navbar.Text>
+          <Nav.Link eventKey={3} onClick={this.props.userLogout}>Logout</Nav.Link>
         </Nav>
-        <Navbar.Text pullRight>
-          Signed in as: <strong>{username}</strong>
-        </Navbar.Text>
       </Navbar>
     )
   }

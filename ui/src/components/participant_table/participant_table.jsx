@@ -14,7 +14,7 @@
  */
 
 import React, {PropTypes, Component} from 'react';
-import {Well, Table, Button, PageHeader, ButtonGroup, ButtonToolbar} from 'react-bootstrap';
+import {Card, Table, Button, ButtonGroup, ButtonToolbar} from 'react-bootstrap';
 import connect from 'react-redux-fetch';
 import ParticipantRow from './participant_row';
 import ParticipantModal from './participant_modal';
@@ -216,7 +216,7 @@ export class ParticipantTable extends Component<ParticipantTableProps, Participa
                                               onClose={this.toggleParticipantModal}
                                               participant={undefined}
                                               participantList={participants} />
-                            <Button onClick={this.toggleParticipantModal} bsStyle='primary' bsSize='small' className='pull-right'>
+                            <Button onClick={this.toggleParticipantModal} variant='primary' size='sm' className='float-end'>
                               Add New Participant
                             </Button>
                           </div>)
@@ -246,7 +246,7 @@ export class ParticipantTable extends Component<ParticipantTableProps, Participa
               rigged.</div>
 
           unrigButton =
-            <Button onClick={this.unrigWheel} bsStyle='primary' bsSize='small' className='pull-right' >
+            <Button onClick={this.unrigWheel} variant='primary' size='sm' className='float-end' >
             Un-rig
             </Button>;
 
@@ -270,24 +270,30 @@ export class ParticipantTable extends Component<ParticipantTableProps, Participa
           <div className='title-text'>{wheelName}</div>
         </h1>
         <div className='container-fluid'>
-          <Well>
-            <LinkWrapper to=''>
-              <Button bsSize='xsmall' className='pull-left backButton'>
-                Back
-              </Button>
-            </LinkWrapper>
-            <LinkWrapper to={`wheel/${this.props.match.params.wheel_id}`}>
-              <Button bsSize='xsmall' className='pull-left'>
-                Go to Wheel
-              </Button>
-            </LinkWrapper>
+          <Card>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
+              <div style={{display: 'flex', gap: '10px'}}>
+                <LinkWrapper to=''>
+                  <Button size='sm' className='backButton'>
+                    Back
+                  </Button>
+                </LinkWrapper>
+                <LinkWrapper to={`wheel/${this.props.match.params.wheel_id}`}>
+                  <Button size='sm'>
+                    Go to Wheel
+                  </Button>
+                </LinkWrapper>
+              </div>
+              <div>
+                {riggingNotifications}
+              </div>
+            </div>
 
             <div className='notification' id='notification' />
-            {riggingNotifications}
-            <PageHeader>
+            <Card.Header>
               <div className='tableHeader'>
                 Participants
-                <ButtonToolbar className='pull-right'>
+                <ButtonToolbar className='float-end' style={{gap: '10px'}}>
                   <ButtonGroup>
                     {unrigButton}
                   </ButtonGroup>
@@ -295,15 +301,15 @@ export class ParticipantTable extends Component<ParticipantTableProps, Participa
                     {participantModal}
                   </ButtonGroup>
                   <ButtonGroup>
-                    <Button onClick={this.toggleResetModal} bsStyle='warning' bsSize='small' >
+                    <Button onClick={this.toggleResetModal} variant='warning' size='sm' >
                       Reset Weights
                     </Button>
                   </ButtonGroup>
                 </ButtonToolbar>
               </div>
-            </PageHeader>
+            </Card.Header>
             {this.state.errorVisible ? <div className='errorNotification'>Participant already exists</div> : null}
-            <Table striped condensed hover>
+            <Table striped hover>
               <thead>
                 <tr>
                   <th>Name</th>
@@ -318,7 +324,7 @@ export class ParticipantTable extends Component<ParticipantTableProps, Participa
                 {participantRows}
               </tbody>
             </Table>
-          </Well>
+          </Card>
         </div>
       </div>
     )

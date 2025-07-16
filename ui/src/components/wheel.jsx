@@ -358,9 +358,9 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
       }
     } else {
       header = <div style={{position: 'relative'}}>
-        <div style={{fontSize: '3vmin', textAlign: 'center', 'width': '100%'}}>
-          {wheel.name}
-        </div>
+        <h1 className='title'>
+          <div className='title-text'>{wheel.name}</div>
+        </h1>
         <h3 style={{display: participants.length === 0 ? 'inline-flex' : 'none'}}>
           You don't have any partcipants!
         </h3>
@@ -374,30 +374,33 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
                src={this.state.clickUrl}
                type='audio/mpeg' />
         {header}
-        <div style={{
-            float: 'left',
-            display: 'inline',
-            'padding-left': '1em',
-          }}
-        >
+        <div style={{position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 0 10px 0'}}>
           <Button
             id='btnSoundToggle'
             onClick={this.toggleSound}
             ref='btnSoundToggle'
+            size='md'
+            style={{
+              position: 'absolute',
+              left: '1em',
+              height: '38px',
+              display: 'flex',
+              alignItems: 'center'
+            }}
           >
             {isMuted ? '🔇' : '🔊'}
           </Button>
-        </div>
-        <div style={{textAlign: 'center', display: 'flex', justifyContent: 'space-around'}}>
-          <LinkWrapper to={`wheel/${this.props.match.params.wheel_id}/participant`} style={{
-            margin: '5px'
-          }}>
-            <Button>Edit participants</Button>
-          </LinkWrapper>
-          <Button bsStyle='primary' bsSize='large' disabled={participantName === undefined}   onClick={this.openParticipantPage}
-          style={{margin: '5px'}}>
-              Choose  <b>{participantName}</b>
-          </Button>
+          <div style={{textAlign: 'center', display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: '10px'}}>
+            <LinkWrapper to={`wheel/${this.props.match.params.wheel_id}/participant`} style={{
+              margin: '5px'
+            }}>
+              <Button size='md' style={{height: '38px', display: 'flex', alignItems: 'center'}}>Edit participants</Button>
+            </LinkWrapper>
+            <Button variant='primary' size='md' disabled={participantName === undefined} onClick={this.openParticipantPage}
+            style={{margin: '5px', height: '38px', display: 'flex', alignItems: 'center'}}>
+                Choose{participantName && <>&nbsp;<b>{participantName}</b></>}
+            </Button>
+          </div>
         </div>
         <div style={{
           display: participants !== undefined && participants.length > 0 ? 'block' : 'none',
@@ -427,7 +430,7 @@ export class Wheel extends PureComponent<WheelProps, WheelState> {
               overflow: 'hidden',
               borderRadius: '50%',
             }} />
-          <Button bsStyle='primary' disabled={isSpinning || participants === undefined || participants.length === 0}
+          <Button variant='primary' disabled={isSpinning || participants === undefined || participants.length === 0}
             id='btnSpin'
             style={{
             position: 'absolute',

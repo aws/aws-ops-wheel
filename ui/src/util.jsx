@@ -67,18 +67,27 @@ export class LinkWrapper extends Component {
   render () {
     let link: any;
     let props: Object = Object.assign({}, this.props);
+    const isRemote = props.remote === true;
 
-    if (props.remote !== true)
+    if (!isRemote)
       props.to = `/app/${props.to}`;
 
     if ('remote' in props)
       delete props.remote;
 
     if (process.env.NODE_ENV === 'test')
-      link = <div> {props.to}`} {props.children} </div>;
-    else
+      link = <div> {props.to} {props.children} </div>;
+    else {
       /* istanbul ignore next */
-      link = <Link {...props}>{props.children}</Link>;
+      if (isRemote) {
+        // For external URLs, use regular anchor tag
+        const {to, ...anchorProps} = props;
+        link = <a href={to} {...anchorProps}>{props.children}</a>;
+      } else {
+        // For internal routes, use React Router Link
+        link = <Link {...props}>{props.children}</Link>;
+      }
+    }
 
     return (
       <div>
