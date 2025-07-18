@@ -246,32 +246,32 @@ Alternative: Manual approach
 Get CloudFront domain
 ```
 CLOUDFRONT_DOMAIN=$(aws cloudformation describe-stacks --stack-name AWSOpsWheel-CloudFront --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDomainName`].OutputValue' --output text --region us-west-2)
-'''
+```
 
 Point frontend to CloudFront
-'''
+```
 echo "module.exports = 'https://$CLOUDFRONT_DOMAIN';" > ui/development_app_location.js
-'''
+```
 Rebuild and deploy (with fixed static directory selection)
-'''
+```
 ./run build_ui
 NEW_STATIC_DIR=$(ls -t build/ | grep static_ | head -1)
 aws s3 sync build/$NEW_STATIC_DIR/ s3://$S3_BUCKET/app/static/ --region us-west-2
-'''
+```
 
 Optional: Clear CloudFront cache
-'''
+```
 DISTRIBUTION_ID=$(aws cloudformation describe-stacks --stack-name AWSOpsWheel-CloudFront --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDistributionId`].OutputValue' --output text --region us-west-2)
 aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*" --region us-west-2
-'''
+```
 
 Optional: Clean up old local static directories (keep last 2)
-'''
+```
 cd build && ls -t | grep static_ | tail -n +3 | xargs -r rm -rf
-'''
+```
 
 The output will be your resulting CloudFront Domain.
-'''
+```
 echo "CloudFront Domain: $CLOUDFRONT_DOMAIN"
 ```
 
