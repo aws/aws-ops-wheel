@@ -159,6 +159,29 @@ npm run test
 
 ## Build and deploy the code
 
+### Option 1: Streamlined Deployment (Recommended)
+
+**For initial deployment:**
+```
+# Full deployment with CloudFront
+./deploy.sh --email your@email.com
+
+# With custom suffix (for multiple environments)
+./deploy.sh --email your@email.com --suffix dev
+
+```
+
+**For app updates:**
+```
+# Quick app update (most common use case)
+./update-app.sh
+
+# OR using the main deploy script
+./deploy.sh --update-only
+```
+
+### Option 2: Manual Deployment
+
 Go to the ``<PATH_TO_YOUR_WORKSPACE>`` directory and run:
 
 ```
@@ -179,6 +202,81 @@ This will:
     - Create the lambda execution IAM role
     - Create the swagger configuration for API Gateway that points the paths to their functions
 - Deploy the template directly to CloudFormation through update or create, depending on if it's a new stack
+
+Get Your Resource IDs
+```
+# Run this script to get your resource information
+API_GATEWAY_ID=$(aws cloudformation describe-stacks --stack-name AWSOpsWheel --query 'Stacks[0].Outputs[?OutputKey==`AWSOpsWheelAPI`].OutputValue' --output text --region us-west-2)
+S3_BUCKET=$(aws cloudformation list-stack-resources --stack-name AWSOpsWheelSourceBucket --query 'StackResourceSummaries[?LogicalResourceId==`SourceS3Bucket`].PhysicalResourceId' --output text --region us-west-2)
+STATIC_DIR=$(aws s3 ls s3://$S3_BUCKET/ | grep static_ | awk '{print $2}' | sed 's|/||')
+
+echo "API Gateway: $API_GATEWAY_ID"
+echo "S3 Bucket: $S3_BUCKET"
+echo "Static Directory: $STATIC_DIR"
+```
+
+Deploy CloudFront (Secure Layer)
+```
+sed -i.bak \
+  -e "s/awsopswheelsourcebucket-sources3bucket-bt0e08ghcrwg/$S3_BUCKET/g" \
+  -e "s/f3btejjb3m.execute-api.us-west-2.amazonaws.com/$API_GATEWAY_ID.execute-api.us-west-2.amazonaws.com/g" \
+  -e "s/static_b05d2340-920c-437a-8243-cf52fef45f80/$STATIC_DIR/g" \
+  cloudformation/s3-cloudfront-secure.yml
+
+aws cloudformation create-stack \
+  --stack-name AWSOpsWheel-CloudFront \
+  --template-body file://cloudformation/s3-cloudfront-secure.yml \
+  --region us-west-2
+
+aws cloudformation wait stack-create-complete --stack-name AWSOpsWheel-CloudFront --region us-west-2
+```
+
+This will update template with your resources and deploy (takes 5-20 minutes)
+
+**Configure & Rebuild Frontend**
+
+Recommended: Use the streamlined deployment script
+```
+# This handles everything automatically, including cleanup
+./deploy.sh --update-only
+```
+
+Alternative: Manual approach
+
+Get CloudFront domain
+```
+CLOUDFRONT_DOMAIN=$(aws cloudformation describe-stacks --stack-name AWSOpsWheel-CloudFront --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDomainName`].OutputValue' --output text --region us-west-2)
+'''
+
+Point frontend to CloudFront
+'''
+echo "module.exports = 'https://$CLOUDFRONT_DOMAIN';" > ui/development_app_location.js
+'''
+Rebuild and deploy (with fixed static directory selection)
+'''
+./run build_ui
+NEW_STATIC_DIR=$(ls -t build/ | grep static_ | head -1)
+aws s3 sync build/$NEW_STATIC_DIR/ s3://$S3_BUCKET/app/static/ --region us-west-2
+'''
+
+Optional: Clear CloudFront cache
+'''
+DISTRIBUTION_ID=$(aws cloudformation describe-stacks --stack-name AWSOpsWheel-CloudFront --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDistributionId`].OutputValue' --output text --region us-west-2)
+aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*" --region us-west-2
+'''
+
+Optional: Clean up old local static directories (keep last 2)
+'''
+cd build && ls -t | grep static_ | tail -n +3 | xargs -r rm -rf
+'''
+
+The output will be your resulting CloudFront Domain.
+'''
+echo "CloudFront Domain: $CLOUDFRONT_DOMAIN"
+```
+
+For regular updates, just use `./update-app.sh`
+
 
 ## Start Local Dev Server
 Go to the ``<PATH_TO_YOUR_WORKSPACE>/ui`` directory and run:
@@ -210,11 +308,43 @@ $ aws cloudformation list-stacks
 
 ## Delete Stack
 
-To delete existing stack:
+To delete existing stack (replace SUFFIX_NAME with your actual suffix or omit if no suffix):
 
+Step 1: Delete CloudFront first
 ```
-$ aws cloudformation delete-stack [--suffix SUFFIX_NAME]
+aws cloudformation delete-stack --stack-name AWSOpsWheel-CloudFront --region us-west-2
+# Or with suffix:
+# aws cloudformation delete-stack --stack-name AWSOpsWheel-SUFFIX_NAME-CloudFront --region us-west-2
 ```
+
+Step 2: Empty S3 bucket (REQUIRED before deleting source bucket stack)
+```
+# Get the S3 bucket name
+S3_BUCKET=$(aws cloudformation list-stack-resources \
+    --stack-name AWSOpsWheelSourceBucket \
+    --query 'StackResourceSummaries[?LogicalResourceId==`SourceS3Bucket`].PhysicalResourceId' \
+    --output text \
+    --region us-west-2)
+
+# Empty the S3 bucket
+aws s3 rm s3://$S3_BUCKET --recursive --region us-west-2
+
+# Verify bucket is empty
+aws s3 ls s3://$S3_BUCKET --region us-west-2
+```
+
+Step 3: Delete main stacks
+```
+# Delete main application stack
+aws cloudformation delete-stack --stack-name AWSOpsWheel --region us-west-2
+# Or with suffix:
+# aws cloudformation delete-stack --stack-name AWSOpsWheel-SUFFIX_NAME --region us-west-2
+
+# Delete source bucket stack (now that bucket is empty)
+aws cloudformation delete-stack --stack-name AWSOpsWheelSourceBucket --region us-west-2
+```
+
+If the bucket cannot be deleted with the command, the user can manually empty and delete the S3 Bucket on their console.
 
 ## Set up continuous deployment
 
