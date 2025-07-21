@@ -53,15 +53,15 @@ export default class ConfirmationModal extends React.Component<ConfirmationModal
         <Modal.Footer>
           <Button
             onClick={this.close}
-            bsStyle='success'
-            bsSize='small'
+            variant='success'
+            size='sm'
           >
             Cancel
           </Button>
           <Button
             onClick={this.onConfirm}
-            bsStyle='danger'
-            bsSize='small'
+            variant='danger'
+            size='sm'
           >
             Yes
           </Button>

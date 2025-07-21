@@ -323,7 +323,7 @@ describe('ParticipantTable', function() {
 
       const wrapper = shallowWithStore(
         <ParticipantTable {...Object.assign({}, props, shallowProps, testProps, dispatchProps)} />);
-      expect(wrapper.html()).to.contain('Wheel information could not be loaded');
+      expect(wrapper.text()).to.contain('Wheel information could not be loaded');
     });
 
   it('Should render an error message if participants could not be fetched and the wheel is rigged', () => {
@@ -340,7 +340,7 @@ describe('ParticipantTable', function() {
     wrapper.instance().setState({wheel: {}});
     wrapper.instance().setState({rigging: {participant_id: 'test_id', hidden: false}});
     wrapper.update();
-    expect(wrapper.html()).to.contain('Participant information could not be loaded.');
+    expect(wrapper.text()).to.contain('Participant information could not be loaded.');
   });
 
   it('Should render loading if participants are still fetching and wheel is rigged', () => {
@@ -357,6 +357,6 @@ describe('ParticipantTable', function() {
     wrapper.instance().setState({wheel: {}});
     wrapper.instance().setState({rigging: {participant_id: 'test_id', hidden: false}});
     wrapper.update();
-    expect(wrapper.html()).to.contain('Loading participant information...');
+    expect(wrapper.text()).to.contain('Loading participant information...');
   });
 });

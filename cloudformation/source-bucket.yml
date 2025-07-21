@@ -18,7 +18,7 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       VersioningConfiguration:
-        Status: Enabled
+        Status: Suspended
       AccessControl: BucketOwnerRead
       BucketEncryption:
         ServerSideEncryptionConfiguration:

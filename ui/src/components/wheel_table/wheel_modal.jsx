@@ -79,11 +79,6 @@ export default class WheelModal extends Component<WheelModalProps, WheelModalSta
 
     const heading: string = isAdd ? 'Add a new wheel' : 'Edit an existing wheel';
     const submitText: string = isAdd ? 'Add Wheel' : 'Update Wheel';
-    const modalStyle = {
-      position: 'fixed',
-      zIndex: 1040,
-      top: 0, bottom: 0, left: 0, right: 0
-    };
 
     return (
       <div>
@@ -91,24 +86,25 @@ export default class WheelModal extends Component<WheelModalProps, WheelModalSta
           show={isModalOpen}
           onEntering={this.modalAfterOpen}
           onHide={this.onClose}
-          style={modalStyle}
+          size="lg"
         >
           <Modal.Header closeButton>
             <Modal.Title>{heading}</Modal.Title>
           </Modal.Header>
-          <Modal.Body className='form-group'>
+          <Modal.Body>
             <Form>
-              <div className='form-group'>
-                <label htmlFor='wheel-name' className='control-label'>Wheel Name</label>
-                <input
+              <Form.Group className='mb-3'>
+                <Form.Label htmlFor='wheel-name'>Wheel Name</Form.Label>
+                <Form.Control
                   type='text'
                   name='name'
-                  className='form-control'
                   onChange={this.onChange}
                   value={wheel.name}
                 />
-              </div>
-              <Modal.Footer>
+              </Form.Group>
+            </Form>
+          </Modal.Body>
+          <Modal.Footer>
                 <Button
                   onClick={this.onClose}>
                   Cancel
@@ -116,13 +112,11 @@ export default class WheelModal extends Component<WheelModalProps, WheelModalSta
                 <Button
                   type='submit'
                   onClick={this.onSubmit}
-                  className='btn btn-success'
+                  variant='success'
                   disabled={!this.state.wheel.name}>
                   {submitText}
                 </Button>
-              </Modal.Footer>
-            </Form>
-          </Modal.Body>
+          </Modal.Footer>
         </Modal>
       </div>
     );

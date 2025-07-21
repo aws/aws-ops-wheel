@@ -52,7 +52,11 @@
                 "dynamodb:UpdateTable",
                 "lambda:GetFunction",
                 "s3:GetEncryptionConfiguration",
-                "s3:PutEncryptionConfiguration"
+                "s3:PutEncryptionConfiguration",
+                "s3:PutBucketPublicAccessBlock",
+                "s3:GetBucketPublicAccessBlock",
+                "s3:GetBucketVersioning",
+                "s3:ListBucketVersions"
             ],
             "Resource": [
                 "arn:aws:s3:::awsopswheelsourcebucket-*",
@@ -63,7 +67,7 @@
                 "arn:aws:codecommit:*:*:AWSOpsWheel*",
                 "arn:aws:codebuild:*:*:project/AWSOpsWheel*",
                 "arn:aws:events:*:*:rule/AWSOpsWheel-*",
-                "arn:aws:cloudformation:*:*:stack/AWSOpsWheelSourceBucket/*",
+                "arn:aws:cloudformation:*:*:stack/AWSOpsWheelSourceBucket*/*",
                 "arn:aws:cloudformation:*:*:stack/AWSOpsWheel/*",
                 "arn:aws:cloudformation:*:*:stack/AWSOpsWheel-*/*",
                 "arn:aws:apigateway:*::/restapis",
@@ -77,11 +81,16 @@
             "Action": [
                 "lambda:CreateFunction",
                 "cloudformation:ListStacks",
+                "cloudformation:ValidateTemplate",
+                "cloudformation:GetTemplate",
+                "cloudformation:DescribeStackEvents",
+                "cloudformation:DescribeStackResources",
                 "cognito-identity:*",
                 "dynamodb:UntagResource",
                 "dynamodb:ListTables",
                 "events:PutRule",
                 "lambda:UpdateFunctionConfiguration",
+                "lambda:ListFunctions",
                 "iam:ListRoles",
                 "codecommit:CreateRepository",
                 "codecommit:ListRepositories",
@@ -90,7 +99,23 @@
                 "iam:ListOpenIDConnectProviders",
                 "cognito-idp:*",
                 "codebuild:ListProjects",
-                "sns:ListPlatformApplications"
+                "sns:ListPlatformApplications",
+                "s3:ListAllMyBuckets",
+                "cloudfront:CreateDistribution",
+                "cloudfront:UpdateDistribution",
+                "cloudfront:DeleteDistribution",
+                "cloudfront:GetDistribution",
+                "cloudfront:GetDistributionConfig",
+                "cloudfront:ListDistributions",
+                "cloudfront:TagResource",
+                "cloudfront:UntagResource",
+                "cloudfront:ListTagsForResource",
+                "cloudfront:CreateOriginAccessControl",
+                "cloudfront:DeleteOriginAccessControl",
+                "cloudfront:GetOriginAccessControl",
+                "cloudfront:UpdateOriginAccessControl",
+                "cloudfront:ListOriginAccessControls",
+                "cloudfront:CreateInvalidation"
             ],
             "Resource": "*"
         },
@@ -108,6 +133,20 @@
                 "arn:aws:codebuild:*:*:project/AWSOpsWheel*",
                 "arn:aws:s3:::awsopswheelsourcebucket-*/*",
                 "arn:aws:s3:::awsopswheel-*/*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+                "logs:DescribeLogGroups",
+                "logs:DescribeLogStreams"
+            ],
+            "Resource": [
+                "arn:aws:logs:*:*:log-group:/aws/lambda/AWSOpsWheel-*",
+                "arn:aws:logs:*:*:log-group:/aws/lambda/AWSOpsWheel-*:*"
             ]
         },
         {

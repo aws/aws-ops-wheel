@@ -84,8 +84,10 @@ class DevManager:
     def __init__(self, suffix, clean, email):
         if suffix is not None:
             self.stack_name = '-'.join([STACK_PREFIX, suffix])
+            self.source_bucket_stack_name = '-'.join([SOURCE_BUCKET_STACK_NAME, suffix])
         else:
             self.stack_name = STACK_PREFIX
+            self.source_bucket_stack_name = SOURCE_BUCKET_STACK_NAME
         self.clean = clean
         self.email = email
         self._s3_bucket = None
@@ -94,14 +96,14 @@ class DevManager:
     @property
     def s3_bucket(self):
         if self._s3_bucket is None:
-            if not stack_exists(SOURCE_BUCKET_STACK_NAME):
+            if not stack_exists(self.source_bucket_stack_name):
                 cf(
                     'create-stack',
                     '--template-body', open(os.path.join(TEMPLATE_DIRECTORY, 'source-bucket.yml')).read(),
-                    '--stack-name', SOURCE_BUCKET_STACK_NAME,
+                    '--stack-name', self.source_bucket_stack_name,
                 )
-                cf('wait', 'stack-create-complete', '--stack-name', SOURCE_BUCKET_STACK_NAME)
-            self._s3_bucket = list_stack_resources(SOURCE_BUCKET_STACK_NAME)['SourceS3Bucket']['PhysicalResourceId']
+                cf('wait', 'stack-create-complete', '--stack-name', self.source_bucket_stack_name)
+            self._s3_bucket = list_stack_resources(self.source_bucket_stack_name)['SourceS3Bucket']['PhysicalResourceId']
         return self._s3_bucket
 
     @property
@@ -135,7 +137,24 @@ class DevManager:
         run('npm', 'run', 'build-prod')
 
         build_id = str(uuid.uuid4())
-        run('mv', os.path.join(BUILD_DIRECTORY, 'static'), os.path.join(BUILD_DIRECTORY, f'static_{build_id}'))
+        static_dir = os.path.join(BUILD_DIRECTORY, 'static')
+        
+        # Check if static directory exists and has content
+        if os.path.exists(static_dir) and os.listdir(static_dir):
+            run('mv', static_dir, os.path.join(BUILD_DIRECTORY, f'static_{build_id}'))
+        else:
+            # Handle case where static directory doesn't exist or is empty
+            LOG.warning(f"Static directory {static_dir} doesn't exist or is empty")
+            LOG.info("Creating empty static directory structure")
+            new_static_dir = os.path.join(BUILD_DIRECTORY, f'static_{build_id}')
+            os.makedirs(new_static_dir, exist_ok=True)
+            
+            # Copy any build artifacts that may exist in BUILD_DIRECTORY
+            for item in os.listdir(BUILD_DIRECTORY):
+                item_path = os.path.join(BUILD_DIRECTORY, item)
+                if os.path.isfile(item_path) and not item.startswith('static_'):
+                    import shutil
+                    shutil.copy2(item_path, new_static_dir)
 
     @staticmethod
     def build_api():

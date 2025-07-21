@@ -92,15 +92,15 @@ export default class ParticipantRow extends Component<ParticipantRowProps> {
                              closeModal={this.toggleConfirmationModal} />
           <ButtonToolbar>
             <ButtonGroup>
-              <Button bsStyle='primary'
-                      bsSize='small'
+              <Button variant='primary'
+                      size='sm'
                       onClick={this.toggleParticipationModal}>
                 Edit
               </Button>
             </ButtonGroup>
             <ButtonGroup>
-              <Button bsStyle='danger'
-                      bsSize='small'
+              <Button variant='danger'
+                      size='sm'
                       onClick={this.toggleConfirmationModal}>
                 Delete
               </Button>

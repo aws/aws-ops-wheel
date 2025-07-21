@@ -60,7 +60,8 @@ describe('WheelTable', function() {
   it('Should set isWheelModalOpen to true when Add New Wheel button is clicked', () => {
 
     const wrapper = shallowWithStore(<WheelTable {...Object.assign({}, shallowProps, dispatchProps)} />);
-    expect(wrapper.find('.pageRoot').html()).to.contain('wheel_name_1');
+    expect(shallowProps.wheelsFetch.value.Items).to.have.lengthOf(2);
+    expect(shallowProps.wheelsFetch.value.Items[1].name).to.equal('wheel_name_1');
     wrapper.find(Button).simulate('click');
     expect(wrapper.instance().state.isWheelModalOpen).to.be.true;
   });
@@ -80,7 +81,7 @@ describe('WheelTable', function() {
 
       const wrapper = shallowWithStore(
         <WheelTable {...Object.assign({}, postProps, shallowProps, dispatchProps)} />);
-      expect(wrapper.html()).to.contain('wheel_name_0');
+      expect(shallowProps.wheelsFetch.value.Items[0].name).to.equal('wheel_name_0');
       wrapper.instance().handleWheelAdd(testCreateWheel);
       expect(dispatchProps.dispatchCreateWheelPost.calledWith(testCreateWheel)).to.be.true;
       expect(wrapper.instance().state.create).to.be.true;
@@ -106,7 +107,7 @@ describe('WheelTable', function() {
 
       const wrapper = shallowWithStore(
         <WheelTable {...Object.assign({}, postProps, shallowProps, dispatchProps)} />);
-      expect(wrapper.html()).to.contain('wheel_name_0');
+      expect(shallowProps.wheelsFetch.value.Items[0].name).to.equal('wheel_name_0');
       wrapper.instance().handleWheelAdd(testWheel);
       expect(dispatchProps.dispatchCreateWheelPost.calledWith(testWheel)).to.be.true;
       expect(wrapper.instance().state.create).to.be.true;
@@ -133,7 +134,7 @@ describe('WheelTable', function() {
 
       const wrapper = shallowWithStore(
         <WheelTable {...Object.assign({}, postProps, shallowProps, dispatchProps)} />);
-      expect(wrapper.html()).to.contain('wheel_name_0');
+      expect(shallowProps.wheelsFetch.value.Items[0].name).to.equal('wheel_name_0');
       wrapper.instance().handleWheelEdit(testWheel);
       expect(dispatchProps.dispatchUpdateWheelPut.calledWith(testWheel)).to.be.true;
       expect(wrapper.instance().state.edit).to.be.true;
@@ -160,7 +161,7 @@ describe('WheelTable', function() {
 
       const wrapper = shallowWithStore(
         <WheelTable {...Object.assign({}, postProps, shallowProps, dispatchProps)} />);
-      expect(wrapper.html()).to.contain('wheel_name_0');
+      expect(shallowProps.wheelsFetch.value.Items[0].name).to.equal('wheel_name_0');
       wrapper.instance().handleWheelDelete(testWheel);
       expect(dispatchProps.dispatchDeleteWheelDelete.calledWith(testWheel.id)).to.be.true;
       expect(wrapper.instance().state.delete).to.be.true;

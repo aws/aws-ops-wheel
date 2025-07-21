@@ -87,11 +87,11 @@ export default class WheelRow extends Component<WheelRowProps, WheelRowState> {
               onConfirm={this.handleWheelDelete}
               closeModal={this.toggleConfirmationModal}
           />
-          <ButtonToolbar>
+          <ButtonToolbar style={{gap: '10px'}}>
             <ButtonGroup>
               <Button
-                bsStyle='primary'
-                bsSize='small'
+                variant='primary'
+                size='sm'
                 onClick={this.toggleWheelModal}
               >
                 Edit Name
@@ -99,7 +99,7 @@ export default class WheelRow extends Component<WheelRowProps, WheelRowState> {
             </ButtonGroup>
             <ButtonGroup>
               <LinkWrapper to={`wheel/${wheel.id}/participant`}>
-                <Button bsStyle='primary' bsSize='small'>
+                <Button variant='primary' size='sm'>
                   Edit Participants
                 </Button>
               </LinkWrapper>
@@ -107,8 +107,8 @@ export default class WheelRow extends Component<WheelRowProps, WheelRowState> {
             <ButtonGroup>
               <Button
                 onClick={this.toggleConfirmationModal}
-                bsStyle='danger'
-                bsSize='small'
+                variant='danger'
+                size='sm'
                 title='Delete the wheel'
               >Delete Wheel</Button>
             </ButtonGroup>

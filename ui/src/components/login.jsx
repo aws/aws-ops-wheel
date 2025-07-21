@@ -14,7 +14,7 @@
  */
 
 import React, { Component, PropTypes } from "react";
-import {Alert, Button, FormGroup, FormControl, ControlLabel} from "react-bootstrap";
+import {Alert, Button, Form} from "react-bootstrap";
 import {AuthenticationDetails, CognitoUser, CognitoUserPool} from "amazon-cognito-identity-js";
 
 interface LoginProps {
@@ -94,22 +94,23 @@ export default class Login extends Component<LoginProps, LoginState> {
     if (this.state.passwordChangeAttributes !== undefined) {
       formSubmit = this.submitNewPassword;
       userElement = <Alert
-                      bsStyle="warning">
+                      variant="warning">
                         <strong>Account used for the first time.</strong> <br />
                         You need to change your password.
                       </Alert>
 
     } else {
       formSubmit = this.login;
-      userElement = <FormGroup controlId="username" bsSize="large">
-        <ControlLabel>Username</ControlLabel>
-        <FormControl
+      userElement = <Form.Group controlId="username" className="mb-3">
+        <Form.Label>Username</Form.Label>
+        <Form.Control
           autoFocus
           type="username"
           value={this.state.username}
           onChange={this.handleChange}
+          size="lg"
         />
-      </FormGroup>;
+      </Form.Group>;
     }
 
     let warning;
@@ -122,20 +123,21 @@ export default class Login extends Component<LoginProps, LoginState> {
       <div className="Login" style={{padding: '60px 0'}}>
         <form onSubmit={formSubmit} style={{margin: '0 auto', maxWidth: '320px'}}>
           {userElement}
-          <FormGroup controlId="password" bsSize="large">
-            <ControlLabel>Password</ControlLabel>
-            <FormControl
+          <Form.Group controlId="password" className="mb-3">
+            <Form.Label>Password</Form.Label>
+            <Form.Control
               value={this.state.password}
               onChange={this.handleChange}
               type="password"
+              size="lg"
             />
-          </FormGroup>
+          </Form.Group>
 
           {warning}
 
           <Button
-            block
-            bsSize="large"
+            className="d-grid"
+            size="lg"
             disabled={isInFlight || this.state.username.length === 0 || this.state.password.length < 6}
             type="submit"
           >
