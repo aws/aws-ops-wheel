@@ -5,7 +5,7 @@ Parameters:
   SourceBucketName:
     Type: String
     Description: Name of the existing S3 bucket containing static assets
-    Default: awsopswheelsourcebucket-sources3bucket-rsujxcwlj84x
+    Default: __PLACEHOLDER_BUCKET_NAME__
 
 Resources:
   # Origin Access Control for secure S3 access
@@ -87,7 +87,7 @@ Resources:
           DefaultTTL: 86400
           MaxTTL: 31536000
           MinTTL: 0
-        DefaultRootObject: static_59f3a915-972a-45ee-bea8-3cffd41e0b1c/index.production.html
+        DefaultRootObject: __PLACEHOLDER_STATIC_DIR__/index.production.html
         Enabled: true
         HttpVersion: http2
         IPV6Enabled: true
@@ -98,7 +98,7 @@ Resources:
               OriginAccessIdentity: ""
             OriginAccessControlId: !GetAtt OriginAccessControl.Id
           - Id: APIGatewayOrigin
-            DomainName: i93ih21n9a.execute-api.us-west-2.amazonaws.com
+            DomainName: __PLACEHOLDER_API_DOMAIN__
             CustomOriginConfig:
               HTTPPort: 80
               HTTPSPort: 443
@@ -109,11 +109,11 @@ Resources:
         CustomErrorResponses:
           - ErrorCode: 404
             ResponseCode: 200
-            ResponsePagePath: "/static_59f3a915-972a-45ee-bea8-3cffd41e0b1c/index.production.html"
+            ResponsePagePath: "/__PLACEHOLDER_STATIC_DIR__/index.production.html"
             ErrorCachingMinTTL: 300
           - ErrorCode: 403
             ResponseCode: 200
-            ResponsePagePath: "/static_59f3a915-972a-45ee-bea8-3cffd41e0b1c/index.production.html"
+            ResponsePagePath: "/__PLACEHOLDER_STATIC_DIR__/index.production.html"
             ErrorCachingMinTTL: 300
 
   # S3 Bucket Policy for CloudFront OAC

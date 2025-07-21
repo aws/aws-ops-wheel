@@ -218,9 +218,9 @@ echo "Static Directory: $STATIC_DIR"
 Deploy CloudFront (Secure Layer)
 ```
 sed -i.bak \
-  -e "s/awsopswheelsourcebucket-sources3bucket-bt0e08ghcrwg/$S3_BUCKET/g" \
-  -e "s/f3btejjb3m.execute-api.us-west-2.amazonaws.com/$API_GATEWAY_ID.execute-api.us-west-2.amazonaws.com/g" \
-  -e "s/static_b05d2340-920c-437a-8243-cf52fef45f80/$STATIC_DIR/g" \
+  -e "s/__PLACEHOLDER_BUCKET_NAME__/$S3_BUCKET/g" \
+  -e "s/__PLACEHOLDER_API_DOMAIN__/$API_GATEWAY_ID.execute-api.$REGION.amazonaws.com/g" \
+  -e "s/__PLACEHOLDER_STATIC_DIR__/$STATIC_DIR/g" \
   cloudformation/s3-cloudfront-secure.yml
 
 aws cloudformation create-stack \

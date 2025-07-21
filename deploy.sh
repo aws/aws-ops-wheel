@@ -136,12 +136,12 @@ done
 if [[ -n "$SUFFIX" ]]; then
     MAIN_STACK="AWSOpsWheel-$SUFFIX"
     CLOUDFRONT_STACK="AWSOpsWheel-$SUFFIX-CloudFront"
+    SOURCE_BUCKET_STACK="AWSOpsWheelSourceBucket-$SUFFIX"
 else
     MAIN_STACK="AWSOpsWheel"
     CLOUDFRONT_STACK="AWSOpsWheel-CloudFront"
+    SOURCE_BUCKET_STACK="AWSOpsWheelSourceBucket"
 fi
-
-SOURCE_BUCKET_STACK="AWSOpsWheelSourceBucket"
 
 # Function to check if stack exists
 stack_exists() {
@@ -256,24 +256,24 @@ get_infrastructure_ids() {
 deploy_cloudfront() {
     log_header "DEPLOYING CLOUDFRONT"
     
-    log_info "Updating CloudFormation template with current resource IDs..."
+    log_info "Creating temporary CloudFormation template with current resource IDs..."
     
-    # Create backup of original template
-    cp cloudformation/s3-cloudfront-secure.yml cloudformation/s3-cloudfront-secure.yml.bak
+    # Create temporary template file instead of modifying the original
+    TEMP_CF_TEMPLATE="/tmp/s3-cloudfront-secure-${RANDOM}.yml"
     
-    # Update template with current values
-    sed -i.tmp \
-        -e "s/awsopswheelsourcebucket-sources3bucket-f216qbzsu0fv/$S3_BUCKET/g" \
-        -e "s/lhk9hgohl5.execute-api.us-west-2.amazonaws.com/$API_GATEWAY_ID.execute-api.$REGION.amazonaws.com/g" \
-        -e "s/static_a3031aac-f60a-41e1-b60c-20dc8d48c4fa/$STATIC_DIR/g" \
-        cloudformation/s3-cloudfront-secure.yml
+    # Copy original template and replace placeholders in the temporary copy
+    sed \
+        -e "s/__PLACEHOLDER_BUCKET_NAME__/$S3_BUCKET/g" \
+        -e "s/__PLACEHOLDER_API_DOMAIN__/$API_GATEWAY_ID.execute-api.$REGION.amazonaws.com/g" \
+        -e "s/__PLACEHOLDER_STATIC_DIR__/$STATIC_DIR/g" \
+        cloudformation/s3-cloudfront-secure.yml > "$TEMP_CF_TEMPLATE"
     
     log_info "Deploying CloudFront stack..."
     if stack_exists "$CLOUDFRONT_STACK"; then
         log_info "CloudFront stack exists, updating..."
         aws cloudformation update-stack \
             --stack-name "$CLOUDFRONT_STACK" \
-            --template-body file://cloudformation/s3-cloudfront-secure.yml \
+            --template-body "file://$TEMP_CF_TEMPLATE" \
             --region "$REGION" || {
                 log_warning "No updates to perform on CloudFront stack"
             }
@@ -286,7 +286,7 @@ deploy_cloudfront() {
         log_info "Creating new CloudFront stack..."
         aws cloudformation create-stack \
             --stack-name "$CLOUDFRONT_STACK" \
-            --template-body file://cloudformation/s3-cloudfront-secure.yml \
+            --template-body "file://$TEMP_CF_TEMPLATE" \
             --region "$REGION"
         
         wait_for_stack "$CLOUDFRONT_STACK" "create"
@@ -294,8 +294,8 @@ deploy_cloudfront() {
     
     log_success "CloudFront deployed successfully"
     
-    # Clean up temporary file
-    rm -f cloudformation/s3-cloudfront-secure.yml.tmp
+    # Clean up temporary template file
+    rm -f "$TEMP_CF_TEMPLATE"
 }
 
 # Function to update frontend and deploy
@@ -369,11 +369,56 @@ delete_stacks() {
         exit 0
     fi
     
-    # Step 1: Delete CloudFront stack first (if exists)
+    # Step 1: Disable and delete CloudFront stack first (if exists)
     if stack_exists "$CLOUDFRONT_STACK"; then
+        log_info "Disabling CloudFront distribution before deletion..."
+        
+        # Get CloudFront distribution ID
+        DISTRIBUTION_ID=$(get_stack_output "$CLOUDFRONT_STACK" "CloudFrontDistributionId" 2>/dev/null || echo "")
+        
+        if [[ -n "$DISTRIBUTION_ID" ]]; then
+            # Get current distribution config
+            aws cloudfront get-distribution-config --id "$DISTRIBUTION_ID" --region "$REGION" > /tmp/cf-config-$$.json 2>/dev/null || {
+                log_warning "Could not get CloudFront distribution config"
+            }
+            
+            # Disable distribution if config was retrieved
+            if [[ -f /tmp/cf-config-$$.json ]]; then
+                ETAG=$(jq -r '.ETag' /tmp/cf-config-$$.json)
+                jq '.DistributionConfig.Enabled = false' /tmp/cf-config-$$.json | jq '.DistributionConfig' > /tmp/cf-update-$$.json
+                
+                log_info "Disabling CloudFront distribution: $DISTRIBUTION_ID"
+                aws cloudfront update-distribution \
+                    --id "$DISTRIBUTION_ID" \
+                    --distribution-config file:///tmp/cf-update-$$.json \
+                    --if-match "$ETAG" \
+                    --region "$REGION" >/dev/null 2>&1 || {
+                    log_warning "Could not disable CloudFront distribution"
+                }
+                
+                # Wait for distribution to be disabled
+                log_info "Waiting for CloudFront distribution to be disabled..."
+                sleep 30  # Give it some time to start disabling
+                
+                # Clean up temp files
+                rm -f /tmp/cf-config-$$.json /tmp/cf-update-$$.json
+            fi
+        fi
+        
         log_info "Deleting CloudFront stack: $CLOUDFRONT_STACK"
         aws cloudformation delete-stack --stack-name "$CLOUDFRONT_STACK" --region "$REGION"
-        wait_for_stack "$CLOUDFRONT_STACK" "delete"
+        
+        # Use a longer timeout for CloudFront deletion
+        log_info "Waiting for CloudFront stack deletion (this may take several minutes)..."
+        aws cloudformation wait stack-delete-complete --stack-name "$CLOUDFRONT_STACK" --region "$REGION" || {
+            log_error "CloudFront stack deletion failed or timed out"
+            log_warning "You may need to:"
+            log_warning "  1. Wait for CloudFront distribution to fully disable (can take 15+ minutes)"
+            log_warning "  2. Delete the CloudFront stack manually in AWS Console"
+            log_warning "  3. Re-run this script to continue with remaining stack deletions"
+            exit 1
+        }
+        
         log_success "CloudFront stack deleted"
     else
         log_info "CloudFront stack $CLOUDFRONT_STACK does not exist, skipping"
@@ -391,10 +436,33 @@ delete_stacks() {
         if [[ -n "$S3_BUCKET" ]]; then
             log_info "Attempting to empty S3 bucket: $S3_BUCKET"
             
-            # Basic cleanup attempt
+            # Comprehensive cleanup - delete all versions and delete markers
+            log_info "Deleting all object versions and delete markers..."
+            
+            # Use a more robust approach - delete everything in one go
+            aws s3api list-object-versions --bucket "$S3_BUCKET" --region "$REGION" --output json | \
+                jq -r '.Versions[]?, .DeleteMarkers[]? | select(. != null) | "--key \"\(.Key)\" --version-id \(.VersionId)"' | \
+                while read -r line; do
+                    if [[ -n "$line" ]]; then
+                        eval "aws s3api delete-object --bucket '$S3_BUCKET' --region '$REGION' $line" 2>/dev/null || true
+                    fi
+                done
+            
+            log_info "Completed object version and delete marker cleanup"
+            
+            # Force delete any remaining objects using high-level CLI
+            log_info "Force removing any remaining objects..."
             aws s3 rm "s3://$S3_BUCKET" --recursive --region "$REGION" 2>/dev/null || {
-                log_warning "Could not empty S3 bucket automatically"
+                log_warning "Could not remove all objects with s3 rm"
             }
+            
+            # Alternative approach: Use s3 sync with delete to empty bucket
+            log_info "Using sync method to ensure bucket is empty..."
+            mkdir -p /tmp/empty_dir_$$
+            aws s3 sync /tmp/empty_dir_$$ "s3://$S3_BUCKET" --delete --region "$REGION" 2>/dev/null || {
+                log_warning "Could not sync empty directory"
+            }
+            rm -rf /tmp/empty_dir_$$
             
             # Suspend versioning
             aws s3api put-bucket-versioning \

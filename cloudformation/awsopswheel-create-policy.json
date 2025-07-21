@@ -67,7 +67,7 @@
                 "arn:aws:codecommit:*:*:AWSOpsWheel*",
                 "arn:aws:codebuild:*:*:project/AWSOpsWheel*",
                 "arn:aws:events:*:*:rule/AWSOpsWheel-*",
-                "arn:aws:cloudformation:*:*:stack/AWSOpsWheelSourceBucket/*",
+                "arn:aws:cloudformation:*:*:stack/AWSOpsWheelSourceBucket*/*",
                 "arn:aws:cloudformation:*:*:stack/AWSOpsWheel/*",
                 "arn:aws:cloudformation:*:*:stack/AWSOpsWheel-*/*",
                 "arn:aws:apigateway:*::/restapis",
