@@ -203,7 +203,7 @@ This will:
     - Create the swagger configuration for API Gateway that points the paths to their functions
 - Deploy the template directly to CloudFormation through update or create, depending on if it's a new stack
 
-Get Your Resource IDs
+**Get Your Resource IDs**
 ```
 # Run this script to get your resource information
 API_GATEWAY_ID=$(aws cloudformation describe-stacks --stack-name AWSOpsWheel --query 'Stacks[0].Outputs[?OutputKey==`AWSOpsWheelAPI`].OutputValue' --output text --region us-west-2)
@@ -215,7 +215,7 @@ echo "S3 Bucket: $S3_BUCKET"
 echo "Static Directory: $STATIC_DIR"
 ```
 
-Deploy CloudFront (Secure Layer)
+**Deploy CloudFront**
 ```
 sed -i.bak \
   -e "s/__PLACEHOLDER_BUCKET_NAME__/$S3_BUCKET/g" \
@@ -241,7 +241,7 @@ Recommended: Use the streamlined deployment script
 ./deploy.sh --update-only
 ```
 
-Alternative: Manual approach
+**Alternative: Manual approach**
 
 Get CloudFront domain
 ```
@@ -282,7 +282,7 @@ For regular updates, just use `./update-app.sh`
 Go to the ``<PATH_TO_YOUR_WORKSPACE>/ui`` directory and run:
 
 ```
-npm run start
+npm run dev
 ```
 
 # Miscellaneous
@@ -345,39 +345,6 @@ aws cloudformation delete-stack --stack-name AWSOpsWheelSourceBucket --region us
 ```
 
 If the bucket cannot be deleted with the command, the user can manually empty and delete the S3 Bucket on their console.
-
-## Set up continuous deployment
-
-Create continuous deployment resources:
-```
-aws cloudformation create-stack --stack-name AWSOpsWheel --template-body file://cloudformation/continuous-deployment.yml --parameters ParameterKey=AdminEmail,ParameterValue=example@example.com --capabilities CAPABILITY_NAMED_IAM
-
-aws cloudformation wait stack-create-complete --stack-name AWSOpsWheel
-```
-Make sure you have your preferred [CodeCommit access](https://docs.aws.amazon.com/codecommit/latest/userguide/setting-up.html) configured.
-
-The following assumes that you are using the AWS CLI Credential Helper.
-
-Push to the newly created git repository:
-```
-git config --global credential.helper '!aws codecommit credential-helper $@'
-
-git config --global credential.UseHttpPath true
-
-git remote add app `aws cloudformation describe-stacks --stack-name AWSOpsWheel --query 'Stacks[0].Outputs[?OutputKey==\`RepositoryCloneUrl\`].OutputValue' --output text`
-
-git push app main
-```
-
-Wait for the pipeline to finish deploying:
-```
-aws cloudformation describe-stacks --stack-name AWSOpsWheel --query 'Stacks[0].Outputs[?OutputKey==`PipelineConsoleUrl`].OutputValue' --output text
-```
-
-Get the URL of the newly deployed application:
-```
-aws cloudformation describe-stacks --stack-name AWSOpsWheel-application --query 'Stacks[0].Outputs[?OutputKey==`Endpoint`].OutputValue' --output text
-```
 
 ## Wheel Customization
 To change how fast wheels spin, modify `EASE_OUT_FRAMES` and `LINEAR_FRAMES` in `wheel.jsx`. 
