@@ -13,6 +13,8 @@
     "build-prod": "NODE_ENV=production webpack --progress --color --mode production",
     "unit-test": "mocha --config .mocharc.json",
     "test-watch": "mocha --config .mocharc.json --watch",
+    "setup-dev": "node setup-dev-environment.js",
+    "dev": "npm run setup-dev && npm run start",
     "start": "webpack serve",
     "flow": "flow",
     "preinstall": "npx npm-force-resolutions"
