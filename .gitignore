@@ -2,6 +2,7 @@
 .DS_Store
 /build
 /ui/node_modules
+/ui-v2/node_modules
 /ui/flow-typed
 /ui/development_app_location.js
 /ui/.nyc_output

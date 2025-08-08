@@ -1,0 +1,296 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS Ops Wheel v2 - Frontend Deployment (S3 + CloudFront)'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Environment for deployment
+
+  # API Gateway Parameters
+  ApiGatewayDomainName:
+    Type: String
+    Description: API Gateway domain name
+
+  # Cognito Parameters
+  UserPoolId:
+    Type: String
+    Description: Cognito User Pool ID
+
+  UserPoolClientId:
+    Type: String
+    Description: Cognito User Pool Client ID
+
+Resources:
+  # =================== FRONTEND S3 + CLOUDFRONT ===================
+
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      VersioningConfiguration:
+        Status: Suspended
+      AccessControl: BucketOwnerRead
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  OriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${AWS::StackName}-OAC"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: !Sub "AWS Ops Wheel v2 Multi-tenant Frontend - ${Environment}"
+        CacheBehaviors:
+          # Static assets (CSS, JS, images)
+          - PathPattern: "/app/static/*"
+            TargetOriginId: S3Origin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            CachedMethods:
+              - GET
+              - HEAD
+            ForwardedValues:
+              QueryString: false
+              Cookies:
+                Forward: none
+            Compress: true
+            DefaultTTL: 86400  # 1 day
+            MaxTTL: 31536000   # 1 year
+            MinTTL: 0
+          # v2 API endpoints - proxy to API Gateway
+          - PathPattern: "/app/api/v2/*"
+            TargetOriginId: APIGatewayOrigin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods:
+              - DELETE
+              - GET
+              - HEAD
+              - OPTIONS
+              - PATCH
+              - POST
+              - PUT
+            CachedMethods:
+              - GET
+              - HEAD
+            ForwardedValues:
+              QueryString: true
+              Headers:
+                - Authorization
+                - Content-Type
+                - Accept
+                - User-Agent
+                - Referer
+              Cookies:
+                Forward: none
+            Compress: false
+            DefaultTTL: 0      # No caching for API calls
+            MaxTTL: 0
+            MinTTL: 0
+          # SPA routes - handle client-side routing (must be after static and api patterns)
+          - PathPattern: "/app/*"
+            TargetOriginId: S3Origin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            CachedMethods:
+              - GET
+              - HEAD
+            ForwardedValues:
+              QueryString: true  # Preserve query params for routing
+              Cookies:
+                Forward: none
+            Compress: true
+            DefaultTTL: 0        # No caching for SPA routes
+            MaxTTL: 86400       # Max 1 day
+            MinTTL: 0
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          Compress: true
+          DefaultTTL: 3600   # 1 hour for HTML files
+          MaxTTL: 86400     # 1 day max
+          MinTTL: 0
+        DefaultRootObject: index.production.html
+        Enabled: true
+        HttpVersion: http2
+        IPV6Enabled: true
+        Origins:
+          # S3 Origin for static files
+          - Id: S3Origin
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+            OriginAccessControlId: !GetAtt OriginAccessControl.Id
+          # API Gateway Origin for v2 API
+          - Id: APIGatewayOrigin
+            DomainName: !Ref ApiGatewayDomainName
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+            OriginPath: !Sub "/${Environment}"
+        PriceClass: PriceClass_100  # Use only North America and Europe edge locations
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+        # SPA routing - redirect 404s to index.production.html
+        CustomErrorResponses:
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: "/app/index.production.html"
+            ErrorCachingMinTTL: 300
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: "/app/index.production.html" 
+            ErrorCachingMinTTL: 300
+
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${FrontendBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                "AWS:SourceArn": !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
+
+  # Lambda function to create frontend config file
+  FrontendConfigFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'create-frontend-config-${Environment}'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt ConfigLambdaRole.Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+          import cfnresponse
+          
+          def lambda_handler(event, context):
+              s3 = boto3.client('s3')
+              
+              if event['RequestType'] == 'Delete':
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                  return
+              
+              try:
+                  bucket = event['ResourceProperties']['Bucket']
+                  config = event['ResourceProperties']['Config']
+                  
+                  s3.put_object(
+                      Bucket=bucket,
+                      Key='app/config.json',
+                      Body=config,
+                      ContentType='application/json'
+                  )
+                  
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+              except Exception as e:
+                  print(f"Error: {str(e)}")
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {})
+
+  # IAM Role for Config Lambda
+  ConfigLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3WritePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: !Sub "${FrontendBucket.Arn}/*"
+
+  # Custom resource to create config file
+  FrontendConfig:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: FrontendBucket
+    Properties:
+      ServiceToken: !GetAtt FrontendConfigFunction.Arn
+      Bucket: !Ref FrontendBucket
+      Config: !Sub |
+        {
+          "API_BASE_URL": "https://${CloudFrontDistribution.DomainName}/app/api/v2",
+          "COGNITO_USER_POOL_ID": "${UserPoolId}",
+          "COGNITO_CLIENT_ID": "${UserPoolClientId}",
+          "COGNITO_REGION": "${AWS::Region}",
+          "ENVIRONMENT": "${Environment}",
+          "MULTI_TENANT_ENABLED": true,
+          "MAX_MULTI_SELECT": 10,
+          "VERSION": "2.0"
+        }
+
+Outputs:
+  FrontendBucketName:
+    Description: Name of the S3 bucket for v2 frontend
+    Value: !Ref FrontendBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-FrontendBucket"
+
+  CloudFrontDomainName:
+    Description: CloudFront Distribution Domain Name for v2 Frontend
+    Value: !GetAtt CloudFrontDistribution.DomainName
+    Export:
+      Name: !Sub "${AWS::StackName}-CloudFrontDomain"
+  
+  CloudFrontDistributionId:
+    Description: CloudFront Distribution ID for v2 Frontend
+    Value: !Ref CloudFrontDistribution
+    Export:
+      Name: !Sub "${AWS::StackName}-CloudFrontDistributionId"
+  
+  FrontendURL:
+    Description: Secure HTTPS URL for the v2 Multi-tenant Frontend
+    Value: !Sub "https://${CloudFrontDistribution.DomainName}/app"
+    Export:
+      Name: !Sub "${AWS::StackName}-FrontendURL"
+
+  FrontendConfigURL:
+    Description: Configuration endpoint for frontend environment variables
+    Value: !Sub "https://${CloudFrontDistribution.DomainName}/app/config.json"
+    Export:
+      Name: !Sub "${AWS::StackName}-ConfigURL"

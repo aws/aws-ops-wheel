@@ -1,0 +1,530 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS Ops Wheel v2 - Lambda Functions and Layer'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Environment for deployment
+
+  # Templates Bucket Parameter
+  TemplatesBucketName:
+    Type: String
+    Description: S3 bucket where nested CloudFormation templates and lambda layer are stored
+
+  # Lambda Layer Version Parameter - automatically updated by deployment script
+  LayerVersion:
+    Type: String
+    Default: "1"
+    Description: Version identifier to force Lambda layer recreation when code changes (auto-managed)
+
+  # DynamoDB Table Parameters
+  TenantsTableName:
+    Type: String
+    Description: Name of the Tenants DynamoDB table
+
+  UsersTableName:
+    Type: String
+    Description: Name of the Users DynamoDB table
+
+  WheelsTableName:
+    Type: String
+    Description: Name of the Wheels DynamoDB table
+
+  ParticipantsTableName:
+    Type: String
+    Description: Name of the Participants DynamoDB table
+
+  TenantsTableArn:
+    Type: String
+    Description: ARN of the Tenants DynamoDB table
+
+  UsersTableArn:
+    Type: String
+    Description: ARN of the Users DynamoDB table
+
+  WheelsTableArn:
+    Type: String
+    Description: ARN of the Wheels DynamoDB table
+
+  ParticipantsTableArn:
+    Type: String
+    Description: ARN of the Participants DynamoDB table
+
+  # Cognito Parameters  
+  UserPoolId:
+    Type: String
+    Description: Cognito User Pool ID
+
+  UserPoolClientId:
+    Type: String
+    Description: Cognito User Pool Client ID
+
+  UserPoolArn:
+    Type: String
+    Description: Cognito User Pool ARN
+
+Resources:
+  # =================== S3 BUCKET FOR LAMBDA LAYER ===================
+  
+  LayerBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'ops-wheel-v2-layer-${Environment}-${AWS::Region}-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Suspended
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # =================== LAMBDA EXECUTION ROLE ===================
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'OpsWheelV2-LambdaExecutionRole-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:BatchGetItem
+                  - dynamodb:BatchWriteItem
+                Resource:
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TenantsTableName}'
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UsersTableName}'
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${WheelsTableName}'
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ParticipantsTableName}'
+                  - !Sub '${UsersTableArn}/index/*'
+                  - !Sub '${WheelsTableArn}/index/*'
+                  - !Sub '${ParticipantsTableArn}/index/*'
+                  - !Sub '${TenantsTableArn}/index/*'
+        - PolicyName: CognitoAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminGetUser
+                  - cognito-idp:AdminUpdateUserAttributes
+                  - cognito-idp:ListUsers
+                  - cognito-idp:AdminCreateUser
+                  - cognito-idp:AdminSetUserPassword
+                  - cognito-idp:AdminDeleteUser
+                Resource:
+                  - !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPoolId}'
+
+  # =================== LAMBDA LAYER ===================
+
+  PythonDependenciesLayer:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      LayerName: !Sub 'ops-wheel-v2-python-dependencies-${Environment}-v${LayerVersion}'
+      Description: !Sub 'Shared Python dependencies and api-v2 code for AWS Ops Wheel v2 - Version ${LayerVersion}'
+      Content:
+        S3Bucket: !Ref TemplatesBucketName
+        S3Key: 'lambda-layer-v2-fixed-nocrypto.zip'
+      CompatibleRuntimes:
+        - python3.9
+      LicenseInfo: 'Apache-2.0'
+
+  # =================== LAMBDA FUNCTIONS ===================
+
+  TenantManagementFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'ops-wheel-v2-tenant-management-${Environment}'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Layers:
+        - !Ref PythonDependenciesLayer
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          TENANTS_TABLE: !Ref TenantsTableName
+          USERS_TABLE: !Ref UsersTableName
+          WHEELS_TABLE: !Ref WheelsTableName
+          PARTICIPANTS_TABLE: !Ref ParticipantsTableName
+          COGNITO_USER_POOL_ID: !Ref UserPoolId
+          COGNITO_CLIENT_ID: !Ref UserPoolClientId
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import sys
+          sys.path.append('/opt/python/api-v2')
+          from tenant_management import create_tenant, get_tenant, update_tenant, get_tenant_users, update_user_role, get_config
+          
+          def parse_body(event):
+              """Parse request body, handling both string and dict formats"""
+              if 'body' not in event:
+                  event['body'] = {}
+                  return
+              
+              body = event['body']
+              if isinstance(body, str):
+                  try:
+                      event['body'] = json.loads(body) if body.strip() else {}
+                  except (json.JSONDecodeError, TypeError, ValueError):
+                      event['body'] = {}
+          
+          ROUTE_MAP = {
+              ('POST', '/app/api/v2/tenant'): create_tenant,
+              ('GET', '/app/api/v2/tenant'): get_tenant,
+              ('PUT', '/app/api/v2/tenant'): update_tenant,
+              ('GET', '/app/api/v2/tenant/users'): get_tenant_users,
+              ('PUT', '/app/api/v2/tenant/users/{id}/role'): update_user_role,
+              ('GET', '/app/api/v2/config'): get_config
+          }
+          
+          def lambda_handler(event, context):
+              try:
+                  # Parse request body
+                  parse_body(event)
+                  
+                  method = event.get('httpMethod')
+                  path = event.get('resource')
+                  handler = ROUTE_MAP.get((method, path))
+                  
+                  if not handler:
+                      return {
+                          'statusCode': 404,
+                          'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                          'body': json.dumps({'error': f'Route not found: {method} {path}'})
+                      }
+                  
+                  return handler(event, context)
+              except Exception as e:
+                  return {
+                      'statusCode': 500,
+                      'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                      'body': json.dumps({'error': f'Internal server error: {str(e)}'})
+                  }
+
+  WheelOperationsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'ops-wheel-v2-wheel-operations-${Environment}'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Layers:
+        - !Ref PythonDependenciesLayer
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          TENANTS_TABLE: !Ref TenantsTableName
+          USERS_TABLE: !Ref UsersTableName
+          WHEELS_TABLE: !Ref WheelsTableName
+          PARTICIPANTS_TABLE: !Ref ParticipantsTableName
+          COGNITO_USER_POOL_ID: !Ref UserPoolId
+          COGNITO_CLIENT_ID: !Ref UserPoolClientId
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import sys
+          sys.path.append('/opt/python/api-v2')
+          from wheel_operations import list_tenant_wheels, create_wheel, get_wheel, update_wheel, delete_wheel, reset_wheel_weights
+          
+          def parse_body(event):
+              """Parse request body, handling both string and dict formats"""
+              if 'body' not in event:
+                  event['body'] = {}
+                  return
+              
+              body = event['body']
+              if isinstance(body, str):
+                  try:
+                      event['body'] = json.loads(body) if body.strip() else {}
+                  except (json.JSONDecodeError, TypeError, ValueError):
+                      event['body'] = {}
+          
+          ROUTE_MAP = {
+              ('GET', '/app/api/v2/wheels'): list_tenant_wheels,
+              ('POST', '/app/api/v2/wheels'): create_wheel,
+              ('GET', '/app/api/v2/wheels/{wheel_id}'): get_wheel,
+              ('PUT', '/app/api/v2/wheels/{wheel_id}'): update_wheel,
+              ('DELETE', '/app/api/v2/wheels/{wheel_id}'): delete_wheel,
+              ('POST', '/app/api/v2/wheels/{wheel_id}/reset'): reset_wheel_weights
+          }
+          
+          def lambda_handler(event, context):
+              try:
+                  # Parse request body
+                  parse_body(event)
+                  
+                  method = event.get('httpMethod')
+                  path = event.get('resource')
+                  handler = ROUTE_MAP.get((method, path))
+                  
+                  if not handler:
+                      return {
+                          'statusCode': 404,
+                          'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                          'body': json.dumps({'error': f'Route not found: {method} {path}'})
+                      }
+                  
+                  return handler(event, context)
+              except Exception as e:
+                  return {
+                      'statusCode': 500,
+                      'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                      'body': json.dumps({'error': f'Internal server error: {str(e)}'})
+                  }
+
+  ParticipantOperationsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'ops-wheel-v2-participant-operations-${Environment}'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Layers:
+        - !Ref PythonDependenciesLayer
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          TENANTS_TABLE: !Ref TenantsTableName
+          USERS_TABLE: !Ref UsersTableName
+          WHEELS_TABLE: !Ref WheelsTableName
+          PARTICIPANTS_TABLE: !Ref ParticipantsTableName
+          COGNITO_USER_POOL_ID: !Ref UserPoolId
+          COGNITO_CLIENT_ID: !Ref UserPoolClientId
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import sys
+          sys.path.append('/opt/python/api-v2')
+          from participant_operations import list_wheel_participants, create_participant, get_participant, update_participant, delete_participant, rig_participant, select_participant, remove_rigging
+          
+          def parse_body(event):
+              """Parse request body, handling both string and dict formats"""
+              if 'body' not in event:
+                  event['body'] = {}
+                  return
+              
+              body = event['body']
+              if isinstance(body, str):
+                  try:
+                      event['body'] = json.loads(body) if body.strip() else {}
+                  except (json.JSONDecodeError, TypeError, ValueError):
+                      event['body'] = {}
+          
+          ROUTE_MAP = {
+              ('GET', '/app/api/v2/wheels/{wheel_id}/participants'): list_wheel_participants,
+              ('POST', '/app/api/v2/wheels/{wheel_id}/participants'): create_participant,
+              ('GET', '/app/api/v2/wheels/{wheel_id}/participants/{participant_id}'): get_participant,
+              ('PUT', '/app/api/v2/wheels/{wheel_id}/participants/{participant_id}'): update_participant,
+              ('DELETE', '/app/api/v2/wheels/{wheel_id}/participants/{participant_id}'): delete_participant,
+              ('POST', '/app/api/v2/wheels/{wheel_id}/participants/{participant_id}/rig'): rig_participant,
+              ('POST', '/app/api/v2/wheels/{wheel_id}/participants/{participant_id}/select'): select_participant,
+              ('DELETE', '/app/api/v2/wheels/{wheel_id}/unrig'): remove_rigging
+          }
+          
+          def lambda_handler(event, context):
+              try:
+                  # Parse request body
+                  parse_body(event)
+                  
+                  method = event.get('httpMethod')
+                  path = event.get('resource')
+                  handler = ROUTE_MAP.get((method, path))
+                  
+                  if not handler:
+                      return {
+                          'statusCode': 404,
+                          'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                          'body': json.dumps({'error': f'Route not found: {method} {path}'})
+                      }
+                  
+                  return handler(event, context)
+              except Exception as e:
+                  return {
+                      'statusCode': 500,
+                      'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                      'body': json.dumps({'error': f'Internal server error: {str(e)}'})
+                  }
+
+  SelectionAlgorithmsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'ops-wheel-v2-selection-algorithms-${Environment}'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Layers:
+        - !Ref PythonDependenciesLayer
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          TENANTS_TABLE: !Ref TenantsTableName
+          USERS_TABLE: !Ref UsersTableName
+          WHEELS_TABLE: !Ref WheelsTableName
+          PARTICIPANTS_TABLE: !Ref ParticipantsTableName
+          COGNITO_USER_POOL_ID: !Ref UserPoolId
+          COGNITO_CLIENT_ID: !Ref UserPoolClientId
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import sys
+          sys.path.append('/opt/python/api-v2')
+          from selection_algorithms import suggest_participant, get_selection_probabilities
+          
+          def parse_body(event):
+              """Parse request body, handling both string and dict formats"""
+              if 'body' not in event:
+                  event['body'] = {}
+                  return
+              
+              body = event['body']
+              if isinstance(body, str):
+                  try:
+                      event['body'] = json.loads(body) if body.strip() else {}
+                  except (json.JSONDecodeError, TypeError, ValueError):
+                      event['body'] = {}
+          
+          ROUTE_MAP = {
+              ('POST', '/app/api/v2/wheels/{wheel_id}/suggest'): suggest_participant,
+              ('GET', '/app/api/v2/wheels/{wheel_id}/probabilities'): get_selection_probabilities
+          }
+          
+          def lambda_handler(event, context):
+              try:
+                  # Parse request body
+                  parse_body(event)
+                  
+                  method = event.get('httpMethod')
+                  path = event.get('resource')
+                  handler = ROUTE_MAP.get((method, path))
+                  
+                  if not handler:
+                      return {
+                          'statusCode': 404,
+                          'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                          'body': json.dumps({'error': f'Route not found: {method} {path}'})
+                      }
+                  
+                  return handler(event, context)
+              except Exception as e:
+                  return {
+                      'statusCode': 500,
+                      'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                      'body': json.dumps({'error': f'Internal server error: {str(e)}'})
+                  }
+
+  ApiAuthorizerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'ops-wheel-v2-api-authorizer-${Environment}'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Layers:
+        - !Ref PythonDependenciesLayer
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          TENANTS_TABLE: !Ref TenantsTableName
+          USERS_TABLE: !Ref UsersTableName
+          COGNITO_USER_POOL_ID: !Ref UserPoolId
+          COGNITO_CLIENT_ID: !Ref UserPoolClientId
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import sys
+          sys.path.append('/opt/python/api-v2')
+          from api_gateway_authorizer import lambda_handler as authorizer_handler
+          
+          def lambda_handler(event, context):
+              try:
+                  return authorizer_handler(event, context)
+              except Exception as e:
+                  print(f"Authorizer error: {str(e)}")
+                  return {
+                      'principalId': 'user',
+                      'policyDocument': {
+                          'Version': '2012-10-17',
+                          'Statement': [{
+                              'Action': 'execute-api:Invoke',
+                              'Effect': 'Deny',
+                              'Resource': event['methodArn']
+                          }]
+                      }
+                  }
+
+Outputs:
+  LayerBucketName:
+    Description: S3 bucket for Lambda layer storage
+    Value: !Ref LayerBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-LayerBucket'
+
+  LambdaExecutionRoleArn:
+    Description: Lambda execution role ARN
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaExecutionRoleArn'
+
+  TenantManagementFunctionArn:
+    Description: Tenant Management Lambda function ARN
+    Value: !GetAtt TenantManagementFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-TenantManagementFunctionArn'
+
+  WheelOperationsFunctionArn:
+    Description: Wheel Operations Lambda function ARN
+    Value: !GetAtt WheelOperationsFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-WheelOperationsFunctionArn'
+
+  ParticipantOperationsFunctionArn:
+    Description: Participant Operations Lambda function ARN
+    Value: !GetAtt ParticipantOperationsFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ParticipantOperationsFunctionArn'
+
+  SelectionAlgorithmsFunctionArn:
+    Description: Selection Algorithms Lambda function ARN
+    Value: !GetAtt SelectionAlgorithmsFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-SelectionAlgorithmsFunctionArn'
+
+  ApiAuthorizerFunctionArn:
+    Description: API Authorizer Lambda function ARN
+    Value: !GetAtt ApiAuthorizerFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiAuthorizerFunctionArn'

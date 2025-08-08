@@ -1,0 +1,6 @@
+{
+  "COGNITO_USER_POOL_ID": "us-west-2_2gsSYMRY8",
+  "COGNITO_CLIENT_ID": "425cdkaqfhqs2v8eubmd3urb8j",
+  "API_BASE_URL": "https://s0xa1lbfuf.execute-api.us-west-2.amazonaws.com/dev/app/api/v2",
+  "REGION": "us-west-2"
+}

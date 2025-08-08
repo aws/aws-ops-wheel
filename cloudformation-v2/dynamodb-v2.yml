@@ -1,0 +1,224 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS Ops Wheel v2 - DynamoDB Tables'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Environment for deployment
+
+Resources:
+  # =================== DYNAMODB TABLES ===================
+
+  TenantsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'OpsWheelV2-Tenants-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: tenant_id
+          AttributeType: S
+        - AttributeName: domain
+          AttributeType: S
+      KeySchema:
+        - AttributeName: tenant_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: domain-index
+          KeySchema:
+            - AttributeName: domain
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: aws-ops-wheel-v2
+
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'OpsWheelV2-Users-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: tenant_id
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+        - AttributeName: role
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: tenant-role-index
+          KeySchema:
+            - AttributeName: tenant_id
+              KeyType: HASH
+            - AttributeName: role
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: tenant-created-index
+          KeySchema:
+            - AttributeName: tenant_id
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: email-index
+          KeySchema:
+            - AttributeName: email
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  WheelsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'OpsWheelV2-Wheels-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: tenant_id
+          AttributeType: S
+        - AttributeName: wheel_id
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: S
+        - AttributeName: last_spun_at
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+      KeySchema:
+        - AttributeName: tenant_id
+          KeyType: HASH
+        - AttributeName: wheel_id
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: tenant-created-index
+          KeySchema:
+            - AttributeName: tenant_id
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: tenant-activity-index
+          KeySchema:
+            - AttributeName: tenant_id
+              KeyType: HASH
+            - AttributeName: last_spun_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: tenant-status-index
+          KeySchema:
+            - AttributeName: tenant_id
+              KeyType: HASH
+            - AttributeName: status
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  ParticipantsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'OpsWheelV2-Participants-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: tenant_wheel_id
+          AttributeType: S
+        - AttributeName: participant_id
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: last_selected_at
+          AttributeType: S
+        - AttributeName: selection_count
+          AttributeType: N
+      KeySchema:
+        - AttributeName: tenant_wheel_id
+          KeyType: HASH
+        - AttributeName: participant_id
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: tenant-wheel-status-index
+          KeySchema:
+            - AttributeName: tenant_wheel_id
+              KeyType: HASH
+            - AttributeName: status
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: tenant-wheel-activity-index
+          KeySchema:
+            - AttributeName: tenant_wheel_id
+              KeyType: HASH
+            - AttributeName: last_selected_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: tenant-wheel-selection-count-index
+          KeySchema:
+            - AttributeName: tenant_wheel_id
+              KeyType: HASH
+            - AttributeName: selection_count
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+Outputs:
+  TenantsTableName:
+    Description: 'Name of the Tenants DynamoDB table'
+    Value: !Ref TenantsTable
+    Export:
+      Name: !Sub '${AWS::StackName}-TenantsTable'
+
+  UsersTableName:
+    Description: 'Name of the Users DynamoDB table'
+    Value: !Ref UsersTable
+    Export:
+      Name: !Sub '${AWS::StackName}-UsersTable'
+
+  WheelsTableName:
+    Description: 'Name of the Wheels DynamoDB table'
+    Value: !Ref WheelsTable
+    Export:
+      Name: !Sub '${AWS::StackName}-WheelsTable'
+
+  ParticipantsTableName:
+    Description: 'Name of the Participants DynamoDB table'
+    Value: !Ref ParticipantsTable
+    Export:
+      Name: !Sub '${AWS::StackName}-ParticipantsTable'
+
+  TenantsTableArn:
+    Description: 'ARN of the Tenants DynamoDB table'
+    Value: !GetAtt TenantsTable.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-TenantsTableArn'
+
+  UsersTableArn:
+    Description: 'ARN of the Users DynamoDB table'
+    Value: !GetAtt UsersTable.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-UsersTableArn'
+
+  WheelsTableArn:
+    Description: 'ARN of the Wheels DynamoDB table'
+    Value: !GetAtt WheelsTable.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-WheelsTableArn'
+
+  ParticipantsTableArn:
+    Description: 'ARN of the Participants DynamoDB table'
+    Value: !GetAtt ParticipantsTable.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ParticipantsTableArn'

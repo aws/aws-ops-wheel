@@ -1,0 +1,12 @@
+--require ./test/setup.js
+--require core-js/stage/4
+--require @babel/register
+--require ./test/globals.jsx
+--require source-map-support/register
+--require ignore-styles
+--full-trace
+--watch-extensions js,jsx
+--recursive
+--exit
+test/*.test.js*
+test/**/*.test.js*

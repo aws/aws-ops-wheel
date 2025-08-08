@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS Ops Wheel v2 - Cognito User Pool'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Environment for deployment
+
+  AdminEmail:
+    Type: String
+    Description: Admin email for Cognito notifications
+    Default: admin@example.com
+
+Resources:
+  # =================== COGNITO USER POOL ===================
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub 'aws-ops-wheel-v2-users-${Environment}'
+      AutoVerifiedAttributes:
+        - email
+      UsernameConfiguration:
+        CaseSensitive: false
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Required: true
+          Mutable: true
+        - Name: tenant_id
+          AttributeDataType: String
+          Mutable: true
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: !Sub 'aws-ops-wheel-v2-client-${Environment}'
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ADMIN_NO_SRP_AUTH
+        - USER_PASSWORD_AUTH
+      TokenValidityUnits:
+        IdToken: hours
+        AccessToken: hours
+        RefreshToken: days
+      IdTokenValidity: 24
+      AccessTokenValidity: 24
+      RefreshTokenValidity: 30
+
+Outputs:
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref UserPool
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPoolId'
+      
+  UserPoolClientId:
+    Description: Cognito User Pool Client ID
+    Value: !Ref UserPoolClient
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPoolClientId'
+
+  UserPoolArn:
+    Description: 'Cognito User Pool ARN'
+    Value: !GetAtt UserPool.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPoolArn'
+
+  UserPoolProviderName:
+    Description: 'Cognito User Pool Provider Name'
+    Value: !GetAtt UserPool.ProviderName
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPoolProviderName'

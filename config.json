@@ -1,0 +1,6 @@
+{
+  "UserPoolId": "us-west-2_J1bh2XPZN",
+  "ClientId": "5c8h0e4a2gvubb5tl6arf7bojn",
+  "API_BASE_URL": "https://xt2ejf17y6.execute-api.us-west-2.amazonaws.com/dev/app/api/v2",
+  "REGION": "us-west-2"
+}
