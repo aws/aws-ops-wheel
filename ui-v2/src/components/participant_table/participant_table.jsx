@@ -22,6 +22,7 @@ import ConfirmationModal from '../confirmation_modal';
 import {WheelType, ParticipantType} from '../../types';
 import {apiURL, getAuthHeaders} from '../../util';
 import {LinkWrapper} from '../../util';
+import PermissionGuard from '../PermissionGuard';
 
 interface ParticipantTableProps {
   listParticipantsFetch: PropTypes.object;
@@ -246,9 +247,11 @@ export class ParticipantTable extends Component<ParticipantTableProps, Participa
                                               onClose={this.toggleParticipantModal}
                                               participant={undefined}
                                               participantList={participants} />
-                            <Button onClick={this.toggleParticipantModal} variant='primary' size='sm' className='float-end'>
-                              Add New Participant
-                            </Button>
+                            <PermissionGuard permission="manage_participants">
+                              <Button onClick={this.toggleParticipantModal} variant='primary' size='sm' className='float-end'>
+                                Add New Participant
+                              </Button>
+                            </PermissionGuard>
                           </div>)
     }
 
@@ -330,11 +333,13 @@ export class ParticipantTable extends Component<ParticipantTableProps, Participa
                   <ButtonGroup>
                     {participantModal}
                   </ButtonGroup>
-                  <ButtonGroup>
-                    <Button onClick={this.toggleResetModal} variant='warning' size='sm' >
-                      Reset Weights
-                    </Button>
-                  </ButtonGroup>
+                  <PermissionGuard permission="manage_participants">
+                    <ButtonGroup>
+                      <Button onClick={this.toggleResetModal} variant='warning' size='sm' >
+                        Reset Weights
+                      </Button>
+                    </ButtonGroup>
+                  </PermissionGuard>
                 </ButtonToolbar>
               </div>
             </Card.Header>

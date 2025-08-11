@@ -21,6 +21,7 @@ import {Card, Table, Button} from 'react-bootstrap';
 import {WheelType} from '../../types';
 // import '../../static_content/favicon.ico'; // Favicon handled by HTML template
 import {apiURL, authenticatedFetch, getAuthHeaders} from '../../util';
+import PermissionGuard from '../PermissionGuard';
 
 interface WheelTableState {
   isWheelModalOpen: bool;
@@ -118,13 +119,15 @@ export class WheelTable extends Component<WheelTableProps, WheelTableState> {
             <Card.Header>
               <div className='tableHeader'>
                 List of available Wheels
-                <Button
-                  variant='primary'
-                  size='sm'
-                  onClick={this.toggleWheelModal}
-                  className='float-end'>
-                  Add New Wheel
-                </Button>
+                <PermissionGuard permission="create_wheel">
+                  <Button
+                    variant='primary'
+                    size='sm'
+                    onClick={this.toggleWheelModal}
+                    className='float-end'>
+                    Add New Wheel
+                  </Button>
+                </PermissionGuard>
               </div>
             </Card.Header>
             <Table striped hover>

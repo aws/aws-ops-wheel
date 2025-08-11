@@ -20,6 +20,7 @@ import ConfirmationModal from '../confirmation_modal';
 import {Button, ButtonGroup, ButtonToolbar} from 'react-bootstrap';
 import {formatDateTime} from '../../util';
 import {WheelType} from '../../types';
+import PermissionGuard from '../PermissionGuard';
 
 export interface WheelRowState {
   isWheelModalOpen: boolean;
@@ -88,30 +89,38 @@ export default class WheelRow extends Component<WheelRowProps, WheelRowState> {
               closeModal={this.toggleConfirmationModal}
           />
           <ButtonToolbar style={{gap: '10px'}}>
-            <ButtonGroup>
-              <Button
-                variant='primary'
-                size='sm'
-                onClick={this.toggleWheelModal}
-              >
-                Edit Name
-              </Button>
-            </ButtonGroup>
-            <ButtonGroup>
-              <LinkWrapper to={`wheel/${wheel.wheel_id}/participant`}>
-                <Button variant='primary' size='sm'>
-                  Edit Participants
+            <PermissionGuard permission="create_wheel">
+              <ButtonGroup>
+                <Button
+                  variant='primary'
+                  size='sm'
+                  onClick={this.toggleWheelModal}
+                >
+                  Edit Name
                 </Button>
-              </LinkWrapper>
-            </ButtonGroup>
-            <ButtonGroup>
-              <Button
-                onClick={this.toggleConfirmationModal}
-                variant='danger'
-                size='sm'
-                title='Delete the wheel'
-              >Delete Wheel</Button>
-            </ButtonGroup>
+              </ButtonGroup>
+            </PermissionGuard>
+            
+            <PermissionGuard permission="manage_participants">
+              <ButtonGroup>
+                <LinkWrapper to={`wheel/${wheel.wheel_id}/participant`}>
+                  <Button variant='primary' size='sm'>
+                    Edit Participants
+                  </Button>
+                </LinkWrapper>
+              </ButtonGroup>
+            </PermissionGuard>
+            
+            <PermissionGuard permission="delete_wheel">
+              <ButtonGroup>
+                <Button
+                  onClick={this.toggleConfirmationModal}
+                  variant='danger'
+                  size='sm'
+                  title='Delete the wheel'
+                >Delete Wheel</Button>
+              </ButtonGroup>
+            </PermissionGuard>
           </ButtonToolbar>
         </td>
       </tr>

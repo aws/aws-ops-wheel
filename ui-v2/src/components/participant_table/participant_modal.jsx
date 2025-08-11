@@ -185,6 +185,10 @@ export default class ParticipantModal extends Component<ParticipantModalProps, P
     // Use state participant values directly
     const participantName = participant ? participant.participant_name || '' : '';
     const participantUrl = participant ? participant.participant_url || '' : '';
+    
+    // Create unique IDs to avoid conflicts when multiple modals exist
+    const participantNameId = isAdd ? 'participant-name-add' : `participant-name-edit-${participant.participant_id || 'new'}`;
+    const participantUrlId = isAdd ? 'participant-url-add' : `participant-url-edit-${participant.participant_id || 'new'}`;
 
     return (
       <div>
@@ -195,8 +199,9 @@ export default class ParticipantModal extends Component<ParticipantModalProps, P
             </Modal.Header>
             <Modal.Body>
               <Form.Group className='mb-3'>
-                <Form.Label htmlFor='participant-name'>Participant Name</Form.Label>
+                <Form.Label htmlFor={participantNameId}>Participant Name</Form.Label>
                 <Form.Control 
+                  id={participantNameId}
                   type='text' 
                   name='participant_name' 
                   value={participantName} 
@@ -205,8 +210,9 @@ export default class ParticipantModal extends Component<ParticipantModalProps, P
                 />
               </Form.Group>
               <Form.Group className='mb-3'>
-                <Form.Label htmlFor='participant-url'>Participant URL</Form.Label>
+                <Form.Label htmlFor={participantUrlId}>Participant URL</Form.Label>
                 <Form.Control 
+                  id={participantUrlId}
                   type='text' 
                   name='participant_url' 
                   value={participantUrl} 

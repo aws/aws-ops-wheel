@@ -91,6 +91,9 @@ export default class WheelModal extends Component<WheelModalProps, WheelModalSta
 
     const heading: string = isAdd ? 'Add a new wheel' : 'Edit an existing wheel';
     const submitText: string = isAdd ? 'Add Wheel' : 'Update Wheel';
+    
+    // Create unique IDs to avoid conflicts when multiple modals exist
+    const wheelNameId = isAdd ? 'wheel-name-add' : `wheel-name-edit-${wheel.wheel_id || 'new'}`;
 
     return (
       <div>
@@ -106,8 +109,9 @@ export default class WheelModal extends Component<WheelModalProps, WheelModalSta
           <Modal.Body>
             <Form>
               <Form.Group className='mb-3'>
-                <Form.Label htmlFor='wheel-name'>Wheel Name</Form.Label>
+                <Form.Label htmlFor={wheelNameId}>Wheel Name</Form.Label>
                 <Form.Control
+                  id={wheelNameId}
                   type='text'
                   name='name'
                   onChange={this.onChange}

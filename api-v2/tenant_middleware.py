@@ -216,18 +216,8 @@ def get_role_permissions(role: str) -> Dict[str, bool]:
             'manage_tenant': False,
             'rig_wheel': False
         },
-        'VIEWER': {
-            'create_wheel': False,
-            'delete_wheel': False,
-            'manage_participants': False,
-            'spin_wheel': False,
-            'view_wheels': True,
-            'manage_users': False,
-            'manage_tenant': False,
-            'rig_wheel': False
-        }
     }
-    return permissions_map.get(role.upper(), permissions_map['VIEWER'])
+    return permissions_map.get(role.upper(), permissions_map['USER'])
 
 def require_auth():
     """Decorator requiring basic authentication"""

@@ -26,6 +26,7 @@ import '../styles.css';
 import {CognitoUserPool} from 'amazon-cognito-identity-js';
 import {BrowserRouter, Router} from 'react-router-dom';
 import {apiURL, setAPIConfig} from '../util';
+import { PermissionProvider } from './PermissionContext';
 
 /**
  * Main Application component
@@ -110,15 +111,17 @@ class App extends Component {
     if (this.state.cognitoSession !== undefined && this.state.cognitoSession.isValid()) {
       return (
           <BrowserRouter>
-            <div id="grandparent" onClickCapture={this.handleClickCapture}>
-              <Navigation {...childProps} />
-              <Switch>
-                <Route path='/app' exact={true} component={WheelTable} />
-                <Route path='/app/wheel/:wheel_id' exact={true} component={Wheel} />
-                <Route path='/app/wheel/:wheel_id/participant' exact={true} component={ParticipantTable} />
-                <Route component={NotFound} />
-              </Switch>
-            </div>
+            <PermissionProvider>
+              <div id="grandparent" onClickCapture={this.handleClickCapture}>
+                <Navigation {...childProps} />
+                <Switch>
+                  <Route path='/app' exact={true} component={WheelTable} />
+                  <Route path='/app/wheel/:wheel_id' exact={true} component={Wheel} />
+                  <Route path='/app/wheel/:wheel_id/participant' exact={true} component={ParticipantTable} />
+                  <Route component={NotFound} />
+                </Switch>
+              </div>
+            </PermissionProvider>
           </BrowserRouter>
       )
     } else {
