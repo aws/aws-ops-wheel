@@ -170,58 +170,8 @@ Resources:
           COGNITO_USER_POOL_ID: !Ref UserPoolId
           COGNITO_CLIENT_ID: !Ref UserPoolClientId
       Code:
-        ZipFile: |
-          import json
-          import os
-          import sys
-          sys.path.append('/opt/python/api-v2')
-          from tenant_management import create_tenant, get_tenant, update_tenant, get_tenant_users, update_user_role, get_config
-          
-          def parse_body(event):
-              """Parse request body, handling both string and dict formats"""
-              if 'body' not in event:
-                  event['body'] = {}
-                  return
-              
-              body = event['body']
-              if isinstance(body, str):
-                  try:
-                      event['body'] = json.loads(body) if body.strip() else {}
-                  except (json.JSONDecodeError, TypeError, ValueError):
-                      event['body'] = {}
-          
-          ROUTE_MAP = {
-              ('POST', '/app/api/v2/tenant'): create_tenant,
-              ('GET', '/app/api/v2/tenant'): get_tenant,
-              ('PUT', '/app/api/v2/tenant'): update_tenant,
-              ('GET', '/app/api/v2/tenant/users'): get_tenant_users,
-              ('PUT', '/app/api/v2/tenant/users/{id}/role'): update_user_role,
-              ('GET', '/app/api/v2/config'): get_config
-          }
-          
-          def lambda_handler(event, context):
-              try:
-                  # Parse request body
-                  parse_body(event)
-                  
-                  method = event.get('httpMethod')
-                  path = event.get('resource')
-                  handler = ROUTE_MAP.get((method, path))
-                  
-                  if not handler:
-                      return {
-                          'statusCode': 404,
-                          'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                          'body': json.dumps({'error': f'Route not found: {method} {path}'})
-                      }
-                  
-                  return handler(event, context)
-              except Exception as e:
-                  return {
-                      'statusCode': 500,
-                      'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                      'body': json.dumps({'error': f'Internal server error: {str(e)}'})
-                  }
+        S3Bucket: !Ref TemplatesBucketName
+        S3Key: 'index.zip'
 
   WheelOperationsFunction:
     Type: AWS::Lambda::Function
@@ -244,58 +194,8 @@ Resources:
           COGNITO_USER_POOL_ID: !Ref UserPoolId
           COGNITO_CLIENT_ID: !Ref UserPoolClientId
       Code:
-        ZipFile: |
-          import json
-          import os
-          import sys
-          sys.path.append('/opt/python/api-v2')
-          from wheel_operations import list_tenant_wheels, create_wheel, get_wheel, update_wheel, delete_wheel, reset_wheel_weights
-          
-          def parse_body(event):
-              """Parse request body, handling both string and dict formats"""
-              if 'body' not in event:
-                  event['body'] = {}
-                  return
-              
-              body = event['body']
-              if isinstance(body, str):
-                  try:
-                      event['body'] = json.loads(body) if body.strip() else {}
-                  except (json.JSONDecodeError, TypeError, ValueError):
-                      event['body'] = {}
-          
-          ROUTE_MAP = {
-              ('GET', '/app/api/v2/wheels'): list_tenant_wheels,
-              ('POST', '/app/api/v2/wheels'): create_wheel,
-              ('GET', '/app/api/v2/wheels/{wheel_id}'): get_wheel,
-              ('PUT', '/app/api/v2/wheels/{wheel_id}'): update_wheel,
-              ('DELETE', '/app/api/v2/wheels/{wheel_id}'): delete_wheel,
-              ('POST', '/app/api/v2/wheels/{wheel_id}/reset'): reset_wheel_weights
-          }
-          
-          def lambda_handler(event, context):
-              try:
-                  # Parse request body
-                  parse_body(event)
-                  
-                  method = event.get('httpMethod')
-                  path = event.get('resource')
-                  handler = ROUTE_MAP.get((method, path))
-                  
-                  if not handler:
-                      return {
-                          'statusCode': 404,
-                          'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                          'body': json.dumps({'error': f'Route not found: {method} {path}'})
-                      }
-                  
-                  return handler(event, context)
-              except Exception as e:
-                  return {
-                      'statusCode': 500,
-                      'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                      'body': json.dumps({'error': f'Internal server error: {str(e)}'})
-                  }
+        S3Bucket: !Ref TemplatesBucketName
+        S3Key: 'index.zip'
 
   ParticipantOperationsFunction:
     Type: AWS::Lambda::Function
@@ -318,60 +218,8 @@ Resources:
           COGNITO_USER_POOL_ID: !Ref UserPoolId
           COGNITO_CLIENT_ID: !Ref UserPoolClientId
       Code:
-        ZipFile: |
-          import json
-          import os
-          import sys
-          sys.path.append('/opt/python/api-v2')
-          from participant_operations import list_wheel_participants, create_participant, get_participant, update_participant, delete_participant, rig_participant, select_participant, remove_rigging
-          
-          def parse_body(event):
-              """Parse request body, handling both string and dict formats"""
-              if 'body' not in event:
-                  event['body'] = {}
-                  return
-              
-              body = event['body']
-              if isinstance(body, str):
-                  try:
-                      event['body'] = json.loads(body) if body.strip() else {}
-                  except (json.JSONDecodeError, TypeError, ValueError):
-                      event['body'] = {}
-          
-          ROUTE_MAP = {
-              ('GET', '/app/api/v2/wheels/{wheel_id}/participants'): list_wheel_participants,
-              ('POST', '/app/api/v2/wheels/{wheel_id}/participants'): create_participant,
-              ('GET', '/app/api/v2/wheels/{wheel_id}/participants/{participant_id}'): get_participant,
-              ('PUT', '/app/api/v2/wheels/{wheel_id}/participants/{participant_id}'): update_participant,
-              ('DELETE', '/app/api/v2/wheels/{wheel_id}/participants/{participant_id}'): delete_participant,
-              ('POST', '/app/api/v2/wheels/{wheel_id}/participants/{participant_id}/rig'): rig_participant,
-              ('POST', '/app/api/v2/wheels/{wheel_id}/participants/{participant_id}/select'): select_participant,
-              ('DELETE', '/app/api/v2/wheels/{wheel_id}/unrig'): remove_rigging
-          }
-          
-          def lambda_handler(event, context):
-              try:
-                  # Parse request body
-                  parse_body(event)
-                  
-                  method = event.get('httpMethod')
-                  path = event.get('resource')
-                  handler = ROUTE_MAP.get((method, path))
-                  
-                  if not handler:
-                      return {
-                          'statusCode': 404,
-                          'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                          'body': json.dumps({'error': f'Route not found: {method} {path}'})
-                      }
-                  
-                  return handler(event, context)
-              except Exception as e:
-                  return {
-                      'statusCode': 500,
-                      'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                      'body': json.dumps({'error': f'Internal server error: {str(e)}'})
-                  }
+        S3Bucket: !Ref TemplatesBucketName
+        S3Key: 'index.zip'
 
   SelectionAlgorithmsFunction:
     Type: AWS::Lambda::Function
@@ -394,61 +242,15 @@ Resources:
           COGNITO_USER_POOL_ID: !Ref UserPoolId
           COGNITO_CLIENT_ID: !Ref UserPoolClientId
       Code:
-        ZipFile: |
-          import json
-          import os
-          import sys
-          sys.path.append('/opt/python/api-v2')
-          from selection_algorithms import suggest_participant, get_selection_probabilities
-          
-          def parse_body(event):
-              """Parse request body, handling both string and dict formats"""
-              if 'body' not in event:
-                  event['body'] = {}
-                  return
-              
-              body = event['body']
-              if isinstance(body, str):
-                  try:
-                      event['body'] = json.loads(body) if body.strip() else {}
-                  except (json.JSONDecodeError, TypeError, ValueError):
-                      event['body'] = {}
-          
-          ROUTE_MAP = {
-              ('POST', '/app/api/v2/wheels/{wheel_id}/suggest'): suggest_participant,
-              ('GET', '/app/api/v2/wheels/{wheel_id}/probabilities'): get_selection_probabilities
-          }
-          
-          def lambda_handler(event, context):
-              try:
-                  # Parse request body
-                  parse_body(event)
-                  
-                  method = event.get('httpMethod')
-                  path = event.get('resource')
-                  handler = ROUTE_MAP.get((method, path))
-                  
-                  if not handler:
-                      return {
-                          'statusCode': 404,
-                          'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                          'body': json.dumps({'error': f'Route not found: {method} {path}'})
-                      }
-                  
-                  return handler(event, context)
-              except Exception as e:
-                  return {
-                      'statusCode': 500,
-                      'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                      'body': json.dumps({'error': f'Internal server error: {str(e)}'})
-                  }
+        S3Bucket: !Ref TemplatesBucketName
+        S3Key: 'index.zip'
 
   ApiAuthorizerFunction:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub 'ops-wheel-v2-api-authorizer-${Environment}'
       Runtime: python3.9
-      Handler: index.lambda_handler
+      Handler: authorizer_index.lambda_handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 30
       MemorySize: 256
@@ -462,29 +264,8 @@ Resources:
           COGNITO_USER_POOL_ID: !Ref UserPoolId
           COGNITO_CLIENT_ID: !Ref UserPoolClientId
       Code:
-        ZipFile: |
-          import json
-          import os
-          import sys
-          sys.path.append('/opt/python/api-v2')
-          from api_gateway_authorizer import lambda_handler as authorizer_handler
-          
-          def lambda_handler(event, context):
-              try:
-                  return authorizer_handler(event, context)
-              except Exception as e:
-                  print(f"Authorizer error: {str(e)}")
-                  return {
-                      'principalId': 'user',
-                      'policyDocument': {
-                          'Version': '2012-10-17',
-                          'Statement': [{
-                              'Action': 'execute-api:Invoke',
-                              'Effect': 'Deny',
-                              'Resource': event['methodArn']
-                          }]
-                      }
-                  }
+        S3Bucket: !Ref TemplatesBucketName
+        S3Key: 'authorizer_index.zip'
 
 Outputs:
   LayerBucketName:

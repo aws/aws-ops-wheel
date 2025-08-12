@@ -19,23 +19,9 @@ Resources:
       AttributeDefinitions:
         - AttributeName: tenant_id
           AttributeType: S
-        - AttributeName: domain
-          AttributeType: S
       KeySchema:
         - AttributeName: tenant_id
           KeyType: HASH
-      GlobalSecondaryIndexes:
-        - IndexName: domain-index
-          KeySchema:
-            - AttributeName: domain
-              KeyType: HASH
-          Projection:
-            ProjectionType: ALL
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Project
-          Value: aws-ops-wheel-v2
 
   UsersTable:
     Type: AWS::DynamoDB::Table
@@ -94,8 +80,6 @@ Resources:
           AttributeType: S
         - AttributeName: last_spun_at
           AttributeType: S
-        - AttributeName: status
-          AttributeType: S
       KeySchema:
         - AttributeName: tenant_id
           KeyType: HASH
@@ -118,14 +102,6 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
-        - IndexName: tenant-status-index
-          KeySchema:
-            - AttributeName: tenant_id
-              KeyType: HASH
-            - AttributeName: status
-              KeyType: RANGE
-          Projection:
-            ProjectionType: ALL
 
   ParticipantsTable:
     Type: AWS::DynamoDB::Table
@@ -137,8 +113,6 @@ Resources:
           AttributeType: S
         - AttributeName: participant_id
           AttributeType: S
-        - AttributeName: status
-          AttributeType: S
         - AttributeName: last_selected_at
           AttributeType: S
         - AttributeName: selection_count
@@ -149,14 +123,6 @@ Resources:
         - AttributeName: participant_id
           KeyType: RANGE
       GlobalSecondaryIndexes:
-        - IndexName: tenant-wheel-status-index
-          KeySchema:
-            - AttributeName: tenant_wheel_id
-              KeyType: HASH
-            - AttributeName: status
-              KeyType: RANGE
-          Projection:
-            ProjectionType: ALL
         - IndexName: tenant-wheel-activity-index
           KeySchema:
             - AttributeName: tenant_wheel_id

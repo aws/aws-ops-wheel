@@ -91,46 +91,60 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
 
-      // Method 1: Extract from JWT token (faster, offline-capable)
-      let userInfo = null;
+      // Check if we have a valid token first
+      let tokenInfo = null;
       try {
-        userInfo = extractUserInfoFromToken();
+        tokenInfo = extractUserInfoFromToken();
       } catch (error) {
         console.warn('Failed to extract user info from token:', error);
-        
-        // Clear invalid tokens and redirect to login
         localStorage.removeItem('idToken');
         window.location.href = '/app/login';
         return;
       }
 
-      if (!userInfo) {
-        // No valid token found, redirect to login
+      if (!tokenInfo) {
         window.location.href = '/app/login';
         return;
       }
 
-      // Method 2: Optionally validate with backend (slower, but authoritative)
-      if (validateWithBackend) {
-        try {
-          const response = await authenticatedFetch(apiURL('auth/validate'));
-          if (response && response.ok) {
-            const backendUserInfo = await response.json();
-            // Use backend info if available, fall back to token info
-            userInfo = { ...userInfo, ...backendUserInfo };
-          }
-        } catch (error) {
-          console.warn('Backend validation failed, using token info:', error);
-          // Continue with token-based info
+      // Always fetch user info from backend API to get role and tenant info
+      let userInfo = tokenInfo; // Fallback to token info
+      try {
+        const response = await authenticatedFetch(apiURL('auth/me'));
+        if (response && response.ok) {
+          const backendUserInfo = await response.json();
+          // Prioritize backend data, especially for role and permissions
+          userInfo = { 
+            ...tokenInfo, 
+            ...backendUserInfo,
+            // Ensure we use backend role data since JWT doesn't contain custom:role
+            role: backendUserInfo.role || 'USER',
+            permissions: backendUserInfo.permissions || {}
+          };
+          console.log('✅ Successfully loaded user info from backend:', userInfo);
+        } else if (response && response.status === 401) {
+          // Token is invalid, redirect to login
+          localStorage.removeItem('idToken');
+          window.location.href = '/app/login';
+          return;
+        } else {
+          console.warn('Backend API returned non-200 status:', response.status);
+          // Use token info as fallback - set default role to USER
+          userInfo = { ...tokenInfo, role: 'USER' };
         }
+      } catch (error) {
+        console.error('Failed to fetch user info from backend:', error);
+        // Use token info as fallback - set default role to USER
+        userInfo = { ...tokenInfo, role: 'USER' };
       }
 
       // Get permissions for the user's role
-      const permissions = ROLE_PERMISSIONS[userInfo.role?.toUpperCase()] || ROLE_PERMISSIONS['USER'];
+      const role = userInfo.role?.toUpperCase() || 'USER';
+      const permissions = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS['USER'];
 
       setState({
         permissions,
-        role: userInfo.role,
+        role: userInfo.role || 'USER',
         tenantId: userInfo.tenant_id,
         tenantName: userInfo.tenant_name,
         userId: userInfo.user_id || userInfo.sub,

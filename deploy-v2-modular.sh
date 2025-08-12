@@ -100,11 +100,81 @@ upload_templates() {
     log_success "All templates uploaded successfully"
 }
 
+# Function to cleanup obsolete build files
+cleanup_obsolete_build_files() {
+    log_info "Cleaning up obsolete build files..."
+    
+    # Clean up old Lambda zip files (but keep the ones we just built)
+    local lambda_zips_to_clean=()
+    
+    # Find old zip files that are older than 1 hour (to avoid cleaning recently built ones)
+    if command -v find >/dev/null 2>&1; then
+        # Use find if available for more precise cleanup
+        local old_zips=($(find . -maxdepth 1 -name "*.zip" -type f -mmin +60 2>/dev/null | grep -E "(authorizer_index|index|lambda-layer.*nocrypto)\.zip$" || true))
+        lambda_zips_to_clean+=("${old_zips[@]}")
+    fi
+    
+    # Clean up specified files
+    for zip_file in "${lambda_zips_to_clean[@]}"; do
+        if [[ -f "$zip_file" ]]; then
+            log_info "Removing old zip file: $zip_file"
+            rm -f "$zip_file"
+        fi
+    done
+    
+    # Clean up temporary directories
+    if [[ -d "lambda-layer-fixed" ]]; then
+        log_info "Removing temporary lambda-layer-fixed directory..."
+        rm -rf lambda-layer-fixed
+    fi
+    
+    # Clean up old config files
+    local config_files=("config.json" "ui-v2/config.json")
+    for config_file in "${config_files[@]}"; do
+        if [[ -f "$config_file" ]]; then
+            log_info "Removing old config file: $config_file"
+            rm -f "$config_file"
+        fi
+    done
+    
+    # Clean up old build artifacts in ui-v2
+    if [[ -d "ui-v2/build" ]]; then
+        log_info "Removing old ui-v2 build directory..."
+        rm -rf ui-v2/build
+    fi
+    
+    if [[ -d "ui-v2/dist" ]]; then
+        log_info "Removing old ui-v2 dist directory..."
+        rm -rf ui-v2/dist
+    fi
+    
+    # Clean up old build directories (keep last 2)
+    if [[ -d "build" ]]; then
+        log_info "Cleaning up old build directories (keeping last 2)..."
+        local old_build_dirs=($(ls -t build/ 2>/dev/null | grep "static_" | tail -n +3 || true))
+        
+        for dir in "${old_build_dirs[@]}"; do
+            if [[ -n "$dir" && -d "build/$dir" ]]; then
+                log_info "Removing old build directory: build/$dir"
+                rm -rf "build/$dir"
+            fi
+        done
+    fi
+    
+    # Clean up node_modules/.cache if it exists
+    if [[ -d "ui-v2/node_modules/.cache" ]]; then
+        log_info "Cleaning up ui-v2 node_modules cache..."
+        rm -rf ui-v2/node_modules/.cache
+    fi
+    
+    log_success "Cleanup of obsolete build files completed"
+}
+
 # Function to build and upload Lambda layer
 build_and_upload_lambda_layer() {
     log_info "Building Lambda layer with latest code..."
     
-    # Always rebuild the layer to ensure latest code
+    # Clean up any existing layer directory first
     rm -rf lambda-layer-fixed
     mkdir -p lambda-layer-fixed/python
     cp -r api-v2 lambda-layer-fixed/python/
@@ -122,6 +192,52 @@ build_and_upload_lambda_layer() {
         log_error "Failed to create Lambda layer zip file"
         exit 1
     fi
+}
+
+# Function to build and upload Lambda function zip files
+build_and_upload_lambda_functions() {
+    log_info "Building and uploading Lambda function zip files..."
+    
+    # Ensure we have the latest code by copying from the layer directory
+    if [ -f "lambda-layer-fixed/python/api-v2/index.py" ]; then
+        log_info "Copying latest index.py from layer..."
+        cp lambda-layer-fixed/python/api-v2/index.py .
+        
+        # Rebuild index.zip with latest code
+        log_info "Rebuilding index.zip with latest code..."
+        zip index.zip index.py > /dev/null 2>&1
+        log_success "Rebuilt index.zip with latest routing logic"
+    else
+        log_warning "lambda-layer-fixed/python/api-v2/index.py not found, using existing index.py"
+        if [ -f "index.py" ]; then
+            zip index.zip index.py > /dev/null 2>&1
+        fi
+    fi
+    
+    # Build authorizer_index.zip if source exists
+    if [ -f "authorizer_index.py" ]; then
+        log_info "Rebuilding authorizer_index.zip..."
+        zip authorizer_index.zip authorizer_index.py > /dev/null 2>&1
+        log_success "Rebuilt authorizer_index.zip"
+    fi
+    
+    local zip_files=(
+        "index.zip"
+        "authorizer_index.zip"
+    )
+    
+    for zip_file in "${zip_files[@]}"; do
+        if [ -f "$zip_file" ]; then
+            log_info "Uploading $zip_file..."
+            aws s3 cp "$zip_file" "s3://$TEMPLATES_BUCKET/$zip_file" --region $REGION
+            log_success "Uploaded $zip_file"
+        else
+            log_error "Lambda function zip file not found: $zip_file"
+            exit 1
+        fi
+    done
+    
+    log_success "All Lambda function zip files built and uploaded successfully"
 }
 
 # Function to validate templates
@@ -340,14 +456,17 @@ main() {
     
     # Execute deployment steps
     check_aws_config
+    cleanup_obsolete_build_files  # Clean up before starting
     create_templates_bucket
     validate_templates
     upload_templates
     build_and_upload_lambda_layer
+    build_and_upload_lambda_functions
     deploy_stack
     show_outputs
     create_and_upload_config
     build_and_upload_frontend
+    cleanup_obsolete_build_files  # Clean up after deployment
     
     log_success "🎉 AWS Ops Wheel v2 deployment completed successfully!"
     

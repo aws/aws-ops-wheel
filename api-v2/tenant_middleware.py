@@ -106,7 +106,7 @@ def lookup_user_tenant_info(user_email: str) -> Dict[str, Any]:
 
 def tenant_middleware(event, context):
     """
-    DynamoDB-based tenant middleware
+    Hybrid tenant middleware: Uses JWT custom attributes first, falls back to DynamoDB lookup
     """
     try:
         # Extract Authorization header
@@ -145,20 +145,45 @@ def tenant_middleware(event, context):
         # Validate token (basic validation)
         payload = validate_token_basic(token, user_pool_id, client_id)
         
-        # Get user email from JWT
+        # Get user info from JWT
+        user_id = payload.get('sub')
         user_email = payload.get('email')
-        if not user_email:
+        user_name = payload.get('name', user_email)
+        
+        if not user_email or not user_id:
             return {
                 'statusCode': 401,
                 'headers': {
                     'Content-Type': 'application/json',
                     'Access-Control-Allow-Origin': '*'
                 },
-                'body': json.dumps({'error': 'Token missing email claim'})
+                'body': json.dumps({'error': 'Token missing required claims (email or sub)'})
             }
         
-        # Look up tenant information from DynamoDB
-        tenant_info = lookup_user_tenant_info(user_email)
+        # Always get latest user info from DynamoDB to ensure roles are up-to-date
+        try:
+            tenant_info = lookup_user_tenant_info(user_email)
+        except Exception as db_error:
+            # For /auth/me endpoint, allow access without tenant info
+            path = event.get('path', '')
+            if '/auth/me' in path:
+                tenant_info = {
+                    'user_id': user_id,
+                    'tenant_id': None,
+                    'tenant_name': None,
+                    'role': 'USER',
+                    'email': user_email,
+                    'name': user_name
+                }
+            else:
+                return {
+                    'statusCode': 401,
+                    'headers': {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    },
+                    'body': json.dumps({'error': f'User not associated with any tenant. Please join a tenant first.'})
+                }
         
         # Add tenant context to event
         event['tenant_context'] = {

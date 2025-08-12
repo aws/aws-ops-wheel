@@ -13,7 +13,7 @@
  * permissions and limitations under the License.
  */
 
-declare var window: Window & { devToolsExtension: any, __REDUX_DEVTOOLS_EXTENSION_COMPOSE__: any };
+// Global window object type declaration removed - handled as JavaScript
 import React from 'react';
 import {render} from 'react-dom';
 import {Provider} from 'react-redux';

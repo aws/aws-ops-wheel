@@ -12,67 +12,178 @@ from utils_v2 import (
 )
 from selection_algorithms import apply_single_selection_weight_redistribution
 
+# Constants
+HTTP_STATUS_CODES = {
+    'OK': 200,
+    'CREATED': 201,
+    'NO_CONTENT': 204,
+    'BAD_REQUEST': 400,
+    'NOT_FOUND': 404,
+    'INTERNAL_ERROR': 500
+}
+
+CORS_HEADERS = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*'
+}
+
+EXTENDED_CORS_HEADERS = {
+    **CORS_HEADERS,
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'
+}
+
+PARTICIPANT_CONSTRAINTS = {
+    'MAX_NAME_LENGTH': 100,
+    'MAX_URL_LENGTH': 500,
+    'MIN_WEIGHT': 0,
+    'MAX_WEIGHT': 100,
+    'DEFAULT_WEIGHT': 1.0,
+    'DEFAULT_MAX_PARTICIPANTS': 100
+}
+
+VALIDATION_MESSAGES = {
+    'WHEEL_ID_REQUIRED': "wheel_id is required",
+    'PARTICIPANT_ID_REQUIRED': "participant_id is required",
+    'PARTICIPANT_NAME_REQUIRED': "participant_name is required and must be a non-empty string",
+    'PARTICIPANT_NAME_TOO_LONG': f"participant_name must be {PARTICIPANT_CONSTRAINTS['MAX_NAME_LENGTH']} characters or less",
+    'PARTICIPANT_URL_TOO_LONG': f"participant_url must be {PARTICIPANT_CONSTRAINTS['MAX_URL_LENGTH']} characters or less",
+    'INVALID_WEIGHT': f"weight must be a number between {PARTICIPANT_CONSTRAINTS['MIN_WEIGHT']} and {PARTICIPANT_CONSTRAINTS['MAX_WEIGHT']}",
+    'INVALID_REQUEST_BODY': "Invalid request body format",
+    'PARTICIPANT_EXISTS': "Participant '{}' already exists in this wheel",
+    'MAX_PARTICIPANTS_REACHED': "Wheel has reached maximum participant limit of {}",
+    'UPDATE_FIELD_REQUIRED': "At least one field must be provided for update",
+    'LAST_PARTICIPANT': "Cannot delete the last participant from a wheel",
+    'RIGGING_NOT_ALLOWED': "Rigging is not allowed for this wheel",
+    'REASON_REQUIRED': "Reason is required for rigging this wheel",
+    'PARTICIPANT_NOT_FOUND_IN_WHEEL': "Selected participant not found in wheel"
+}
+
+RIGGING_DEFAULTS = {
+    'HIDDEN': False,
+    'REQUIRE_REASON': False
+}
+
+
+def create_api_response(status_code: int, body: Any, additional_headers: Dict = None) -> Dict:
+    """Create standardized API response with CORS headers"""
+    headers = CORS_HEADERS.copy()
+    if additional_headers:
+        headers.update(additional_headers)
+    
+    return {
+        'statusCode': status_code,
+        'headers': headers,
+        'body': json.dumps(decimal_to_float(body) if isinstance(body, (dict, list)) else body) if body != '' else ''
+    }
+
+
+def create_error_response(status_code: int, error_message: str, extended_cors: bool = False) -> Dict:
+    """Create standardized error response"""
+    headers = EXTENDED_CORS_HEADERS if extended_cors else CORS_HEADERS
+    return create_api_response(status_code, {'error': error_message}, headers)
+
+
+def handle_api_exceptions(func):
+    """Decorator to handle common API exceptions"""
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except BadRequestError as e:
+            return create_error_response(HTTP_STATUS_CODES['BAD_REQUEST'], str(e))
+        except NotFoundError as e:
+            return create_error_response(HTTP_STATUS_CODES['NOT_FOUND'], str(e))
+        except Exception as e:
+            print(f"[ERROR] {func.__name__} error: {str(e)}")
+            return create_error_response(HTTP_STATUS_CODES['INTERNAL_ERROR'], f'Internal server error: {str(e)}')
+    
+    return wrapper
+
+
+def validate_participant_name(participant_name: str) -> None:
+    """Validate participant name"""
+    if not check_string(participant_name):
+        raise BadRequestError(VALIDATION_MESSAGES['PARTICIPANT_NAME_REQUIRED'])
+    if len(participant_name) > PARTICIPANT_CONSTRAINTS['MAX_NAME_LENGTH']:
+        raise BadRequestError(VALIDATION_MESSAGES['PARTICIPANT_NAME_TOO_LONG'])
+
+
+def validate_participant_url(participant_url: str) -> None:
+    """Validate participant URL"""
+    if participant_url and len(participant_url) > PARTICIPANT_CONSTRAINTS['MAX_URL_LENGTH']:
+        raise BadRequestError(VALIDATION_MESSAGES['PARTICIPANT_URL_TOO_LONG'])
+
+
+def validate_weight(weight: Any) -> float:
+    """Validate and convert weight to float"""
+    try:
+        weight = float(weight)
+        if weight < PARTICIPANT_CONSTRAINTS['MIN_WEIGHT'] or weight > PARTICIPANT_CONSTRAINTS['MAX_WEIGHT']:
+            raise BadRequestError(VALIDATION_MESSAGES['INVALID_WEIGHT'])
+        return weight
+    except (TypeError, ValueError):
+        raise BadRequestError(VALIDATION_MESSAGES['INVALID_WEIGHT'])
+
+
+def validate_request_body(body: Any) -> Dict:
+    """Validate and clean request body"""
+    if not isinstance(body, dict):
+        raise BadRequestError(VALIDATION_MESSAGES['INVALID_REQUEST_BODY'])
+    
+    # Remove participant_id from body if present (not needed for creation/updates)
+    return {k: v for k, v in body.items() if k != 'participant_id'}
+
+
+def check_participant_name_conflict(tenant_id: str, wheel_id: str, participant_name: str, exclude_participant_id: str = None) -> None:
+    """Check if participant name already exists in wheel"""
+    existing_participants = ParticipantRepository.list_wheel_participants(tenant_id, wheel_id)
+    
+    for participant in existing_participants:
+        if (participant['participant_name'].lower() == participant_name.lower() and 
+            participant['participant_id'] != exclude_participant_id):
+            raise BadRequestError(VALIDATION_MESSAGES['PARTICIPANT_EXISTS'].format(participant_name))
+
+
+def check_participant_limit(wheel: Dict, existing_participants: List) -> None:
+    """Check if wheel has reached participant limit"""
+    max_participants = wheel.get('settings', {}).get('max_participants_per_wheel', PARTICIPANT_CONSTRAINTS['DEFAULT_MAX_PARTICIPANTS'])
+    if len(existing_participants) >= max_participants:
+        raise BadRequestError(VALIDATION_MESSAGES['MAX_PARTICIPANTS_REACHED'].format(max_participants))
+
+
+def parse_request_body(event) -> Dict:
+    """Parse request body from event"""
+    body = event.get('body', {})
+    return validate_request_body(body)
+
 
 @require_tenant_permission('view_wheels')
+@handle_api_exceptions
 def list_wheel_participants(event, context=None):
     """
     List all participants for a specific wheel
     
     GET /v2/wheels/{wheel_id}/participants
     """
-    try:
-        tenant_context = get_tenant_context(event)
-        wheel_id = event.get('pathParameters', {}).get('wheel_id')
-        
-        if not wheel_id:
-            raise BadRequestError("wheel_id is required")
-        
-        # Verify wheel exists and belongs to tenant
-        WheelRepository.get_wheel(tenant_context['tenant_id'], wheel_id)
-        
-        # Get participants
-        participants = ParticipantRepository.list_wheel_participants(
-            tenant_context['tenant_id'], 
-            wheel_id
-        )
-        
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'
-            },
-            'body': json.dumps({
-                'participants': participants,  # Already converted to float by repository
-                'count': len(participants)
-            })
-        }
-        
-    except (BadRequestError, NotFoundError) as e:
-        status_code = getattr(e, 'status_code', 400) if hasattr(e, 'status_code') else (404 if isinstance(e, NotFoundError) else 400)
-        return {
-            'statusCode': status_code,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'
-            },
-            'body': json.dumps({'error': str(e)})
-        }
-    except Exception as e:
-        return {
-            'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'
-            },
-            'body': json.dumps({'error': f'Internal server error: {str(e)}'})
-        }
+    tenant_context = get_tenant_context(event)
+    wheel_id = event.get('pathParameters', {}).get('wheel_id')
+    
+    if not wheel_id:
+        raise BadRequestError(VALIDATION_MESSAGES['WHEEL_ID_REQUIRED'])
+    
+    # Verify wheel exists and belongs to tenant
+    WheelRepository.get_wheel(tenant_context['tenant_id'], wheel_id)
+    
+    # Get participants
+    participants = ParticipantRepository.list_wheel_participants(
+        tenant_context['tenant_id'], 
+        wheel_id
+    )
+    
+    return create_api_response(HTTP_STATUS_CODES['OK'], {
+        'participants': participants,
+        'count': len(participants)
+    }, EXTENDED_CORS_HEADERS)
 
 
 @require_tenant_permission('manage_participants')
@@ -644,7 +755,6 @@ def select_participant(event, context=None):
                 'weight': weight,
                 'original_weight': original_weight,
                 'selection_count': selection_count,
-                'status': participant_item.get('status', 'ACTIVE'),  # Preserve status
                 'created_at': participant_item.get('created_at', get_utc_timestamp()),  # Preserve creation time
             }
             

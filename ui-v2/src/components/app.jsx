@@ -17,6 +17,7 @@ import React, {PropTypes, Component} from 'react';
 import WheelTable from './wheel_table/wheel_table';
 import Wheel from './wheel';
 import ParticipantTable from './participant_table/participant_table';
+import UserTable from './user_table/user_table';
 import Login from './login';
 import NotFound from './notFound';
 import Navigation from './navigation';
@@ -28,16 +29,37 @@ import {BrowserRouter, Router} from 'react-router-dom';
 import {apiURL, setAPIConfig} from '../util';
 import { PermissionProvider } from './PermissionContext';
 
+// Constants
+const INITIAL_STATE = {
+  cognitoUserPool: undefined,
+  cognitoSession: undefined
+};
+
+const TOKEN_KEYS = {
+  ID_TOKEN: 'idToken',
+  ACCESS_TOKEN: 'accessToken',
+  REFRESH_TOKEN: 'refreshToken'
+};
+
+const ROUTES = {
+  APP_ROOT: '/app',
+  USERS: '/app/users',
+  WHEEL: '/app/wheel/:wheel_id',
+  PARTICIPANTS: '/app/wheel/:wheel_id/participant'
+};
+
+const LOADING_MESSAGES = {
+  INITIAL: 'Loading ...',
+  CONFIG: 'Loading configuration...'
+};
+
 /**
  * Main Application component
  */
 class App extends Component {
   constructor(props) {
     super(props);
-    this.state = {
-      cognitoUserPool: undefined,
-      cognitoSession: undefined
-    };
+    this.state = INITIAL_STATE;
   }
 
   componentDidMount() {
@@ -69,9 +91,9 @@ class App extends Component {
         const idToken = session.getIdToken().getJwtToken();
         // Store token for both react-redux-fetch and direct API calls
         container.registerRequestHeader('Authorization', idToken);
-        localStorage.setItem('idToken', idToken);
-        localStorage.setItem('accessToken', session.getAccessToken().getJwtToken());
-        localStorage.setItem('refreshToken', session.getRefreshToken().getToken());
+        localStorage.setItem(TOKEN_KEYS.ID_TOKEN, idToken);
+        localStorage.setItem(TOKEN_KEYS.ACCESS_TOKEN, session.getAccessToken().getJwtToken());
+        localStorage.setItem(TOKEN_KEYS.REFRESH_TOKEN, session.getRefreshToken().getToken());
         app.setState({cognitoSession: session});
       })
     }
@@ -80,10 +102,38 @@ class App extends Component {
   userLogout = () => {
     this.state.cognitoUserPool.getCurrentUser().signOut();
     // Clear stored tokens
-    localStorage.removeItem('idToken');
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    this.setState({cognitoUserPool: undefined, cognitoSession: undefined});
+    localStorage.removeItem(TOKEN_KEYS.ID_TOKEN);
+    localStorage.removeItem(TOKEN_KEYS.ACCESS_TOKEN);
+    localStorage.removeItem(TOKEN_KEYS.REFRESH_TOKEN);
+    this.setState(INITIAL_STATE);
+  }
+
+  createUserPool = (config) => {
+    return new CognitoUserPool({
+      UserPoolId: config.UserPoolId,
+      ClientId: config.ClientId,
+    });
+  }
+
+  getChildProps = () => {
+    const config = this.props.configFetch.value;
+    return {
+      userHasAuthenticated: this.refreshSession,
+      userPool: this.createUserPool(config),
+      userLogout: this.userLogout
+    };
+  }
+
+  renderRoutes = () => {
+    return (
+      <Switch>
+        <Route path={ROUTES.APP_ROOT} exact={true} component={WheelTable} />
+        <Route path={ROUTES.USERS} exact={true} component={UserTable} />
+        <Route path={ROUTES.WHEEL} exact={true} component={Wheel} />
+        <Route path={ROUTES.PARTICIPANTS} exact={true} component={ParticipantTable} />
+        <Route component={NotFound} />
+      </Switch>
+    );
   }
 
   handleClickCapture = () => {
@@ -96,34 +146,22 @@ class App extends Component {
 
   render() {
     if (!this.props.configFetch.fulfilled) {
-      return (<div>Loading ...</div>);
+      return <div>{LOADING_MESSAGES.INITIAL}</div>;
     }
 
-    const childProps = {
-      userHasAuthenticated: this.refreshSession,
-      userPool: new CognitoUserPool({
-        UserPoolId: this.props.configFetch.value.UserPoolId,
-        ClientId: this.props.configFetch.value.ClientId,
-      }),
-      userLogout: this.userLogout
-    };
+    const childProps = this.getChildProps();
 
     if (this.state.cognitoSession !== undefined && this.state.cognitoSession.isValid()) {
       return (
-          <BrowserRouter>
-            <PermissionProvider>
-              <div id="grandparent" onClickCapture={this.handleClickCapture}>
-                <Navigation {...childProps} />
-                <Switch>
-                  <Route path='/app' exact={true} component={WheelTable} />
-                  <Route path='/app/wheel/:wheel_id' exact={true} component={Wheel} />
-                  <Route path='/app/wheel/:wheel_id/participant' exact={true} component={ParticipantTable} />
-                  <Route component={NotFound} />
-                </Switch>
-              </div>
-            </PermissionProvider>
-          </BrowserRouter>
-      )
+        <BrowserRouter>
+          <PermissionProvider>
+            <div id="grandparent" onClickCapture={this.handleClickCapture}>
+              <Navigation {...childProps} />
+              {this.renderRoutes()}
+            </div>
+          </PermissionProvider>
+        </BrowserRouter>
+      );
     } else {
       return <Login {...childProps}/>;
     }

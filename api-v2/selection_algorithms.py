@@ -23,11 +23,11 @@ def calculate_selection_probabilities(participants: List[Dict]) -> Dict[str, flo
         return {}
     
     # Calculate total weight - add safety check for None
-    total_weight = sum(float(p.get('weight', 1.0)) for p in participants if p is not None and p.get('status') == 'ACTIVE')
+    total_weight = sum(float(p.get('weight', 1.0)) for p in participants if p is not None)
     
     if total_weight == 0:
-        # If all weights are 0, give equal probability to all active participants
-        active_participants = [p for p in participants if p is not None and p.get('status') == 'ACTIVE']
+        # If all weights are 0, give equal probability to all participants
+        active_participants = [p for p in participants if p is not None]
         equal_prob = 1.0 / len(active_participants) if active_participants else 0
         return {p['participant_id']: equal_prob for p in active_participants}
     
@@ -36,9 +36,8 @@ def calculate_selection_probabilities(participants: List[Dict]) -> Dict[str, flo
     for participant in participants:
         if participant is None:
             continue
-        if participant.get('status') == 'ACTIVE':
-            weight = float(participant.get('weight', 1.0))
-            probabilities[participant['participant_id']] = weight / total_weight
+        weight = float(participant.get('weight', 1.0))
+        probabilities[participant['participant_id']] = weight / total_weight
     
     return probabilities
 
@@ -51,38 +50,32 @@ def suggest_participant_legacy(participants: List[Dict], rigging_data: Optional[
     if not participants:
         raise BadRequestError("No participants available for selection")
     
-    # Filter active participants
-    active_participants = [p for p in participants if p.get('status') == 'ACTIVE']
-    
-    if not active_participants:
-        raise BadRequestError("No active participants available for selection")
-    
     # Check for rigging
     if rigging_data:
         rigged_id = rigging_data.get('rigged_participant_id')
-        for participant in active_participants:
+        for participant in participants:
             if participant['participant_id'] == rigged_id:
                 return participant
-        # If rigged participant not found or inactive, fall through to normal selection
+        # If rigged participant not found, fall through to normal selection
     
     # Calculate total weight
-    total_weight = sum(float(p.get('weight', 1.0)) for p in active_participants)
+    total_weight = sum(float(p.get('weight', 1.0)) for p in participants)
     
     if total_weight == 0:
         # If all weights are 0, select randomly
-        return random.choice(active_participants)
+        return random.choice(participants)
     
     # Get random number between 0 and total_weight
     target_number = total_weight * random.random()
     
     # Find participant using cumulative weight
-    for participant in active_participants:
+    for participant in participants:
         target_number -= float(participant.get('weight', 1.0))
         if target_number <= 0:
             return participant
     
     # Fallback (should not reach here)
-    return active_participants[-1]
+    return participants[-1]
 
 
 def apply_single_selection_weight_redistribution(participants: List[Dict], selected_participant: Dict):
@@ -283,15 +276,14 @@ def get_selection_probabilities(event, context=None):
         # Format response with participant details
         participant_probabilities = []
         for participant in participants:
-            if participant.get('status') == 'ACTIVE':
-                participant_probabilities.append({
-                    'participant_id': participant['participant_id'],
-                    'participant_name': participant['participant_name'],
-                    'current_weight': float(participant.get('weight', 1.0)),
-                    'selection_probability': probabilities.get(participant['participant_id'], 0.0),
-                    'selection_count': participant.get('selection_count', 0),
-                    'last_selected_at': participant.get('last_selected_at')
-                })
+            participant_probabilities.append({
+                'participant_id': participant['participant_id'],
+                'participant_name': participant['participant_name'],
+                'current_weight': float(participant.get('weight', 1.0)),
+                'selection_probability': probabilities.get(participant['participant_id'], 0.0),
+                'selection_count': participant.get('selection_count', 0),
+                'last_selected_at': participant.get('last_selected_at')
+            })
         
         return {
             'statusCode': 200,

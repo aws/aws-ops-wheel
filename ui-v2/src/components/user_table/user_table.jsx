@@ -15,58 +15,56 @@
 
 import React, {PropTypes, Component} from 'react';
 import connect from 'react-redux-fetch';
-import WheelRow from './wheel_row';
-import WheelModal from './wheel_modal';
+import UserRow from './user_row';
+import UserModal from './user_modal';
 import {Card, Table, Button} from 'react-bootstrap';
-import {WheelType} from '../../types';
-// import '../../static_content/favicon.ico'; // Favicon handled by HTML template
-import {apiURL, authenticatedFetch, getAuthHeaders} from '../../util';
+import {apiURL, getAuthHeaders} from '../../util';
 import PermissionGuard from '../PermissionGuard';
 
 // Constants
 const INITIAL_STATE = {
-  isWheelModalOpen: false,
+  isUserModalOpen: false,
   create: false,
   edit: false,
   delete: false,
 };
 
 const TABLE_HEADERS = [
-  'Wheel Name',
-  'Number of Participants', 
-  'Last Updated',
+  'Email',
+  'Username', 
+  'Role',
   'Created At',
+  'Last Login',
   'Operations'
 ];
 
-export class WheelTable extends Component {
+export class UserTable extends Component {
   constructor(props) {
     super(props);
     this.state = INITIAL_STATE;
-    this.cachedWheelsData = null;
+    this.cachedUsersData = null;
   }
 
   componentWillMount() {
-    this.props.dispatchWheelsGet();
+    this.props.dispatchUsersGet();
   }
 
-  toggleWheelModal = () => {
-    this.setState({isWheelModalOpen: !this.state.isWheelModalOpen});
+  toggleUserModal = () => {
+    this.setState({isUserModalOpen: !this.state.isUserModalOpen});
   };
 
-  handleWheelAdd = (wheel) => {
-    this.props.dispatchCreateWheelPost(wheel);
+  handleUserAdd = (user) => {
+    this.props.dispatchCreateUserPost(user);
     this.setState({create: true});
   };
 
-  handleWheelEdit = (wheel) => {
-    this.props.dispatchUpdateWheelPut(wheel);
+  handleUserEdit = (user) => {
+    this.props.dispatchUpdateUserPut(user);
     this.setState({edit: true});
   };
 
-  handleWheelDelete = (wheel) => {
-    // V2 API uses wheel_id instead of id
-    this.props.dispatchDeleteWheelDelete(wheel.wheel_id);
+  handleUserDelete = (user) => {
+    this.props.dispatchDeleteUserDelete(user.user_id);
     this.setState({delete: true});
   };
 
@@ -74,32 +72,32 @@ export class WheelTable extends Component {
     const updates = this.getStateUpdatesAfterOperations();
     if (Object.keys(updates).length > 0) {
       this.setState(updates);
-      this.props.dispatchWheelsGet();
+      this.props.dispatchUsersGet();
     }
   }
 
   getStateUpdatesAfterOperations = () => {
     const updates = {};
-    const { createWheelFetch, updateWheelFetch, deleteWheelFetch } = this.props;
+    const { createUserFetch, updateUserFetch, deleteUserFetch } = this.props;
     
-    if (this.state.create && createWheelFetch.fulfilled) {
+    if (this.state.create && createUserFetch.fulfilled) {
       updates.create = false;
     }
-    if (this.state.edit && updateWheelFetch.fulfilled) {
+    if (this.state.edit && updateUserFetch.fulfilled) {
       updates.edit = false;
     }
-    if (this.state.delete && deleteWheelFetch.fulfilled) {
+    if (this.state.delete && deleteUserFetch.fulfilled) {
       updates.delete = false;
     }
     
     return updates;
   };
 
-  getSortedWheels = (wheelsData) => {
-    const wheels = wheelsData?.wheels || [];
-    // Deep clone to avoid mutation and sort by wheel name
-    return JSON.parse(JSON.stringify(wheels)).sort((a, b) => 
-      a.wheel_name.localeCompare(b.wheel_name)
+  getSortedUsers = (usersData) => {
+    const users = usersData?.users || [];
+    // Deep clone to avoid mutation and sort by email
+    return JSON.parse(JSON.stringify(users)).sort((a, b) => 
+      a.email.localeCompare(b.email)
     );
   };
 
@@ -115,35 +113,35 @@ export class WheelTable extends Component {
     );
   };
 
-  renderWheelRows = (wheels) => {
-    return wheels.map(wheel => (
-      <WheelRow 
-        key={wheel.wheel_id} 
-        wheel={wheel} 
-        onEdit={this.handleWheelEdit} 
-        onDelete={this.handleWheelDelete}
+  renderUserRows = (users) => {
+    return users.map(user => (
+      <UserRow 
+        key={user.user_id} 
+        user={user} 
+        onEdit={this.handleUserEdit} 
+        onDelete={this.handleUserDelete}
       />
     ));
   };
 
   render() {
-    const { wheelsFetch } = this.props;
+    const { usersFetch } = this.props;
     
-    if (wheelsFetch.rejected) {
-      return <div>Oops... Could not fetch the wheels data!</div>;
+    if (usersFetch.rejected) {
+      return <div>Oops... Could not fetch the users data!</div>;
     }
     
-    if (wheelsFetch.fulfilled) {
-      this.cachedWheelsData = wheelsFetch.value;
+    if (usersFetch.fulfilled) {
+      this.cachedUsersData = usersFetch.value;
     }
     
-    if (!this.cachedWheelsData) {
+    if (!this.cachedUsersData) {
       return <div style={{padding: '15px'}}>Loading...</div>;
     }
 
-    const { isWheelModalOpen } = this.state;
-    const wheels = this.getSortedWheels(this.cachedWheelsData);
-    const wheelRows = this.renderWheelRows(wheels);
+    const { isUserModalOpen } = this.state;
+    const users = this.getSortedUsers(this.cachedUsersData);
+    const userRows = this.renderUserRows(users);
 
     return (
       <div className='pageRoot'>
@@ -151,14 +149,14 @@ export class WheelTable extends Component {
           <Card>
             <Card.Header>
               <div className='tableHeader'>
-                List of available Wheels
-                <PermissionGuard permission="create_wheel">
+                User Management
+                <PermissionGuard permission="manage_users">
                   <Button
                     variant='primary'
                     size='sm'
-                    onClick={this.toggleWheelModal}
+                    onClick={this.toggleUserModal}
                     className='float-end'>
-                    Add New Wheel
+                    Add New User
                   </Button>
                 </PermissionGuard>
               </div>
@@ -166,16 +164,16 @@ export class WheelTable extends Component {
             <Table striped hover>
               {this.renderTableHeaders()}
               <tbody>
-                {wheelRows}
+                {userRows}
               </tbody>
             </Table>
           </Card>
         </div>
-        <WheelModal
-          isModalOpen={isWheelModalOpen}
-          onSubmit={this.handleWheelAdd}
-          onClose={this.toggleWheelModal}
-          wheel={undefined}/>
+        <UserModal
+          isModalOpen={isUserModalOpen}
+          onSubmit={this.handleUserAdd}
+          onClose={this.toggleUserModal}
+          user={undefined}/>
       </div>
     );
   }
@@ -183,43 +181,43 @@ export class WheelTable extends Component {
 
 export default connect([
   {
-    resource: 'wheels',
+    resource: 'users',
     method: 'get',
     request: () => ({
-      url: apiURL('wheels'),
+      url: apiURL('tenant/users'),
       headers: getAuthHeaders()
     })
   },
   {
-    resource: 'createWheel',
+    resource: 'createUser',
     method: 'post',
-    request: (wheel) => ({
-      url: apiURL('wheels'),
+    request: (user) => ({
+      url: apiURL('tenant/users'),
       headers: getAuthHeaders(),
-      body: JSON.stringify(wheel)
+      body: JSON.stringify(user)
     })
   },
   {
-    resource: 'updateWheel',
+    resource: 'updateUser',
     method: 'put',
-    request: (wheel) => ({
-      url: apiURL(`wheels/${wheel.wheel_id}`),
+    request: (user) => ({
+      url: apiURL(`tenant/users/${user.user_id}/role`),
       headers: getAuthHeaders(),
-      body: JSON.stringify(wheel)
+      body: JSON.stringify({role: user.role})
     })
   },
   {
-    resource: 'deleteWheel',
+    resource: 'deleteUser',
     method: 'delete',
-    request: (wheelId) => ({
-      url: apiURL(`wheels/${wheelId}`),
+    request: (userId) => ({
+      url: apiURL(`tenant/users/${userId}`),
       headers: getAuthHeaders(),
       meta: {
         removeFromList: {
-          idName: 'wheel_id',
-          id: wheelId,
+          idName: 'user_id',
+          id: userId,
         }
       }
     })
   }
-])(WheelTable);
+])(UserTable);

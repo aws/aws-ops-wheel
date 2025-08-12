@@ -19,6 +19,7 @@ import connect from 'react-redux-fetch';
 import {Button} from 'react-bootstrap';
 import {WheelType, ParticipantType} from '../types';
 import {LinkWrapper, WHEEL_COLORS, apiURL, staticURL, getAuthHeaders} from '../util';
+import {usePermissions} from './PermissionContext';
 import '../static_content/wheel_click.mp3';
 import 'isomorphic-fetch';
 import * as PIXI from 'pixi.js';
@@ -68,6 +69,30 @@ const FIXED_TRUNCATION_MAX_PARTICIPANTS = 50;
 // Number of characters to truncate at a time by
 const TRUNCATION_INCREMENT = 2;
 
+/**
+ * Permission-aware EditParticipantsButton component
+ * Only shows for users with manage_participants permission (WHEEL_ADMIN and ADMIN)
+ */
+const EditParticipantsButton = ({ wheelId }) => {
+  const { hasPermission, loading } = usePermissions();
+  
+  if (loading) {
+    return null; // Don't show anything while loading permissions
+  }
+  
+  // Only show the button if user has manage_participants permission
+  if (!hasPermission('manage_participants')) {
+    return null;
+  }
+  
+  return (
+    <LinkWrapper to={`wheel/${wheelId}/participant`} style={{ margin: '5px' }}>
+      <Button size='md' style={{height: '38px', display: 'flex', alignItems: 'center'}}>
+        Edit participants
+      </Button>
+    </LinkWrapper>
+  );
+};
 
 /**
  * The Wheel component
@@ -412,11 +437,7 @@ export class Wheel extends PureComponent {
             {isMuted ? '🔇' : '🔊'}
           </Button>
           <div style={{textAlign: 'center', display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: '10px'}}>
-            <LinkWrapper to={`wheel/${this.props.match.params.wheel_id}/participant`} style={{
-              margin: '5px'
-            }}>
-              <Button size='md' style={{height: '38px', display: 'flex', alignItems: 'center'}}>Edit participants</Button>
-            </LinkWrapper>
+            <EditParticipantsButton wheelId={this.props.match.params.wheel_id} />
             <Button variant='primary' size='md' disabled={participantName === undefined} onClick={this.openParticipantPage}
             style={{margin: '5px', height: '38px', display: 'flex', alignItems: 'center'}}>
                 Choose{participantName && <>&nbsp;<b>{participantName}</b></>}

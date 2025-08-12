@@ -33,6 +33,10 @@ def add_extended_table_functions(table):
 
     def iter_query(*args, **kwargs):
         """Unwrap pagination from DynamoDB query results"""
+        # Ensure KeyConditionExpression uses boto3.dynamodb.conditions for safety
+        if 'KeyConditionExpression' in kwargs and isinstance(kwargs['KeyConditionExpression'], str):
+            raise ValueError("KeyConditionExpression must use boto3.dynamodb.conditions.Key() for security")
+        
         query_results = None
         while query_results is None or 'LastEvaluatedKey' in query_results:
             if query_results is not None:
@@ -124,7 +128,6 @@ class TenantRepository:
         tenant = {
             'tenant_id': tenant_data.get('tenant_id') or get_uuid(),
             'tenant_name': tenant_data['tenant_name'],
-            'domain': tenant_data.get('domain'),
             'created_at': timestamp,
             'quotas': tenant_data.get('quotas', {
                 'max_wheels': 50,
@@ -179,8 +182,7 @@ class UserRepository:
             'name': user_data.get('name', user_data['email']),
             'role': user_data.get('role', 'USER'),
             'created_at': timestamp,
-            'updated_at': timestamp,
-            'status': user_data.get('status', 'ACTIVE')
+            'updated_at': timestamp
         }
         
         UsersTable.put_item(Item=user)
@@ -224,6 +226,16 @@ class UserRepository:
     def update_user_role(user_id: str, new_role: str) -> Dict[str, Any]:
         """Update user role"""
         return UserRepository.update_user(user_id, {'role': new_role})
+    
+    @staticmethod
+    def update_last_login(user_id: str) -> Dict[str, Any]:
+        """Update user's last login timestamp"""
+        return UserRepository.update_user(user_id, {'last_login_at': get_utc_timestamp()})
+    
+    @staticmethod
+    def delete_user(user_id: str) -> None:
+        """Delete a user"""
+        UsersTable.delete_item(Key={'user_id': user_id})
 
 
 class WheelRepository:
@@ -242,7 +254,6 @@ class WheelRepository:
             'created_by': wheel_data['created_by'],
             'created_at': timestamp,
             'updated_at': timestamp,
-            'status': wheel_data.get('status', 'ACTIVE'),
             'settings': wheel_data.get('settings', {
                 'allow_rigging': True,
                 'multi_select_enabled': True,
@@ -329,8 +340,7 @@ class ParticipantRepository:
             'updated_at': timestamp,
             # Don't include last_selected_at for new participants to avoid GSI issues
             # 'last_selected_at': None,
-            'selection_count': 0,
-            'status': participant_data.get('status', 'ACTIVE')
+            'selection_count': 0
         }
         
         ParticipantsTable.put_item(Item=participant)

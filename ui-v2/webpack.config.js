@@ -79,7 +79,7 @@ module.exports = {
   devtool: (ENV === "production") ? "source-map" : "eval-cheap-module-source-map",
 
   resolve: {
-    extensions: [".jsx", ".js", ".json", ".css"],
+    extensions: [".tsx", ".ts", ".jsx", ".js", ".json", ".css"],
     fallback: {
       "util": false,
       "path": false
@@ -89,7 +89,11 @@ module.exports = {
 
   module: {
     rules: [
-      { test: /\.jsx?$/, exclude: /node_modules/, use: ['babel-loader']},
+      { 
+        test: /\.(js|jsx|ts|tsx)$/, 
+        exclude: /node_modules/, 
+        use: ['babel-loader']
+      },
       { test: /\.html$/, use: ['html-loader'] },
       { test: /\.css$/,
       use: [

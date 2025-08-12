@@ -255,8 +255,8 @@ Resources:
       Config: !Sub |
         {
           "API_BASE_URL": "https://${CloudFrontDistribution.DomainName}/app/api/v2",
-          "COGNITO_USER_POOL_ID": "${UserPoolId}",
-          "COGNITO_CLIENT_ID": "${UserPoolClientId}",
+          "UserPoolId": "${UserPoolId}",
+          "ClientId": "${UserPoolClientId}",
           "COGNITO_REGION": "${AWS::Region}",
           "ENVIRONMENT": "${Environment}",
           "MULTI_TENANT_ENABLED": true,

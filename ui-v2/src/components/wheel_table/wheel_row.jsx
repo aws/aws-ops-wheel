@@ -22,24 +22,28 @@ import {formatDateTime} from '../../util';
 import {WheelType} from '../../types';
 import PermissionGuard from '../PermissionGuard';
 
-export interface WheelRowState {
-  isWheelModalOpen: boolean;
-  isConfirmationModalOpen: boolean;
-}
+// Constants
+const INITIAL_STATE = {
+  isWheelModalOpen: false,
+  isConfirmationModalOpen: false,
+};
 
-export interface WheelRowProps {
-  wheel: WheelType;
-  onEdit: (wheel: WheelType) => void;
-  onDelete: (wheel: WheelType) => void;
-}
+const BUTTON_LABELS = {
+  EDIT_NAME: 'Edit Name',
+  EDIT_PARTICIPANTS: 'Edit Participants',
+  DELETE_WHEEL: 'Delete Wheel'
+};
 
-export default class WheelRow extends Component<WheelRowProps, WheelRowState> {
-  constructor(props: WheelRowProps) {
+const PERMISSIONS = {
+  CREATE_WHEEL: 'create_wheel',
+  MANAGE_PARTICIPANTS: 'manage_participants',
+  DELETE_WHEEL: 'delete_wheel'
+};
+
+export default class WheelRow extends Component {
+  constructor(props) {
     super(props);
-    this.state = {
-      isWheelModalOpen: false,
-      isConfirmationModalOpen: false,
-    };
+    this.state = INITIAL_STATE;
   }
 
   toggleWheelModal = () => {
@@ -50,7 +54,7 @@ export default class WheelRow extends Component<WheelRowProps, WheelRowState> {
       this.setState({isConfirmationModalOpen: !this.state.isConfirmationModalOpen});
   }
 
-  handleWheelEdit = (wheel: WheelType) => {
+  handleWheelEdit = (wheel) => {
     this.props.onEdit(wheel);
   };
 
@@ -89,36 +93,38 @@ export default class WheelRow extends Component<WheelRowProps, WheelRowState> {
               closeModal={this.toggleConfirmationModal}
           />
           <ButtonToolbar style={{gap: '10px'}}>
-            <PermissionGuard permission="create_wheel">
+            <PermissionGuard permission={PERMISSIONS.CREATE_WHEEL}>
               <ButtonGroup>
                 <Button
                   variant='primary'
                   size='sm'
                   onClick={this.toggleWheelModal}
                 >
-                  Edit Name
+                  {BUTTON_LABELS.EDIT_NAME}
                 </Button>
               </ButtonGroup>
             </PermissionGuard>
             
-            <PermissionGuard permission="manage_participants">
+            <PermissionGuard permission={PERMISSIONS.MANAGE_PARTICIPANTS}>
               <ButtonGroup>
                 <LinkWrapper to={`wheel/${wheel.wheel_id}/participant`}>
                   <Button variant='primary' size='sm'>
-                    Edit Participants
+                    {BUTTON_LABELS.EDIT_PARTICIPANTS}
                   </Button>
                 </LinkWrapper>
               </ButtonGroup>
             </PermissionGuard>
             
-            <PermissionGuard permission="delete_wheel">
+            <PermissionGuard permission={PERMISSIONS.DELETE_WHEEL}>
               <ButtonGroup>
                 <Button
                   onClick={this.toggleConfirmationModal}
                   variant='danger'
                   size='sm'
                   title='Delete the wheel'
-                >Delete Wheel</Button>
+                >
+                  {BUTTON_LABELS.DELETE_WHEEL}
+                </Button>
               </ButtonGroup>
             </PermissionGuard>
           </ButtonToolbar>

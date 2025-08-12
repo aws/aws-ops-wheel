@@ -24,44 +24,43 @@ import {apiURL, getAuthHeaders} from '../../util';
 import {LinkWrapper} from '../../util';
 import PermissionGuard from '../PermissionGuard';
 
-interface ParticipantTableProps {
-  listParticipantsFetch: PropTypes.object;
-  wheelFetch: PropTypes.object;
-  createParticipantFetch: PropTypes.object;
-  updateParticipantFetch: PropTypes.object;
-  deleteParticipantFetch: PropTypes.object;
-  rigParticipantFetch: PropTypes.object;
-  unrigParticipantFetch: PropTypes.object;
-  resetWheelFetch: PropTypes.object;
+// Constants
+const INITIAL_STATE = {
+  wheel: undefined,
+  participants: undefined,
+  rigging: {},
+  resetModalOpen: false,
+  participantModalOpen: false,
+  createPending: false,
+  updatePending: false,
+  deletePending: false,
+  resetPending: false,
+  fetchPending: false,
+  unrigCompleted: false,
+};
 
-  dispatchListParticipantsGet: PropTypes.func;
-  dispatchWheelGet: PropTypes.func;
-  dispatchCreateParticipantPost: PropTypes.func;
-  dispatchUpdateParticipantPut: PropTypes.func;
-  dispatchDeleteParticipantDelete: PropTypes.func;
-  dispatchRigParticipantPost: PropTypes.func;
-  dispatchUnrigParticipantDelete: PropTypes.func;
-  dispatchResetWheelPost: PropTypes.func;
-}
+const TABLE_HEADERS = [
+  'Name',
+  'URL',
+  'Chance of Selection',
+  'Operations',
+  'Rig',
+  'Hidden Rig'
+];
 
-interface Rigging {
-  participant_id: string | undefined;
-  hidden: boolean | undefined;
-}
+const BUTTON_LABELS = {
+  BACK: 'Back',
+  GO_TO_WHEEL: 'Go to Wheel',
+  ADD_PARTICIPANT: 'Add New Participant',
+  RESET_WEIGHTS: 'Reset Weights',
+  UNRIG: 'Un-rig'
+};
 
-interface ParticipantTableState {
-  wheel: WheelType | undefined;
-  participants: ParticipantType[] | undefined;
-  rigging: Rigging;
-  resetModalOpen: boolean;
-  participantModalOpen: boolean;
-  createPending: boolean;
-  deletePending: boolean;
-  resetPending: boolean;
-  fetchPending: boolean;
-}
+const PERMISSIONS = {
+  MANAGE_PARTICIPANTS: 'manage_participants'
+};
 
-export class ParticipantTable extends Component<ParticipantTableProps, ParticipantTableState> {
+export class ParticipantTable extends Component {
 
   constructor(props) {
     super(props);
@@ -159,22 +158,22 @@ export class ParticipantTable extends Component<ParticipantTableProps, Participa
     this.setState({participantModalOpen: !this.state.participantModalOpen});
   };
 
-  handleCreateParticipant = (participant: ParticipantType) => {
+  handleCreateParticipant = (participant) => {
     this.props.dispatchCreateParticipantPost(this.props.match.params.wheel_id, participant);
     this.setState({createPending: true});
   };
 
-  handleUpdateParticipant = (participant: ParticipantType) => {
+  handleUpdateParticipant = (participant) => {
     this.props.dispatchUpdateParticipantPut(this.props.match.params.wheel_id, participant);
     this.setState({updatePending: true});
   };
 
-  handleDeleteParticipant = (participant: ParticipantType) => {
+  handleDeleteParticipant = (participant) => {
     this.props.dispatchDeleteParticipantDelete(this.props.match.params.wheel_id, participant.participant_id);
     this.setState({deletePending: true});
   };
 
-  handleRigParticipant = (participant: ParticipantType) => {
+  handleRigParticipant = (participant) => {
     let {participant_id} = this.state.rigging;
 
     // Do nothing if we're already rigged
@@ -187,7 +186,7 @@ export class ParticipantTable extends Component<ParticipantTableProps, Participa
     this.setState({rigging: {participant_id: participant.participant_id, hidden: false}});
   };
 
-  handleHiddenRigParticipant = (participant: ParticipantType) => {
+  handleHiddenRigParticipant = (participant) => {
     let {participant_id, hidden} = this.state.rigging;
     // Change the hidden rig state if this participant is already rigged, otherwise do nothing
     if (participant_id === participant.participant_id) {

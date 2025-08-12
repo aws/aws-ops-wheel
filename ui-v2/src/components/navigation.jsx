@@ -18,6 +18,7 @@ import {Navbar, Nav} from 'react-bootstrap';
 import {LinkContainer} from 'react-router-bootstrap';
 import {CognitoUserPool} from 'amazon-cognito-identity-js';
 import {apiURL, authenticatedFetch} from '../util';
+import PermissionGuard from './PermissionGuard';
 
 interface NavigationProps {
   userPool: CognitoUserPool,
@@ -68,6 +69,11 @@ class Navigation extends Component<NavigationProps> {
           <LinkContainer to="/app" className="navbar-tab-active">
             <Nav.Link eventKey={1}>Wheels</Nav.Link>
           </LinkContainer>
+          <PermissionGuard permission="manage_users">
+            <LinkContainer to="/app/users">
+              <Nav.Link eventKey={2}>Users</Nav.Link>
+            </LinkContainer>
+          </PermissionGuard>
         </Nav>
         <Nav className="ms-auto">
           <Navbar.Text className="me-3">

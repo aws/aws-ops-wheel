@@ -20,26 +20,27 @@ import ConfirmationModal from '../confirmation_modal';
 import {ParticipantType} from '../../types';
 import {LinkWrapper} from '../../util';
 
-interface ParticipantRowProps {
-  participant: ParticipantType;
-  totalParticipantWeight: number;
-  rig: boolean;
-  hidden: boolean;
-  onEdit: Function;
-  onDelete: Function;
-  onRig: Function;
-  onHidden: Function;
-  participantList: ParticipantType[];
-}
+// Constants
+const INITIAL_STATE = {
+  participationModalOpen: false,
+  confirmationModalOpen: false,
+};
 
-export default class ParticipantRow extends Component<ParticipantRowProps> {
+const BUTTON_LABELS = {
+  EDIT: 'Edit',
+  DELETE: 'Delete'
+};
+
+const INPUT_LABELS = {
+  PUBLIC_RIG: 'public-rig',
+  HIDDEN_UNRIG: 'hidden-unrig'
+};
+
+export default class ParticipantRow extends Component {
 
   constructor(props) {
     super(props);
-    this.state = {
-      participationModalOpen: false,
-      confirmationModalOpen: false,
-    };
+    this.state = INITIAL_STATE;
   }
 
   toggleParticipationModal = () => {
@@ -50,7 +51,7 @@ export default class ParticipantRow extends Component<ParticipantRowProps> {
     this.setState({confirmationModalOpen: !this.state.confirmationModalOpen});
   }
 
-  handleUpdateParticipant = (participant: ParticipantType) => {
+  handleUpdateParticipant = (participant) => {
     this.props.onEdit(participant);
   }
 
@@ -61,8 +62,14 @@ export default class ParticipantRow extends Component<ParticipantRowProps> {
   handleRigParticipant = () => {
     this.props.onRig(this.props.participant);
   }
+  
   handleHiddenRigParticipant = () => {
     this.props.onHidden(this.props.participant);
+  }
+
+  calculateSelectionPercentage = () => {
+    const { participant, totalParticipantWeight } = this.props;
+    return (participant.weight / totalParticipantWeight * 100).toFixed(2);
   }
 
   render(){
@@ -78,7 +85,7 @@ export default class ParticipantRow extends Component<ParticipantRowProps> {
           <LinkWrapper to={participant.participant_url} remote={true} target='_blank'>{participant.participant_url}</LinkWrapper>
         </td>
         <td>
-          {(participant.weight / totalParticipantWeight * 100).toFixed(2)}%
+          {this.calculateSelectionPercentage()}%
         </td>
         <td>
           <ParticipantModal isOpen={participationModalOpen}
@@ -95,24 +102,24 @@ export default class ParticipantRow extends Component<ParticipantRowProps> {
               <Button variant='primary'
                       size='sm'
                       onClick={this.toggleParticipationModal}>
-                Edit
+                {BUTTON_LABELS.EDIT}
               </Button>
             </ButtonGroup>
             <ButtonGroup>
               <Button variant='danger'
                       size='sm'
                       onClick={this.toggleConfirmationModal}>
-                Delete
+                {BUTTON_LABELS.DELETE}
               </Button>
             </ButtonGroup>
           </ButtonToolbar>
         </td>
-        <td key='public-rig'>
+        <td key={INPUT_LABELS.PUBLIC_RIG}>
           <input type='radio'
                  checked={this.props.rig}
                  onChange={this.handleRigParticipant} />
         </td>
-        <td key='hidden-unrig'>
+        <td key={INPUT_LABELS.HIDDEN_UNRIG}>
           <input type='checkbox'
                  checked={this.props.hidden}
                  onChange={this.handleHiddenRigParticipant} />
