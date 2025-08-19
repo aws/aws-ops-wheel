@@ -13,9 +13,8 @@
  * permissions and limitations under the License.
  */
 
-import React, {PropTypes, Component} from 'react';
+import React, {Component} from 'react';
 import {Modal, Button, Form} from 'react-bootstrap';
-import {ParticipantType} from '../../types';
 import {validate} from 'validate.js';
 
 validate.options = {format: 'flat'};
@@ -27,19 +26,6 @@ validate.validators.uniqueName = function(participant, participantList, key, att
   return undefined;
 };
 
-interface ParticipantModalProps {
-  isOpen: boolean;
-  onSubmit: Function;
-  onClose: Function;
-  participant: ParticipantType;
-  participantList: ParticipantType[];
-}
-
-interface ParticipantModalState {
-  participant: ParticipantType,
-  isAdd: boolean,
-}
-
 const defaultParticipant = {
   participant_id: '',
   participant_name: '',
@@ -47,7 +33,7 @@ const defaultParticipant = {
   weight: 1
 };
 
-export default class ParticipantModal extends Component<ParticipantModalProps, ParticipantModalState> {
+export default class ParticipantModal extends Component {
   constructor(props) {
     super(props);
     this.state = {

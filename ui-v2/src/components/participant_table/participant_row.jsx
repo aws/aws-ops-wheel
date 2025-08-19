@@ -13,11 +13,10 @@
  * permissions and limitations under the License.
  */
 
-import React, {PropTypes, Component} from 'react';
+import React, {Component} from 'react';
 import {Button, ButtonGroup, ButtonToolbar} from 'react-bootstrap';
 import ParticipantModal from './participant_modal';
 import ConfirmationModal from '../confirmation_modal';
-import {ParticipantType} from '../../types';
 import {LinkWrapper} from '../../util';
 
 // Constants

@@ -5,8 +5,12 @@ Parameters:
   Environment:
     Type: String
     Default: dev
-    AllowedValues: [dev, staging, prod]
-    Description: Environment for deployment
+    Description: Deployment suffix for naming resources
+
+  ForceUpdateTimestamp:
+    Type: String
+    Default: '1'
+    Description: Timestamp parameter to force nested stack updates
 
   # Lambda Function ARN Parameters
   TenantManagementFunctionArn:
@@ -83,19 +87,19 @@ Resources:
       ParentId: !Ref ApiResource
       PathPart: 'v2'
 
-  # Tenant Resource and Methods
-  TenantResource:
+  # Wheel Group Resource and Methods
+  WheelGroupResource:
     Type: AWS::ApiGateway::Resource
     Properties:
       RestApiId: !Ref OpsWheelApiV2
       ParentId: !Ref V2Resource
-      PathPart: 'tenant'
+      PathPart: 'wheel-group'
 
-  TenantGetMethod:
+  WheelGroupGetMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref OpsWheelApiV2
-      ResourceId: !Ref TenantResource
+      ResourceId: !Ref WheelGroupResource
       HttpMethod: GET
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
@@ -104,11 +108,11 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
 
-  TenantPostMethod:
+  WheelGroupPostMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref OpsWheelApiV2
-      ResourceId: !Ref TenantResource
+      ResourceId: !Ref WheelGroupResource
       HttpMethod: POST
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
@@ -117,11 +121,11 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
 
-  TenantPutMethod:
+  WheelGroupPutMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref OpsWheelApiV2
-      ResourceId: !Ref TenantResource
+      ResourceId: !Ref WheelGroupResource
       HttpMethod: PUT
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
@@ -130,11 +134,11 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
 
-  TenantOptionsMethod:
+  WheelGroupOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref OpsWheelApiV2
-      ResourceId: !Ref TenantResource
+      ResourceId: !Ref WheelGroupResource
       HttpMethod: OPTIONS
       AuthorizationType: NONE
       Integration:
@@ -156,45 +160,31 @@ Resources:
             method.response.header.Access-Control-Allow-Origin: true
             method.response.header.Access-Control-Max-Age: true
 
-  # Tenant Users Resource (/tenant/users)
-  TenantUsersResource:
+  # Wheel Group Create Public Resource (/wheel-group/create-public)
+  WheelGroupCreatePublicResource:
     Type: AWS::ApiGateway::Resource
     Properties:
       RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref TenantResource
-      PathPart: 'users'
+      ParentId: !Ref WheelGroupResource
+      PathPart: 'create-public'
 
-  TenantUsersGetMethod:
+  WheelGroupCreatePublicPostMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref OpsWheelApiV2
-      ResourceId: !Ref TenantUsersResource
-      HttpMethod: GET
-      AuthorizationType: CUSTOM
-      AuthorizerId: !Ref LambdaAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
-
-  TenantUsersPostMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ResourceId: !Ref TenantUsersResource
+      ResourceId: !Ref WheelGroupCreatePublicResource
       HttpMethod: POST
-      AuthorizationType: CUSTOM
-      AuthorizerId: !Ref LambdaAuthorizer
+      AuthorizationType: NONE
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
 
-  TenantUsersOptionsMethod:
+  WheelGroupCreatePublicOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref OpsWheelApiV2
-      ResourceId: !Ref TenantUsersResource
+      ResourceId: !Ref WheelGroupCreatePublicResource
       HttpMethod: OPTIONS
       AuthorizationType: NONE
       Integration:
@@ -203,7 +193,7 @@ Resources:
           - StatusCode: 200
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
               method.response.header.Access-Control-Max-Age: "'86400'"
         RequestTemplates:
@@ -216,19 +206,19 @@ Resources:
             method.response.header.Access-Control-Allow-Origin: true
             method.response.header.Access-Control-Max-Age: true
 
-  # Tenant Users by ID Resource (/tenant/users/{user_id})
-  TenantUserIdResource:
+  # Wheel Group Delete Recursive Resource (/wheel-group/delete-recursive)
+  WheelGroupDeleteRecursiveResource:
     Type: AWS::ApiGateway::Resource
     Properties:
       RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref TenantUsersResource
-      PathPart: '{user_id}'
+      ParentId: !Ref WheelGroupResource
+      PathPart: 'delete-recursive'
 
-  TenantUserIdDeleteMethod:
+  WheelGroupDeleteRecursiveDeleteMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref OpsWheelApiV2
-      ResourceId: !Ref TenantUserIdResource
+      ResourceId: !Ref WheelGroupDeleteRecursiveResource
       HttpMethod: DELETE
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
@@ -237,11 +227,11 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
 
-  TenantUserIdOptionsMethod:
+  WheelGroupDeleteRecursiveOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref OpsWheelApiV2
-      ResourceId: !Ref TenantUserIdResource
+      ResourceId: !Ref WheelGroupDeleteRecursiveResource
       HttpMethod: OPTIONS
       AuthorizationType: NONE
       Integration:
@@ -263,19 +253,126 @@ Resources:
             method.response.header.Access-Control-Allow-Origin: true
             method.response.header.Access-Control-Max-Age: true
 
-  # Tenant Users Role Resource (/tenant/users/{user_id}/role)
-  TenantUserRoleResource:
+  # Wheel Group Users Resource (/wheel-group/users)
+  WheelGroupUsersResource:
     Type: AWS::ApiGateway::Resource
     Properties:
       RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref TenantUserIdResource
-      PathPart: 'role'
+      ParentId: !Ref WheelGroupResource
+      PathPart: 'users'
 
-  TenantUserRolePutMethod:
+  WheelGroupUsersGetMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref OpsWheelApiV2
-      ResourceId: !Ref TenantUserRoleResource
+      ResourceId: !Ref WheelGroupUsersResource
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref LambdaAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
+
+  WheelGroupUsersPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref OpsWheelApiV2
+      ResourceId: !Ref WheelGroupUsersResource
+      HttpMethod: POST
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref LambdaAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
+
+  WheelGroupUsersOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref OpsWheelApiV2
+      ResourceId: !Ref WheelGroupUsersResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+
+  # Wheel Group Users by ID Resource (/wheel-group/users/{user_id})
+  WheelGroupUserIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref OpsWheelApiV2
+      ParentId: !Ref WheelGroupUsersResource
+      PathPart: '{user_id}'
+
+  WheelGroupUserIdDeleteMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref OpsWheelApiV2
+      ResourceId: !Ref WheelGroupUserIdResource
+      HttpMethod: DELETE
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref LambdaAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
+
+  WheelGroupUserIdOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref OpsWheelApiV2
+      ResourceId: !Ref WheelGroupUserIdResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'DELETE,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+
+  # Wheel Group Users Role Resource (/wheel-group/users/{user_id}/role)
+  WheelGroupUserRoleResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref OpsWheelApiV2
+      ParentId: !Ref WheelGroupUserIdResource
+      PathPart: 'role'
+
+  WheelGroupUserRolePutMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref OpsWheelApiV2
+      ResourceId: !Ref WheelGroupUserRoleResource
       HttpMethod: PUT
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
@@ -284,11 +381,11 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
 
-  TenantUserRoleOptionsMethod:
+  WheelGroupUserRoleOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref OpsWheelApiV2
-      ResourceId: !Ref TenantUserRoleResource
+      ResourceId: !Ref WheelGroupUserRoleResource
       HttpMethod: OPTIONS
       AuthorizationType: NONE
       Integration:
@@ -344,6 +441,108 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
               method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+
+  # Admin Resource and Methods
+  AdminResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref OpsWheelApiV2
+      ParentId: !Ref V2Resource
+      PathPart: 'admin'
+
+  # Admin Wheel Groups Resource (/admin/wheel-groups)
+  AdminWheelGroupsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref OpsWheelApiV2
+      ParentId: !Ref AdminResource
+      PathPart: 'wheel-groups'
+
+  AdminWheelGroupsGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref OpsWheelApiV2
+      ResourceId: !Ref AdminWheelGroupsResource
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref LambdaAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
+
+  AdminWheelGroupsOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref OpsWheelApiV2
+      ResourceId: !Ref AdminWheelGroupsResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+
+  # Admin Wheel Group by ID Resource (/admin/wheel-groups/{wheel_group_id})
+  AdminWheelGroupIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref OpsWheelApiV2
+      ParentId: !Ref AdminWheelGroupsResource
+      PathPart: '{wheel_group_id}'
+
+  AdminWheelGroupIdDeleteMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref OpsWheelApiV2
+      ResourceId: !Ref AdminWheelGroupIdResource
+      HttpMethod: DELETE
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref LambdaAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
+
+  AdminWheelGroupIdOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref OpsWheelApiV2
+      ResourceId: !Ref AdminWheelGroupIdResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'DELETE,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
               method.response.header.Access-Control-Max-Age: "'86400'"
         RequestTemplates:
@@ -430,7 +629,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WheelOperationsFunctionArn}/invocations'
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
 
   WheelsPostMethod:
     Type: AWS::ApiGateway::Method
@@ -443,7 +642,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WheelOperationsFunctionArn}/invocations'
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
 
   WheelsOptionsMethod:
     Type: AWS::ApiGateway::Method
@@ -490,7 +689,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WheelOperationsFunctionArn}/invocations'
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
 
   WheelIdPutMethod:
     Type: AWS::ApiGateway::Method
@@ -503,7 +702,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WheelOperationsFunctionArn}/invocations'
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
 
   WheelIdDeleteMethod:
     Type: AWS::ApiGateway::Method
@@ -516,7 +715,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WheelOperationsFunctionArn}/invocations'
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
 
   WheelIdOptionsMethod:
     Type: AWS::ApiGateway::Method
@@ -837,7 +1036,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WheelOperationsFunctionArn}/invocations'
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
 
   ResetOptionsMethod:
     Type: AWS::ApiGateway::Method
@@ -916,19 +1115,27 @@ Resources:
   ApiDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
-      - TenantGetMethod
-      - TenantPostMethod
-      - TenantPutMethod
-      - TenantOptionsMethod
-      - TenantUsersGetMethod
-      - TenantUsersPostMethod
-      - TenantUsersOptionsMethod
-      - TenantUserIdDeleteMethod
-      - TenantUserIdOptionsMethod
-      - TenantUserRolePutMethod
-      - TenantUserRoleOptionsMethod
+      - WheelGroupGetMethod
+      - WheelGroupPostMethod
+      - WheelGroupPutMethod
+      - WheelGroupOptionsMethod
+      - WheelGroupCreatePublicPostMethod
+      - WheelGroupCreatePublicOptionsMethod
+      - WheelGroupDeleteRecursiveDeleteMethod
+      - WheelGroupDeleteRecursiveOptionsMethod
+      - WheelGroupUsersGetMethod
+      - WheelGroupUsersPostMethod
+      - WheelGroupUsersOptionsMethod
+      - WheelGroupUserIdDeleteMethod
+      - WheelGroupUserIdOptionsMethod
+      - WheelGroupUserRolePutMethod
+      - WheelGroupUserRoleOptionsMethod
       - ConfigGetMethod
       - ConfigOptionsMethod
+      - AdminWheelGroupsGetMethod
+      - AdminWheelGroupsOptionsMethod
+      - AdminWheelGroupIdDeleteMethod
+      - AdminWheelGroupIdOptionsMethod
       - MeGetMethod
       - MeOptionsMethod
       - WheelsGetMethod
@@ -1008,14 +1215,14 @@ Resources:
         gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
 
   # API Permissions (created after deployment to avoid circular dependency)
-  TenantApiPermission:
+  WheelGroupApiPermission:
     Type: AWS::Lambda::Permission
     DependsOn: ApiStage
     Properties:
       FunctionName: !Ref TenantManagementFunctionArn
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${OpsWheelApiV2}/${Environment}/*/app/api/v2/tenant*'
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${OpsWheelApiV2}/${Environment}/*/app/api/v2/wheel-group*'
 
   ConfigApiPermission:
     Type: AWS::Lambda::Permission
@@ -1039,7 +1246,7 @@ Resources:
     Type: AWS::Lambda::Permission
     DependsOn: ApiStage
     Properties:
-      FunctionName: !Ref WheelOperationsFunctionArn
+      FunctionName: !Ref TenantManagementFunctionArn
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${OpsWheelApiV2}/${Environment}/*/app/api/v2/wheels*'
@@ -1070,6 +1277,15 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${OpsWheelApiV2}/${Environment}/*/app/api/v2/wheels/*/suggest'
+
+  AdminApiPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn: ApiStage
+    Properties:
+      FunctionName: !Ref TenantManagementFunctionArn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${OpsWheelApiV2}/${Environment}/*/app/api/v2/admin*'
 
 Outputs:
   ApiGatewayId:

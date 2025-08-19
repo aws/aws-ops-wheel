@@ -73,16 +73,16 @@ def validate_token_basic(token: str, user_pool_id: str, client_id: str) -> dict:
     except Exception as e:
         raise ValueError(f"Token validation failed: {str(e)}")
 
-def lookup_user_tenant_info(user_email: str) -> dict:
+def lookup_user_wheel_group_info(user_email: str) -> dict:
     """
-    Look up tenant information from DynamoDB based on user email (inline copy)
+    Look up wheel group information from DynamoDB based on user email (inline copy)
     """
     import boto3
     try:
         # Initialize DynamoDB
         dynamodb = boto3.resource('dynamodb', region_name=os.environ.get('AWS_DEFAULT_REGION', 'us-west-2'))
         users_table = dynamodb.Table(os.environ.get('USERS_TABLE'))
-        tenants_table = dynamodb.Table(os.environ.get('TENANTS_TABLE'))
+        wheel_groups_table = dynamodb.Table(os.environ.get('WHEEL_GROUPS_TABLE'))
         
         # Query Users table by email
         response = users_table.scan(
@@ -95,17 +95,17 @@ def lookup_user_tenant_info(user_email: str) -> dict:
             raise ValueError(f"User not found in database: {user_email}")
         
         user_record = items[0]
-        tenant_id = user_record['tenant_id']
+        wheel_group_id = user_record['wheel_group_id']
         user_role = user_record.get('role', 'USER')
         
-        # Get tenant information
-        tenant_response = tenants_table.get_item(Key={'tenant_id': tenant_id})
-        tenant_record = tenant_response.get('Item', {})
+        # Get wheel group information
+        wheel_group_response = wheel_groups_table.get_item(Key={'wheel_group_id': wheel_group_id})
+        wheel_group_record = wheel_group_response.get('Item', {})
         
         return {
             'user_id': user_record['user_id'],
-            'tenant_id': tenant_id,
-            'tenant_name': tenant_record.get('tenant_name', tenant_id),
+            'wheel_group_id': wheel_group_id,
+            'wheel_group_name': wheel_group_record.get('wheel_group_name', wheel_group_id),
             'role': user_role,
             'email': user_email,
             'name': user_record.get('name', user_email),
@@ -113,14 +113,14 @@ def lookup_user_tenant_info(user_email: str) -> dict:
         }
         
     except Exception as e:
-        raise ValueError(f"Failed to lookup user tenant info: {str(e)}")
+        raise ValueError(f"Failed to lookup user wheel group info: {str(e)}")
 
 def get_role_permissions(role: str) -> list:
     """Get permissions for a user role (inline copy)"""
     permissions_map = {
         'ADMIN': [
             'create_wheel', 'delete_wheel', 'manage_participants', 'spin_wheel', 
-            'view_wheels', 'manage_users', 'manage_tenant', 'rig_wheel'
+            'view_wheels', 'manage_users', 'manage_wheel_group', 'rig_wheel'
         ],
         'WHEEL_ADMIN': [
             'create_wheel', 'delete_wheel', 'manage_participants', 'spin_wheel', 
@@ -166,13 +166,35 @@ def lambda_handler(event, context):
                 logger.error("Token missing email claim")
                 raise Exception('Unauthorized')
             
-            # Look up tenant information from DynamoDB
-            tenant_info = lookup_user_tenant_info(user_email)
+            # Check if this is a deployment admin user
+            is_deployment_admin = payload.get('custom:deployment_admin') == 'true'
             
-            logger.info(f"Token validated for user: {user_email}, tenant: {tenant_info['tenant_id']}")
+            if is_deployment_admin:
+                # For deployment admin, create context without database lookup
+                logger.info(f"Deployment admin token validated for user: {user_email}")
+                wheel_group_info = {
+                    'user_id': payload.get('sub'),
+                    'wheel_group_id': None,  # Deployment admins don't belong to specific wheel groups
+                    'wheel_group_name': None,
+                    'role': 'DEPLOYMENT_ADMIN',
+                    'email': user_email,
+                    'name': payload.get('name', user_email),
+                    'deployment_admin': True,
+                    'permissions': [
+                        # Deployment admin specific permissions
+                        'view_all_wheel_groups', 'delete_wheel_group', 'manage_deployment',
+                        # All regular admin permissions
+                        'create_wheel', 'delete_wheel', 'manage_participants', 'spin_wheel', 
+                        'view_wheels', 'manage_users', 'manage_wheel_group', 'rig_wheel'
+                    ]
+                }
+            else:
+                # Look up wheel group information from DynamoDB for regular users
+                wheel_group_info = lookup_user_wheel_group_info(user_email)
+                logger.info(f"Regular user token validated for user: {user_email}, wheel_group: {wheel_group_info['wheel_group_id']}")
             
             # Generate Allow policy
-            policy = generate_policy(user_email, 'Allow', event['methodArn'], tenant_info)
+            policy = generate_policy(user_email, 'Allow', event['methodArn'], wheel_group_info)
             logger.info(f"Generated policy: {json.dumps(policy)}")
             return policy
             
@@ -217,13 +239,14 @@ def generate_policy(principal_id, effect, resource, context=None):
         }
         auth_response['policyDocument'] = policy_document
     
-    # Pass tenant context to downstream Lambda (API Gateway context values must be strings)
+    # Pass wheel group context to downstream Lambda (API Gateway context values must be strings)
     if context:
         auth_response['context'] = {
-            'tenant_id': str(context.get('tenant_id', '')),
+            'wheel_group_id': str(context.get('wheel_group_id', '')),
             'user_id': str(context.get('user_id', '')),
             'role': str(context.get('role', '')),
-            'tenant_name': str(context.get('tenant_name', ''))
+            'wheel_group_name': str(context.get('wheel_group_name', '')),
+            'deployment_admin': str(context.get('deployment_admin', 'false'))
         }
     
     return auth_response

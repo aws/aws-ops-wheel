@@ -5,10 +5,10 @@ import json
 from decimal import Decimal
 from typing import Dict, Any, List
 from base import BadRequestError, NotFoundError
-from tenant_middleware import tenant_middleware, require_tenant_permission, get_tenant_context
+from wheel_group_middleware import wheel_group_middleware, require_wheel_group_permission, get_wheel_group_context
 from utils_v2 import (
     WheelRepository, ParticipantRepository, check_string, get_uuid, 
-    decimal_to_float, create_tenant_wheel_id, get_utc_timestamp
+    decimal_to_float, create_wheel_group_wheel_id, get_utc_timestamp
 )
 
 # Constants
@@ -120,19 +120,19 @@ def parse_request_body(event) -> Dict:
     return body_str if isinstance(body_str, dict) else (json.loads(body_str) if body_str else {})
 
 
-def get_sub_wheel_size(participant_name: str, tenant_id: str) -> int:
+def get_sub_wheel_size(participant_name: str, wheel_group_id: str) -> int:
     """
     Look for a wheel with the same name as the participant and return its participant count.
     This implements the same logic as V1's get_sub_wheel_size function.
     """
     try:
-        # Look for wheels in the same tenant with matching name
-        tenant_wheels = WheelRepository.list_tenant_wheels(tenant_id)
-        for wheel in tenant_wheels:
+        # Look for wheels in the same wheel group with matching name
+        wheel_group_wheels = WheelRepository.list_wheel_group_wheels(wheel_group_id)
+        for wheel in wheel_group_wheels:
             if wheel.get('wheel_name') == participant_name:
                 # Get participants for this wheel to count them
                 wheel_participants = ParticipantRepository.list_wheel_participants(
-                    tenant_id, 
+                    wheel_group_id, 
                     wheel['wheel_id']
                 )
                 participant_count = len(wheel_participants)
@@ -142,28 +142,43 @@ def get_sub_wheel_size(participant_name: str, tenant_id: str) -> int:
         return 1  # Default to 1 on any error
 
 
-@require_tenant_permission('view_wheels')
+@require_wheel_group_permission('view_wheels')
 @handle_api_exceptions
-def list_tenant_wheels(event, context=None):
+def list_wheel_group_wheels(event, context=None):
     """
-    List all wheels for the current tenant
+    List all wheels for the current wheel group
     
     GET /v2/wheels
     """
-    tenant_context = get_tenant_context(event)
-    wheels = WheelRepository.list_tenant_wheels(tenant_context['tenant_id'])
-    
-    return create_api_response(HTTP_STATUS_CODES['OK'], {
-        'wheels': wheels,
-        'count': len(wheels)
-    })
+    try:
+        print(f"[DEBUG] list_wheel_group_wheels called")
+        wheel_group_context = get_wheel_group_context(event)
+        print(f"[DEBUG] wheel_group_context: {wheel_group_context}")
+        
+        if not wheel_group_context or not wheel_group_context.get('wheel_group_id'):
+            print(f"[ERROR] Missing wheel_group_context or wheel_group_id")
+            raise BadRequestError("No wheel group associated with user")
+        
+        wheels = WheelRepository.list_wheel_group_wheels(wheel_group_context['wheel_group_id'])
+        print(f"[DEBUG] Found {len(wheels)} wheels")
+        
+        return create_api_response(HTTP_STATUS_CODES['OK'], {
+            'wheels': wheels,
+            'count': len(wheels)
+        })
+    except Exception as e:
+        print(f"[ERROR] list_wheel_group_wheels detailed error: {str(e)}")
+        print(f"[ERROR] Exception type: {type(e).__name__}")
+        import traceback
+        print(f"[ERROR] Traceback: {traceback.format_exc()}")
+        raise e
 
 
-@require_tenant_permission('create_wheel')
+@require_wheel_group_permission('create_wheel')
 @handle_api_exceptions
 def create_wheel(event, context=None):
     """
-    Create a new wheel for the current tenant
+    Create a new wheel for the current wheel group
     
     POST /v2/wheels
     
@@ -178,7 +193,7 @@ def create_wheel(event, context=None):
       }
     }
     """
-    tenant_context = get_tenant_context(event)
+    wheel_group_context = get_wheel_group_context(event)
     body = parse_request_body(event)
     
     # Validate required fields
@@ -196,17 +211,17 @@ def create_wheel(event, context=None):
     wheel_data = {
         'wheel_name': body['wheel_name'],
         'description': description,
-        'created_by': tenant_context['user_id'],
+        'created_by': wheel_group_context['user_id'],
         'settings': {**DEFAULT_WHEEL_SETTINGS, **settings}
     }
     
     # Create the wheel
-    wheel = WheelRepository.create_wheel(tenant_context['tenant_id'], wheel_data)
+    wheel = WheelRepository.create_wheel(wheel_group_context['wheel_group_id'], wheel_data)
     
     return create_api_response(HTTP_STATUS_CODES['CREATED'], wheel)
 
 
-@require_tenant_permission('view_wheels')
+@require_wheel_group_permission('view_wheels')
 @handle_api_exceptions
 def get_wheel(event, context=None):
     """
@@ -214,18 +229,18 @@ def get_wheel(event, context=None):
     
     GET /v2/wheels/{wheel_id}
     """
-    tenant_context = get_tenant_context(event)
+    wheel_group_context = get_wheel_group_context(event)
     wheel_id = event.get('pathParameters', {}).get('wheel_id')
     
     if not wheel_id:
         raise BadRequestError(VALIDATION_MESSAGES['WHEEL_ID_REQUIRED'])
     
     # Get wheel
-    wheel = WheelRepository.get_wheel(tenant_context['tenant_id'], wheel_id)
+    wheel = WheelRepository.get_wheel(wheel_group_context['wheel_group_id'], wheel_id)
     
     # Get participants for this wheel
     participants = ParticipantRepository.list_wheel_participants(
-        tenant_context['tenant_id'], 
+        wheel_group_context['wheel_group_id'], 
         wheel_id
     )
     
@@ -237,7 +252,7 @@ def get_wheel(event, context=None):
     return create_api_response(HTTP_STATUS_CODES['OK'], wheel_with_participants)
 
 
-@require_tenant_permission('create_wheel')
+@require_wheel_group_permission('create_wheel')
 @handle_api_exceptions
 def update_wheel(event, context=None):
     """
@@ -254,15 +269,15 @@ def update_wheel(event, context=None):
       }
     }
     """
-    tenant_context = get_tenant_context(event)
+    wheel_group_context = get_wheel_group_context(event)
     wheel_id = event.get('pathParameters', {}).get('wheel_id')
     body = parse_request_body(event)
     
     if not wheel_id:
         raise BadRequestError(VALIDATION_MESSAGES['WHEEL_ID_REQUIRED'])
     
-    # Verify wheel exists and belongs to tenant
-    existing_wheel = WheelRepository.get_wheel(tenant_context['tenant_id'], wheel_id)
+    # Verify wheel exists and belongs to wheel group
+    existing_wheel = WheelRepository.get_wheel(wheel_group_context['wheel_group_id'], wheel_id)
     
     # Prepare updates
     updates = {}
@@ -292,7 +307,7 @@ def update_wheel(event, context=None):
     
     # Update the wheel
     updated_wheel = WheelRepository.update_wheel(
-        tenant_context['tenant_id'], 
+        wheel_group_context['wheel_group_id'], 
         wheel_id, 
         updates
     )
@@ -300,7 +315,7 @@ def update_wheel(event, context=None):
     return create_api_response(HTTP_STATUS_CODES['OK'], updated_wheel)
 
 
-@require_tenant_permission('delete_wheel')
+@require_wheel_group_permission('delete_wheel')
 @handle_api_exceptions
 def delete_wheel(event, context=None):
     """
@@ -308,22 +323,22 @@ def delete_wheel(event, context=None):
     
     DELETE /v2/wheels/{wheel_id}
     """
-    tenant_context = get_tenant_context(event)
+    wheel_group_context = get_wheel_group_context(event)
     wheel_id = event.get('pathParameters', {}).get('wheel_id')
     
     if not wheel_id:
         raise BadRequestError(VALIDATION_MESSAGES['WHEEL_ID_REQUIRED'])
     
-    # Verify wheel exists and belongs to tenant (this will throw NotFoundError if not)
-    WheelRepository.get_wheel(tenant_context['tenant_id'], wheel_id)
+    # Verify wheel exists and belongs to wheel group (this will throw NotFoundError if not)
+    WheelRepository.get_wheel(wheel_group_context['wheel_group_id'], wheel_id)
     
     # Delete wheel and all participants
-    WheelRepository.delete_wheel(tenant_context['tenant_id'], wheel_id)
+    WheelRepository.delete_wheel(wheel_group_context['wheel_group_id'], wheel_id)
     
     return create_api_response(HTTP_STATUS_CODES['NO_CONTENT'], '')
 
 
-@require_tenant_permission('manage_participants')
+@require_wheel_group_permission('manage_participants')
 @handle_api_exceptions  
 def reset_wheel_weights(event, context=None):
     """
@@ -335,19 +350,19 @@ def reset_wheel_weights(event, context=None):
       "reason": "Starting fresh for new sprint"
     }
     """
-    tenant_context = get_tenant_context(event)
+    wheel_group_context = get_wheel_group_context(event)
     wheel_id = event.get('pathParameters', {}).get('wheel_id')
     body = parse_request_body(event)
     
     if not wheel_id:
         raise BadRequestError(VALIDATION_MESSAGES['WHEEL_ID_REQUIRED'])
     
-    # Verify wheel exists and belongs to tenant
-    WheelRepository.get_wheel(tenant_context['tenant_id'], wheel_id)
+    # Verify wheel exists and belongs to wheel group
+    WheelRepository.get_wheel(wheel_group_context['wheel_group_id'], wheel_id)
     
     # Get all participants
     participants = ParticipantRepository.list_wheel_participants(
-        tenant_context['tenant_id'], 
+        wheel_group_context['wheel_group_id'], 
         wheel_id
     )
     
@@ -367,7 +382,7 @@ def reset_wheel_weights(event, context=None):
             continue
             
         # Use V1 logic: get sub-wheel size based on participant name
-        reset_weight = get_sub_wheel_size(participant['participant_name'], tenant_context['tenant_id'])
+        reset_weight = get_sub_wheel_size(participant['participant_name'], wheel_group_context['wheel_group_id'])
         reset_weight_decimal = Decimal(str(reset_weight))
         
         update_data = {
@@ -385,14 +400,14 @@ def reset_wheel_weights(event, context=None):
     
     # Batch update all participants
     ParticipantRepository.batch_update_participants(
-        tenant_context['tenant_id'],
+        wheel_group_context['wheel_group_id'],
         wheel_id,
         participant_updates
     )
     
     # Update wheel's reset information
     WheelRepository.update_wheel(
-        tenant_context['tenant_id'],
+        wheel_group_context['wheel_group_id'],
         wheel_id,
         {'total_spins': 0}
     )
@@ -406,7 +421,7 @@ def reset_wheel_weights(event, context=None):
 
 # Export Lambda handler functions
 lambda_handlers = {
-    'list_tenant_wheels': list_tenant_wheels,
+    'list_wheel_group_wheels': list_wheel_group_wheels,
     'create_wheel': create_wheel,
     'get_wheel': get_wheel,
     'update_wheel': update_wheel,

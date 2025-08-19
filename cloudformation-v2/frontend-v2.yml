@@ -5,8 +5,7 @@ Parameters:
   Environment:
     Type: String
     Default: dev
-    AllowedValues: [dev, staging, prod]
-    Description: Environment for deployment
+    Description: Deployment suffix for naming resources
 
   # API Gateway Parameters
   ApiGatewayDomainName:
@@ -21,6 +20,11 @@ Parameters:
   UserPoolClientId:
     Type: String
     Description: Cognito User Pool Client ID
+
+  ForceUpdateTimestamp:
+    Type: String
+    Default: '1'
+    Description: Timestamp parameter to force nested stack updates
 
 Resources:
   # =================== FRONTEND S3 + CLOUDFRONT ===================

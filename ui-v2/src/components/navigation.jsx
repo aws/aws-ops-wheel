@@ -13,76 +13,105 @@
  * permissions and limitations under the License.
  */
 
-import React, {Component, PropTypes} from 'react';
+import React, {Component} from 'react';
+import PropTypes from 'prop-types';
 import {Navbar, Nav} from 'react-bootstrap';
 import {LinkContainer} from 'react-router-bootstrap';
 import {CognitoUserPool} from 'amazon-cognito-identity-js';
 import {apiURL, authenticatedFetch} from '../util';
 import PermissionGuard from './PermissionGuard';
 
-interface NavigationProps {
-  userPool: CognitoUserPool,
-  userLogout: PropTypes.func,
-}
+// Constants
+const NAVIGATION_CONSTANTS = {
+  APP_NAME: 'AWS Ops Wheel',
+  MIN_HEIGHT: '56px',
+  BACKGROUND_COLOR: '#EFEFEF'
+};
 
-class Navigation extends Component<NavigationProps> {
+const NAVIGATION_ROUTES = {
+  WHEELS: '/app/wheels',
+  USERS: '/app/users'
+};
+
+const NAV_LABELS = {
+  WHEELS: 'Wheels',
+  USERS: 'Users',
+  LOGOUT: 'Logout'
+};
+
+const EVENT_KEYS = {
+  WHEELS: 1,
+  USERS: 2,
+  LOGOUT: 3
+};
+
+const USER_INFO_LABELS = {
+  SIGNED_IN: 'Signed in as:',
+  WHEEL_GROUP: 'Wheel Group:'
+};
+
+const REQUIRED_PERMISSIONS = {
+  MANAGE_USERS: 'manage_users'
+};
+
+class Navigation extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      tenantName: null,
+      wheelGroupName: null,
       loading: true
     };
   }
 
   componentDidMount() {
-    this.fetchTenantInfo();
+    this.fetchWheelGroupInfo();
   }
 
-  fetchTenantInfo = async () => {
+  fetchWheelGroupInfo = async () => {
     try {
-      const response = await authenticatedFetch(apiURL('tenant'));
+      const response = await authenticatedFetch(apiURL('wheel-group'));
       if (response && response.ok) {
-        const tenant = await response.json();
+        const wheelGroup = await response.json();
         this.setState({
-          tenantName: tenant.tenant_name,
+          wheelGroupName: wheelGroup.wheel_group_name,
           loading: false
         });
       } else {
         this.setState({ loading: false });
       }
     } catch (error) {
-      console.error('Failed to fetch tenant info:', error);
+      console.error('Failed to fetch wheel group info:', error);
       this.setState({ loading: false });
     }
   };
 
   render() {
     const username = this.props.userPool.getCurrentUser().getUsername();
-    const { tenantName, loading } = this.state;
+    const { wheelGroupName, loading } = this.state;
 
     return(
-      <Navbar expand="lg" className="px-3" style={{backgroundColor: '#EFEFEF', minHeight: '56px'}}>
+      <Navbar expand="lg" className="px-3" style={{backgroundColor: NAVIGATION_CONSTANTS.BACKGROUND_COLOR, minHeight: NAVIGATION_CONSTANTS.MIN_HEIGHT}}>
         <Nav style={{height: '100%'}}>
           <Navbar.Brand className="me-3">
-            AWS Ops Wheel
+            {NAVIGATION_CONSTANTS.APP_NAME}
           </Navbar.Brand>
-          <LinkContainer to="/app" className="navbar-tab-active">
-            <Nav.Link eventKey={1}>Wheels</Nav.Link>
+          <LinkContainer to={NAVIGATION_ROUTES.WHEELS} className="navbar-tab-active">
+            <Nav.Link eventKey={EVENT_KEYS.WHEELS}>{NAV_LABELS.WHEELS}</Nav.Link>
           </LinkContainer>
-          <PermissionGuard permission="manage_users">
-            <LinkContainer to="/app/users">
-              <Nav.Link eventKey={2}>Users</Nav.Link>
+          <PermissionGuard permission={REQUIRED_PERMISSIONS.MANAGE_USERS}>
+            <LinkContainer to={NAVIGATION_ROUTES.USERS}>
+              <Nav.Link eventKey={EVENT_KEYS.USERS}>{NAV_LABELS.USERS}</Nav.Link>
             </LinkContainer>
           </PermissionGuard>
         </Nav>
         <Nav className="ms-auto">
           <Navbar.Text className="me-3">
-            Signed in as: <strong>{username}</strong>
-            {!loading && tenantName && (
-              <span> | Tenant: <strong>{tenantName}</strong></span>
+            {USER_INFO_LABELS.SIGNED_IN} <strong>{username}</strong>
+            {!loading && wheelGroupName && (
+              <span> | {USER_INFO_LABELS.WHEEL_GROUP} <strong>{wheelGroupName}</strong></span>
             )}
           </Navbar.Text>
-          <Nav.Link eventKey={3} onClick={this.props.userLogout}>Logout</Nav.Link>
+          <Nav.Link eventKey={EVENT_KEYS.LOGOUT} onClick={this.props.userLogout}>{NAV_LABELS.LOGOUT}</Nav.Link>
         </Nav>
       </Navbar>
     )

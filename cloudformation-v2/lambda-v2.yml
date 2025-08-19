@@ -5,8 +5,7 @@ Parameters:
   Environment:
     Type: String
     Default: dev
-    AllowedValues: [dev, staging, prod]
-    Description: Environment for deployment
+    Description: Deployment suffix for naming resources
 
   # Templates Bucket Parameter
   TemplatesBucketName:
@@ -19,10 +18,15 @@ Parameters:
     Default: "1"
     Description: Version identifier to force Lambda layer recreation when code changes (auto-managed)
 
-  # DynamoDB Table Parameters
-  TenantsTableName:
+  ForceUpdateTimestamp:
     Type: String
-    Description: Name of the Tenants DynamoDB table
+    Default: '1'
+    Description: Timestamp parameter to force nested stack updates
+
+  # DynamoDB Table Parameters
+  WheelGroupsTableName:
+    Type: String
+    Description: Name of the WheelGroups DynamoDB table
 
   UsersTableName:
     Type: String
@@ -36,9 +40,9 @@ Parameters:
     Type: String
     Description: Name of the Participants DynamoDB table
 
-  TenantsTableArn:
+  WheelGroupsTableArn:
     Type: String
-    Description: ARN of the Tenants DynamoDB table
+    Description: ARN of the WheelGroups DynamoDB table
 
   UsersTableArn:
     Type: String
@@ -66,19 +70,6 @@ Parameters:
     Description: Cognito User Pool ARN
 
 Resources:
-  # =================== S3 BUCKET FOR LAMBDA LAYER ===================
-  
-  LayerBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Sub 'ops-wheel-v2-layer-${Environment}-${AWS::Region}-${AWS::AccountId}'
-      VersioningConfiguration:
-        Status: Suspended
-      BucketEncryption:
-        ServerSideEncryptionConfiguration:
-          - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
-
   # =================== LAMBDA EXECUTION ROLE ===================
 
   LambdaExecutionRole:
@@ -110,14 +101,14 @@ Resources:
                   - dynamodb:BatchGetItem
                   - dynamodb:BatchWriteItem
                 Resource:
-                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TenantsTableName}'
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${WheelGroupsTableName}'
                   - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UsersTableName}'
                   - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${WheelsTableName}'
                   - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ParticipantsTableName}'
                   - !Sub '${UsersTableArn}/index/*'
                   - !Sub '${WheelsTableArn}/index/*'
                   - !Sub '${ParticipantsTableArn}/index/*'
-                  - !Sub '${TenantsTableArn}/index/*'
+                  - !Sub '${WheelGroupsTableArn}/index/*'
         - PolicyName: CognitoAccess
           PolicyDocument:
             Version: '2012-10-17'
@@ -142,7 +133,7 @@ Resources:
       Description: !Sub 'Shared Python dependencies and api-v2 code for AWS Ops Wheel v2 - Version ${LayerVersion}'
       Content:
         S3Bucket: !Ref TemplatesBucketName
-        S3Key: 'lambda-layer-v2-fixed-nocrypto.zip'
+        S3Key: 'lambda-layer-v2.zip'
       CompatibleRuntimes:
         - python3.9
       LicenseInfo: 'Apache-2.0'
@@ -163,7 +154,7 @@ Resources:
       Environment:
         Variables:
           ENVIRONMENT: !Ref Environment
-          TENANTS_TABLE: !Ref TenantsTableName
+          WHEEL_GROUPS_TABLE: !Ref WheelGroupsTableName
           USERS_TABLE: !Ref UsersTableName
           WHEELS_TABLE: !Ref WheelsTableName
           PARTICIPANTS_TABLE: !Ref ParticipantsTableName
@@ -187,7 +178,7 @@ Resources:
       Environment:
         Variables:
           ENVIRONMENT: !Ref Environment
-          TENANTS_TABLE: !Ref TenantsTableName
+          WHEEL_GROUPS_TABLE: !Ref WheelGroupsTableName
           USERS_TABLE: !Ref UsersTableName
           WHEELS_TABLE: !Ref WheelsTableName
           PARTICIPANTS_TABLE: !Ref ParticipantsTableName
@@ -211,7 +202,7 @@ Resources:
       Environment:
         Variables:
           ENVIRONMENT: !Ref Environment
-          TENANTS_TABLE: !Ref TenantsTableName
+          WHEEL_GROUPS_TABLE: !Ref WheelGroupsTableName
           USERS_TABLE: !Ref UsersTableName
           WHEELS_TABLE: !Ref WheelsTableName
           PARTICIPANTS_TABLE: !Ref ParticipantsTableName
@@ -235,7 +226,7 @@ Resources:
       Environment:
         Variables:
           ENVIRONMENT: !Ref Environment
-          TENANTS_TABLE: !Ref TenantsTableName
+          WHEEL_GROUPS_TABLE: !Ref WheelGroupsTableName
           USERS_TABLE: !Ref UsersTableName
           WHEELS_TABLE: !Ref WheelsTableName
           PARTICIPANTS_TABLE: !Ref ParticipantsTableName
@@ -259,7 +250,7 @@ Resources:
       Environment:
         Variables:
           ENVIRONMENT: !Ref Environment
-          TENANTS_TABLE: !Ref TenantsTableName
+          WHEEL_GROUPS_TABLE: !Ref WheelGroupsTableName
           USERS_TABLE: !Ref UsersTableName
           COGNITO_USER_POOL_ID: !Ref UserPoolId
           COGNITO_CLIENT_ID: !Ref UserPoolClientId
@@ -268,12 +259,6 @@ Resources:
         S3Key: 'authorizer_index.zip'
 
 Outputs:
-  LayerBucketName:
-    Description: S3 bucket for Lambda layer storage
-    Value: !Ref LayerBucket
-    Export:
-      Name: !Sub '${AWS::StackName}-LayerBucket'
-
   LambdaExecutionRoleArn:
     Description: Lambda execution role ARN
     Value: !GetAtt LambdaExecutionRole.Arn

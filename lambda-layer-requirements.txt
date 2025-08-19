@@ -1,0 +1,8 @@
+# Lambda Layer Requirements - Minimal set for AWS Ops Wheel v2
+# Excludes libraries already provided by AWS Lambda runtime
+
+# Don't include boto3/botocore - AWS Lambda runtime provides these
+# Don't include cryptography - causes ELF header issues and not needed
+
+# Only include what's absolutely necessary
+pyjwt>=2.8.0

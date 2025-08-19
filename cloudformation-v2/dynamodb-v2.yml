@@ -5,22 +5,26 @@ Parameters:
   Environment:
     Type: String
     Default: dev
-    AllowedValues: [dev, staging, prod]
-    Description: Environment for deployment
+    Description: Deployment suffix for naming resources
+
+  ForceUpdateTimestamp:
+    Type: String
+    Default: '1'
+    Description: Timestamp parameter to force nested stack updates
 
 Resources:
   # =================== DYNAMODB TABLES ===================
 
-  TenantsTable:
+  WheelGroupsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub 'OpsWheelV2-Tenants-${Environment}'
+      TableName: !Sub 'OpsWheelV2-WheelGroups-${Environment}'
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: tenant_id
+        - AttributeName: wheel_group_id
           AttributeType: S
       KeySchema:
-        - AttributeName: tenant_id
+        - AttributeName: wheel_group_id
           KeyType: HASH
 
   UsersTable:
@@ -31,7 +35,7 @@ Resources:
       AttributeDefinitions:
         - AttributeName: user_id
           AttributeType: S
-        - AttributeName: tenant_id
+        - AttributeName: wheel_group_id
           AttributeType: S
         - AttributeName: email
           AttributeType: S
@@ -43,17 +47,17 @@ Resources:
         - AttributeName: user_id
           KeyType: HASH
       GlobalSecondaryIndexes:
-        - IndexName: tenant-role-index
+        - IndexName: wheel-group-role-index
           KeySchema:
-            - AttributeName: tenant_id
+            - AttributeName: wheel_group_id
               KeyType: HASH
             - AttributeName: role
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
-        - IndexName: tenant-created-index
+        - IndexName: wheel-group-created-index
           KeySchema:
-            - AttributeName: tenant_id
+            - AttributeName: wheel_group_id
               KeyType: HASH
             - AttributeName: created_at
               KeyType: RANGE
@@ -72,7 +76,7 @@ Resources:
       TableName: !Sub 'OpsWheelV2-Wheels-${Environment}'
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: tenant_id
+        - AttributeName: wheel_group_id
           AttributeType: S
         - AttributeName: wheel_id
           AttributeType: S
@@ -81,22 +85,22 @@ Resources:
         - AttributeName: last_spun_at
           AttributeType: S
       KeySchema:
-        - AttributeName: tenant_id
+        - AttributeName: wheel_group_id
           KeyType: HASH
         - AttributeName: wheel_id
           KeyType: RANGE
       GlobalSecondaryIndexes:
-        - IndexName: tenant-created-index
+        - IndexName: wheel-group-created-index
           KeySchema:
-            - AttributeName: tenant_id
+            - AttributeName: wheel_group_id
               KeyType: HASH
             - AttributeName: created_at
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
-        - IndexName: tenant-activity-index
+        - IndexName: wheel-group-activity-index
           KeySchema:
-            - AttributeName: tenant_id
+            - AttributeName: wheel_group_id
               KeyType: HASH
             - AttributeName: last_spun_at
               KeyType: RANGE
@@ -109,7 +113,7 @@ Resources:
       TableName: !Sub 'OpsWheelV2-Participants-${Environment}'
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: tenant_wheel_id
+        - AttributeName: wheel_group_wheel_id
           AttributeType: S
         - AttributeName: participant_id
           AttributeType: S
@@ -118,22 +122,22 @@ Resources:
         - AttributeName: selection_count
           AttributeType: N
       KeySchema:
-        - AttributeName: tenant_wheel_id
+        - AttributeName: wheel_group_wheel_id
           KeyType: HASH
         - AttributeName: participant_id
           KeyType: RANGE
       GlobalSecondaryIndexes:
-        - IndexName: tenant-wheel-activity-index
+        - IndexName: wheel-group-wheel-activity-index
           KeySchema:
-            - AttributeName: tenant_wheel_id
+            - AttributeName: wheel_group_wheel_id
               KeyType: HASH
             - AttributeName: last_selected_at
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
-        - IndexName: tenant-wheel-selection-count-index
+        - IndexName: wheel-group-wheel-selection-count-index
           KeySchema:
-            - AttributeName: tenant_wheel_id
+            - AttributeName: wheel_group_wheel_id
               KeyType: HASH
             - AttributeName: selection_count
               KeyType: RANGE
@@ -141,11 +145,11 @@ Resources:
             ProjectionType: ALL
 
 Outputs:
-  TenantsTableName:
-    Description: 'Name of the Tenants DynamoDB table'
-    Value: !Ref TenantsTable
+  WheelGroupsTableName:
+    Description: 'Name of the WheelGroups DynamoDB table'
+    Value: !Ref WheelGroupsTable
     Export:
-      Name: !Sub '${AWS::StackName}-TenantsTable'
+      Name: !Sub '${AWS::StackName}-WheelGroupsTable'
 
   UsersTableName:
     Description: 'Name of the Users DynamoDB table'
@@ -165,11 +169,11 @@ Outputs:
     Export:
       Name: !Sub '${AWS::StackName}-ParticipantsTable'
 
-  TenantsTableArn:
-    Description: 'ARN of the Tenants DynamoDB table'
-    Value: !GetAtt TenantsTable.Arn
+  WheelGroupsTableArn:
+    Description: 'ARN of the WheelGroups DynamoDB table'
+    Value: !GetAtt WheelGroupsTable.Arn
     Export:
-      Name: !Sub '${AWS::StackName}-TenantsTableArn'
+      Name: !Sub '${AWS::StackName}-WheelGroupsTableArn'
 
   UsersTableArn:
     Description: 'ARN of the Users DynamoDB table'

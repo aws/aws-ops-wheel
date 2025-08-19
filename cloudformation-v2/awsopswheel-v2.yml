@@ -5,18 +5,12 @@ Parameters:
   Environment:
     Type: String
     Default: dev
-    AllowedValues: [dev, staging, prod]
-    Description: Environment for deployment
+    Description: Deployment suffix for naming resources
 
   AdminEmail:
     Type: String
     Description: Admin email for Cognito notifications
     Default: admin@example.com
-    
-  TenantDomain:
-    Type: String
-    Description: Primary tenant domain for the application
-    Default: example.com
 
   TemplatesBucketName:
     Type: String
@@ -36,6 +30,7 @@ Resources:
       TemplateURL: !Sub 'https://${TemplatesBucketName}.s3.${AWS::Region}.amazonaws.com/templates/dynamodb-v2.yml'
       Parameters:
         Environment: !Ref Environment
+        ForceUpdateTimestamp: !Ref LayerVersion
 
   # =================== COGNITO STACK (No Dependencies) ===================
   CognitoStack:
@@ -45,6 +40,7 @@ Resources:
       Parameters:
         Environment: !Ref Environment
         AdminEmail: !Ref AdminEmail
+        ForceUpdateTimestamp: !Ref LayerVersion
 
   # =================== LAMBDA STACK (Depends on DynamoDB + Cognito) ===================
   LambdaStack:
@@ -58,11 +54,12 @@ Resources:
         Environment: !Ref Environment
         TemplatesBucketName: !Ref TemplatesBucketName
         LayerVersion: !Ref LayerVersion
-        TenantsTableName: !GetAtt DynamoDBStack.Outputs.TenantsTableName
+        ForceUpdateTimestamp: !Ref LayerVersion
+        WheelGroupsTableName: !GetAtt DynamoDBStack.Outputs.WheelGroupsTableName
         UsersTableName: !GetAtt DynamoDBStack.Outputs.UsersTableName
         WheelsTableName: !GetAtt DynamoDBStack.Outputs.WheelsTableName
         ParticipantsTableName: !GetAtt DynamoDBStack.Outputs.ParticipantsTableName
-        TenantsTableArn: !GetAtt DynamoDBStack.Outputs.TenantsTableArn
+        WheelGroupsTableArn: !GetAtt DynamoDBStack.Outputs.WheelGroupsTableArn
         UsersTableArn: !GetAtt DynamoDBStack.Outputs.UsersTableArn
         WheelsTableArn: !GetAtt DynamoDBStack.Outputs.WheelsTableArn
         ParticipantsTableArn: !GetAtt DynamoDBStack.Outputs.ParticipantsTableArn
@@ -78,6 +75,7 @@ Resources:
       TemplateURL: !Sub 'https://${TemplatesBucketName}.s3.${AWS::Region}.amazonaws.com/templates/api-gateway-v2.yml'
       Parameters:
         Environment: !Ref Environment
+        ForceUpdateTimestamp: !Ref LayerVersion
         TenantManagementFunctionArn: !GetAtt LambdaStack.Outputs.TenantManagementFunctionArn
         WheelOperationsFunctionArn: !GetAtt LambdaStack.Outputs.WheelOperationsFunctionArn
         ParticipantOperationsFunctionArn: !GetAtt LambdaStack.Outputs.ParticipantOperationsFunctionArn
@@ -97,14 +95,15 @@ Resources:
         ApiGatewayDomainName: !GetAtt ApiGatewayStack.Outputs.ApiGatewayDomainName
         UserPoolId: !GetAtt CognitoStack.Outputs.UserPoolId
         UserPoolClientId: !GetAtt CognitoStack.Outputs.UserPoolClientId
+        ForceUpdateTimestamp: !Ref LayerVersion
 
 Outputs:
   # =================== DATABASE OUTPUTS ===================
-  TenantsTableName:
-    Description: 'Name of the Tenants DynamoDB table'
-    Value: !GetAtt DynamoDBStack.Outputs.TenantsTableName
+  WheelGroupsTableName:
+    Description: 'Name of the WheelGroups DynamoDB table'
+    Value: !GetAtt DynamoDBStack.Outputs.WheelGroupsTableName
     Export:
-      Name: !Sub '${AWS::StackName}-TenantsTable'
+      Name: !Sub '${AWS::StackName}-WheelGroupsTable'
 
   UsersTableName:
     Description: 'Name of the Users DynamoDB table'
@@ -138,12 +137,6 @@ Outputs:
       Name: !Sub '${AWS::StackName}-UserPoolClientId'
 
   # =================== COMPUTE OUTPUTS ===================
-  LayerBucketName:
-    Description: S3 bucket for Lambda layer storage
-    Value: !GetAtt LambdaStack.Outputs.LayerBucketName
-    Export:
-      Name: !Sub '${AWS::StackName}-LayerBucket'
-
   TenantManagementFunctionArn:
     Description: Tenant Management Lambda function ARN
     Value: !GetAtt LambdaStack.Outputs.TenantManagementFunctionArn
@@ -226,7 +219,7 @@ Outputs:
       - Cognito Client: ${CognitoStack.Outputs.UserPoolClientId}
       
       Database Tables:
-      - Tenants: ${DynamoDBStack.Outputs.TenantsTableName}
+      - Wheel Groups: ${DynamoDBStack.Outputs.WheelGroupsTableName}
       - Users: ${DynamoDBStack.Outputs.UsersTableName}
       - Wheels: ${DynamoDBStack.Outputs.WheelsTableName}
       - Participants: ${DynamoDBStack.Outputs.ParticipantsTableName}
@@ -263,6 +256,6 @@ Outputs:
          Backend API: ${ApiGatewayStack.Outputs.ApiGatewayURL}
       
       🔧 Manual Steps (if needed):
-      1. Upload Lambda layer: aws s3 cp lambda-layer-v2-fixed.zip s3://${LambdaStack.Outputs.LayerBucketName}/lambda-layer-v2-fixed.zip
+      1. Upload Lambda layer: aws s3 cp lambda-layer-v2-fixed.zip s3://${TemplatesBucketName}/lambda-layer-v2-fixed.zip
       2. Manual frontend build: cd ui-v2 && npm run build && aws s3 sync ../build/static/ s3://${FrontendStack.Outputs.FrontendBucketName}/app/ --delete
       3. Cache invalidation: aws cloudfront create-invalidation --distribution-id ${FrontendStack.Outputs.CloudFrontDistributionId} --paths "/*"

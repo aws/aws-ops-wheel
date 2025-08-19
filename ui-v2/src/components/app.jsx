@@ -13,26 +13,35 @@
  * permissions and limitations under the License.
  */
 
-import React, {PropTypes, Component} from 'react';
-import WheelTable from './wheel_table/wheel_table';
-import Wheel from './wheel';
-import ParticipantTable from './participant_table/participant_table';
-import UserTable from './user_table/user_table';
+import React, {Component, Suspense, lazy} from 'react';
+import PropTypes from 'prop-types';
 import Login from './login';
+import ForgotPassword from './forgot_password';
+import ResetPassword from './reset_password';
+import WheelGroupCreation from './wheel_group_creation';
 import NotFound from './notFound';
 import Navigation from './navigation';
+import DeploymentAdminNavigation from './deployment_admin_navigation';
 import connect, {container} from 'react-redux-fetch';
-import {Route, Switch} from 'react-router-dom';
+import {Route, Switch, Redirect} from 'react-router-dom';
 import '../styles.css';
 import {CognitoUserPool} from 'amazon-cognito-identity-js';
-import {BrowserRouter, Router} from 'react-router-dom';
-import {apiURL, setAPIConfig} from '../util';
-import { PermissionProvider } from './PermissionContext';
+import {BrowserRouter} from 'react-router-dom';
+import {setAPIConfig} from '../util';
+import { PermissionProvider, usePermissions } from './PermissionContext';
+
+// Lazy load heavy components for better performance
+const WheelTable = lazy(() => import('./wheel_table/wheel_table'));
+const Wheel = lazy(() => import('./wheel'));
+const ParticipantTable = lazy(() => import('./participant_table/participant_table'));
+const UserTable = lazy(() => import('./user_table/user_table'));
+const WheelGroupsTable = lazy(() => import('./wheel_groups_table/wheel_groups_table'));
 
 // Constants
 const INITIAL_STATE = {
   cognitoUserPool: undefined,
-  cognitoSession: undefined
+  cognitoSession: undefined,
+  showTenantCreation: false
 };
 
 const TOKEN_KEYS = {
@@ -43,9 +52,12 @@ const TOKEN_KEYS = {
 
 const ROUTES = {
   APP_ROOT: '/app',
+  WHEELS: '/app/wheels',
+  WHEEL_GROUPS: '/app/wheelgroups',
   USERS: '/app/users',
   WHEEL: '/app/wheel/:wheel_id',
-  PARTICIPANTS: '/app/wheel/:wheel_id/participant'
+  PARTICIPANTS: '/app/wheel/:wheel_id/participant',
+  CREATE_WHEEL_GROUP: '/app/createtenant'
 };
 
 const LOADING_MESSAGES = {
@@ -89,12 +101,24 @@ class App extends Component {
           return;
         }
         const idToken = session.getIdToken().getJwtToken();
-        // Store token for both react-redux-fetch and direct API calls
-        container.registerRequestHeader('Authorization', idToken);
-        localStorage.setItem(TOKEN_KEYS.ID_TOKEN, idToken);
-        localStorage.setItem(TOKEN_KEYS.ACCESS_TOKEN, session.getAccessToken().getJwtToken());
-        localStorage.setItem(TOKEN_KEYS.REFRESH_TOKEN, session.getRefreshToken().getToken());
-        app.setState({cognitoSession: session});
+        
+        // Only update state if the session actually changed to prevent unnecessary re-renders
+        const currentIdToken = app.state.cognitoSession?.getIdToken()?.getJwtToken();
+        const currentStoredToken = localStorage.getItem(TOKEN_KEYS.ID_TOKEN);
+        
+        if (currentIdToken !== idToken) {
+          // Store token for both react-redux-fetch and direct API calls
+          container.registerRequestHeader('Authorization', idToken);
+          
+          // Only update localStorage if the token is actually different to prevent storage events
+          if (currentStoredToken !== idToken) {
+            localStorage.setItem(TOKEN_KEYS.ID_TOKEN, idToken);
+            localStorage.setItem(TOKEN_KEYS.ACCESS_TOKEN, session.getAccessToken().getJwtToken());
+            localStorage.setItem(TOKEN_KEYS.REFRESH_TOKEN, session.getRefreshToken().getToken());
+          }
+          
+          app.setState({cognitoSession: session});
+        }
       })
     }
   }
@@ -120,18 +144,60 @@ class App extends Component {
     return {
       userHasAuthenticated: this.refreshSession,
       userPool: this.createUserPool(config),
-      userLogout: this.userLogout
+      userLogout: this.userLogout,
+      onCreateTenant: this.handleShowTenantCreation
     };
+  }
+
+  handleShowTenantCreation = () => {
+    this.setState({ showTenantCreation: true });
+  }
+
+  handleBackToLogin = () => {
+    this.setState({ showTenantCreation: false });
+  }
+
+  handleWheelGroupCreated = (wheelGroupData, credentials) => {
+    // After wheel group creation, go back to login page
+    this.setState({ showTenantCreation: false });
+    
+    // Instead of auto-login, we'll just show a success message and let user manually log in
+    // This avoids timing issues with Cognito user creation
+    console.log('Wheel group created successfully! Please log in with your credentials.');
   }
 
   renderRoutes = () => {
     return (
+      <Suspense fallback={<div style={{padding: '20px', textAlign: 'center'}}>Loading...</div>}>
+        <Switch>
+          <Route path="/" exact={true} render={() => <Redirect to={ROUTES.WHEELS} />} />
+          <Route path={ROUTES.APP_ROOT} exact={true} render={() => <Redirect to={ROUTES.WHEELS} />} />
+          <Route path={ROUTES.WHEELS} exact={true} component={WheelTable} />
+          <Route path={ROUTES.USERS} exact={true} component={UserTable} />
+          <Route path={ROUTES.WHEEL} exact={true} component={Wheel} />
+          <Route path={ROUTES.PARTICIPANTS} exact={true} component={ParticipantTable} />
+          <Route component={NotFound} />
+        </Switch>
+      </Suspense>
+    );
+  }
+
+  renderUnauthenticatedRoutes = () => {
+    return (
       <Switch>
-        <Route path={ROUTES.APP_ROOT} exact={true} component={WheelTable} />
-        <Route path={ROUTES.USERS} exact={true} component={UserTable} />
-        <Route path={ROUTES.WHEEL} exact={true} component={Wheel} />
-        <Route path={ROUTES.PARTICIPANTS} exact={true} component={ParticipantTable} />
-        <Route component={NotFound} />
+        <Route path={ROUTES.CREATE_WHEEL_GROUP} exact={true} render={() => (
+          <WheelGroupCreation 
+            onWheelGroupCreated={this.handleWheelGroupCreated}
+            onBackToLogin={this.handleBackToLogin}
+          />
+        )} />
+        <Route path="/forgot-password" exact={true} render={() => (
+          <ForgotPassword {...this.getChildProps()} />
+        )} />
+        <Route path="/reset-password" exact={true} render={() => (
+          <ResetPassword {...this.getChildProps()} />
+        )} />
+        <Route path="/" render={() => <Login {...this.getChildProps()} />} />
       </Switch>
     );
   }
@@ -155,18 +221,91 @@ class App extends Component {
       return (
         <BrowserRouter>
           <PermissionProvider>
-            <div id="grandparent" onClickCapture={this.handleClickCapture}>
-              <Navigation {...childProps} />
-              {this.renderRoutes()}
-            </div>
+            <AuthenticatedApp
+              childProps={childProps}
+              handleClickCapture={this.handleClickCapture}
+            />
           </PermissionProvider>
         </BrowserRouter>
       );
     } else {
-      return <Login {...childProps}/>;
+      return (
+        <BrowserRouter>
+          {this.renderUnauthenticatedRoutes()}
+        </BrowserRouter>
+      );
     }
   }
 }
+
+// Functional component that uses hooks to access permissions
+const AuthenticatedApp = React.memo(({ childProps, handleClickCapture }) => {
+  const { isRole, loading } = usePermissions();
+
+  // Track when permissions have been loaded to prevent redirect loops
+  const [permissionsStable, setPermissionsStable] = React.useState(false);
+  const [initialLoad, setInitialLoad] = React.useState(true);
+
+  React.useEffect(() => {
+    if (!loading && initialLoad) {
+      // Add a small delay to ensure permissions are fully stable
+      const timer = setTimeout(() => {
+        setPermissionsStable(true);
+        setInitialLoad(false);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, initialLoad]);
+
+  // Show loading until permissions are stable
+  if (!permissionsStable) {
+    return <div style={{padding: '20px', textAlign: 'center'}}>Loading permissions...</div>;
+  }
+
+  const isDeploymentAdmin = isRole('DEPLOYMENT_ADMIN');
+
+  return (
+    <div id="grandparent" onClickCapture={handleClickCapture}>
+      {isDeploymentAdmin ? (
+        <DeploymentAdminNavigation {...childProps} />
+      ) : (
+        <Navigation {...childProps} />
+      )}
+      <Suspense fallback={<div style={{padding: '20px', textAlign: 'center'}}>Loading...</div>}>
+        <Switch>
+          {/* Root redirects - only after permissions are stable */}
+          <Route path="/" exact={true} render={() => 
+            <Redirect to={isDeploymentAdmin ? ROUTES.WHEEL_GROUPS : ROUTES.WHEELS} />
+          } />
+          <Route path={ROUTES.APP_ROOT} exact={true} render={() => 
+            <Redirect to={isDeploymentAdmin ? ROUTES.WHEEL_GROUPS : ROUTES.WHEELS} />
+          } />
+          
+          {/* Deployment Admin Routes - no cross-redirects */}
+          <Route path={ROUTES.WHEEL_GROUPS} exact={true} render={() => 
+            isDeploymentAdmin ? <WheelGroupsTable /> : <div>Access denied</div>
+          } />
+          
+          {/* Regular User Routes - no cross-redirects */}
+          <Route path={ROUTES.WHEELS} exact={true} render={(props) => 
+            !isDeploymentAdmin ? <WheelTable {...props} /> : <div>Access denied</div>
+          } />
+          <Route path={ROUTES.USERS} exact={true} render={(props) => 
+            !isDeploymentAdmin ? <UserTable {...props} /> : <div>Access denied</div>
+          } />
+          <Route path={ROUTES.WHEEL} exact={true} render={(props) => 
+            !isDeploymentAdmin ? <Wheel {...props} /> : <div>Access denied</div>
+          } />
+          <Route path={ROUTES.PARTICIPANTS} exact={true} render={(props) => 
+            !isDeploymentAdmin ? <ParticipantTable {...props} /> : <div>Access denied</div>
+          } />
+          
+          <Route component={NotFound} />
+        </Switch>
+      </Suspense>
+    </div>
+  );
+});
 
 export default connect([
   {

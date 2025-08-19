@@ -70,8 +70,11 @@ export default class UserRow extends Component {
 
 
   render() {
-    const {user} = this.props;
+    const {user, currentUser} = this.props;
     const {isUserModalOpen, isConfirmationModalOpen} = this.state;
+    
+    // Check if this is the current user to hide delete button
+    const isCurrentUser = currentUser && currentUser.user_id === user.user_id;
 
     return (
       <tr>
@@ -117,16 +120,18 @@ export default class UserRow extends Component {
               </ButtonGroup>
             </PermissionGuard>
             
-            <PermissionGuard permission="manage_users">
-              <ButtonGroup>
-                <Button
-                  onClick={this.toggleConfirmationModal}
-                  variant='danger'
-                  size='sm'
-                  title='Delete the user'
-                >Delete User</Button>
-              </ButtonGroup>
-            </PermissionGuard>
+            {!isCurrentUser && (
+              <PermissionGuard permission="manage_users">
+                <ButtonGroup>
+                  <Button
+                    onClick={this.toggleConfirmationModal}
+                    variant='danger'
+                    size='sm'
+                    title='Delete the user'
+                  >Delete User</Button>
+                </ButtonGroup>
+              </PermissionGuard>
+            )}
           </ButtonToolbar>
         </td>
       </tr>

@@ -18,6 +18,19 @@ import { authenticatedFetch, apiURL } from '../util';
 
 // Permission mappings matching backend role definitions
 const ROLE_PERMISSIONS = {
+  'DEPLOYMENT_ADMIN': {
+    'view_all_wheel_groups': true,
+    'delete_wheel_group': true,
+    'manage_deployment': true,
+    'create_wheel': false,
+    'delete_wheel': false,
+    'manage_participants': false,
+    'spin_wheel': false,
+    'view_wheels': false,
+    'manage_users': false,
+    'manage_wheel_group': false,
+    'rig_wheel': false
+  },
   'ADMIN': {
     'create_wheel': true,
     'delete_wheel': true,
@@ -25,7 +38,7 @@ const ROLE_PERMISSIONS = {
     'spin_wheel': true,
     'view_wheels': true,
     'manage_users': true,
-    'manage_tenant': true,
+    'manage_wheel_group': true,
     'rig_wheel': true
   },
   'WHEEL_ADMIN': {
@@ -35,7 +48,7 @@ const ROLE_PERMISSIONS = {
     'spin_wheel': true,
     'view_wheels': true,
     'manage_users': false,
-    'manage_tenant': false,
+    'manage_wheel_group': false,
     'rig_wheel': true
   },
   'USER': {
@@ -45,7 +58,7 @@ const ROLE_PERMISSIONS = {
     'spin_wheel': true,
     'view_wheels': true,
     'manage_users': false,
-    'manage_tenant': false,
+    'manage_wheel_group': false,
     'rig_wheel': false
   }
 };
@@ -53,8 +66,8 @@ const ROLE_PERMISSIONS = {
 const PermissionContext = createContext({
   permissions: {},
   role: null,
-  tenantId: null,
-  tenantName: null,
+  wheelGroupId: null,
+  wheelGroupName: null,
   userId: null,
   email: null,
   name: null,
@@ -65,21 +78,12 @@ const PermissionContext = createContext({
   refreshPermissions: () => {}
 });
 
-/**
- * PermissionProvider component that provides user permissions context to the app
- * 
- * This component:
- * 1. Extracts user info from JWT token stored in localStorage
- * 2. Optionally validates token with backend API
- * 3. Provides permission checking functions
- * 4. Handles permission loading states and errors
- */
 export const PermissionProvider = ({ children, validateWithBackend = false }) => {
   const [state, setState] = useState({
     permissions: {},
     role: null,
-    tenantId: null,
-    tenantName: null,
+    wheelGroupId: null,
+    wheelGroupName: null,
     userId: null,
     email: null,
     name: null,
@@ -87,11 +91,20 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
     error: null
   });
 
+  const loadingRef = React.useRef(false);
+
   const loadPermissions = async () => {
+    if (loadingRef.current) {
+      console.log('🔒 loadPermissions already in progress, skipping...');
+      return;
+    }
+    
+    loadingRef.current = true;
+    console.log('🚀 Starting loadPermissions...');
+    
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
 
-      // Check if we have a valid token first
       let tokenInfo = null;
       try {
         tokenInfo = extractUserInfoFromToken();
@@ -107,35 +120,41 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
         return;
       }
 
-      // Always fetch user info from backend API to get role and tenant info
-      let userInfo = tokenInfo; // Fallback to token info
-      try {
-        const response = await authenticatedFetch(apiURL('auth/me'));
-        if (response && response.ok) {
-          const backendUserInfo = await response.json();
-          // Prioritize backend data, especially for role and permissions
-          userInfo = { 
-            ...tokenInfo, 
-            ...backendUserInfo,
-            // Ensure we use backend role data since JWT doesn't contain custom:role
-            role: backendUserInfo.role || 'USER',
-            permissions: backendUserInfo.permissions || {}
-          };
-          console.log('✅ Successfully loaded user info from backend:', userInfo);
-        } else if (response && response.status === 401) {
-          // Token is invalid, redirect to login
-          localStorage.removeItem('idToken');
-          window.location.href = '/app/login';
-          return;
-        } else {
-          console.warn('Backend API returned non-200 status:', response.status);
-          // Use token info as fallback - set default role to USER
+      // For deployment admin, skip backend API call and use token info directly
+      let userInfo = tokenInfo;
+      
+      if (tokenInfo.deployment_admin) {
+        console.log('👑 Deployment admin detected from token, skipping backend API call');
+        userInfo = tokenInfo;
+      } else {
+        // For regular users, fetch from backend API
+        try {
+          console.log('🔍 Calling backend /auth/me API for regular user...');
+          const response = await authenticatedFetch(apiURL('auth/me'));
+          
+          if (response && response.ok) {
+            const backendUserInfo = await response.json();
+            console.log('📦 Backend user info:', backendUserInfo);
+            
+            userInfo = { 
+              ...tokenInfo, 
+              ...backendUserInfo,
+              role: backendUserInfo.role || 'USER',
+              permissions: backendUserInfo.permissions || {}
+            };
+          } else if (response && response.status === 401) {
+            console.warn('🚫 Backend returned 401, redirecting to login');
+            localStorage.removeItem('idToken');
+            window.location.href = '/app/login';
+            return;
+          } else {
+            console.warn('⚠️ Backend API failed, using token info with USER role');
+            userInfo = { ...tokenInfo, role: 'USER' };
+          }
+        } catch (error) {
+          console.error('❌ Backend API error, using token info with USER role:', error);
           userInfo = { ...tokenInfo, role: 'USER' };
         }
-      } catch (error) {
-        console.error('Failed to fetch user info from backend:', error);
-        // Use token info as fallback - set default role to USER
-        userInfo = { ...tokenInfo, role: 'USER' };
       }
 
       // Get permissions for the user's role
@@ -145,8 +164,8 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
       setState({
         permissions,
         role: userInfo.role || 'USER',
-        tenantId: userInfo.tenant_id,
-        tenantName: userInfo.tenant_name,
+        wheelGroupId: userInfo.wheel_group_id,
+        wheelGroupName: userInfo.wheel_group_name,
         userId: userInfo.user_id || userInfo.sub,
         email: userInfo.email,
         name: userInfo.name || userInfo.email,
@@ -154,21 +173,24 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
         error: null
       });
 
+      console.log('✅ loadPermissions completed successfully');
+
     } catch (error) {
-      console.error('Failed to load permissions:', error);
+      console.error('❌ loadPermissions failed:', error);
       setState(prev => ({
         ...prev,
         loading: false,
         error: error.message || 'Failed to load permissions'
       }));
+    } finally {
+      loadingRef.current = false;
+      console.log('🔓 loadPermissions flag reset');
     }
   };
 
   const extractUserInfoFromToken = () => {
-    // First try the simple key (for compatibility)
     let idToken = localStorage.getItem('idToken');
     
-    // If not found, look for Cognito-stored ID token
     if (!idToken) {
       const cognitoKeys = Object.keys(localStorage).filter(key => 
         key.includes('CognitoIdentityServiceProvider') && key.endsWith('.idToken')
@@ -180,31 +202,41 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
     }
 
     if (!idToken) {
+      console.log('🚫 No ID token found in localStorage');
       return null;
     }
 
     try {
-      // Decode JWT payload (safe for reading, not for validation)
       const payload = JSON.parse(atob(idToken.split('.')[1]));
+      console.log('🔍 JWT payload decoded:', payload);
       
-      // Check if token is expired
       const currentTime = Math.floor(Date.now() / 1000);
       if (payload.exp && payload.exp < currentTime) {
-        console.warn('Token has expired');
+        console.warn('⏰ Token has expired');
         localStorage.removeItem('idToken');
         return null;
       }
 
-      return {
-        tenant_id: payload['custom:tenant_id'],
-        tenant_name: payload['custom:tenant_name'],
-        role: payload['custom:role'] || 'USER',
+      const isDeploymentAdmin = payload['custom:deployment_admin'] === 'true';
+      console.log('👑 Deployment admin check:', {
+        'custom:deployment_admin': payload['custom:deployment_admin'],
+        isDeploymentAdmin
+      });
+      
+      const userInfo = {
+        wheel_group_id: payload['custom:wheel_group_id'],
+        wheel_group_name: payload['custom:wheel_group_name'],
+        role: isDeploymentAdmin ? 'DEPLOYMENT_ADMIN' : (payload['custom:role'] || 'USER'),
         user_id: payload.sub,
         email: payload.email,
-        name: payload.name || payload.email
+        name: payload.name || payload.email,
+        deployment_admin: isDeploymentAdmin
       };
+      
+      console.log('📦 Extracted user info from token:', userInfo);
+      return userInfo;
     } catch (error) {
-      console.error('Failed to decode JWT token:', error);
+      console.error('❌ Failed to decode JWT token:', error);
       throw new Error('Invalid token format');
     }
   };
@@ -227,16 +259,22 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
   };
 
   const refreshPermissions = () => {
-    loadPermissions();
+    if (!loadingRef.current) {
+      loadPermissions();
+    }
   };
 
-  // Load permissions on mount and when localStorage changes
+  // Load permissions on mount only
   useEffect(() => {
+    console.log('🎯 PermissionProvider useEffect running - component mounted');
     loadPermissions();
+  }, []);
 
-    // Listen for localStorage changes (e.g., login/logout in another tab)
+  // Separate effect for storage changes
+  useEffect(() => {
     const handleStorageChange = (event) => {
-      if (event.key === 'idToken') {
+      if (event.key === 'idToken' && !loadingRef.current) {
+        console.log('🔄 Token changed in another tab, reloading permissions');
         loadPermissions();
       }
     };
@@ -259,21 +297,6 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
   );
 };
 
-/**
- * Hook to access permission context
- * 
- * @example
- * const { hasPermission, role, loading, permissions } = usePermissions();
- * 
- * if (loading) return <div>Loading...</div>;
- * 
- * return (
- *   <div>
- *     <p>Role: {role}</p>
- *     {hasPermission('create_wheel') && <Button>Create Wheel</Button>}
- *   </div>
- * );
- */
 export const usePermissions = () => {
   const context = useContext(PermissionContext);
   if (!context) {
@@ -282,15 +305,9 @@ export const usePermissions = () => {
   return context;
 };
 
-/**
- * Hook to get current user info
- * 
- * @example
- * const { tenantId, tenantName, email, name, role } = useUserInfo();
- */
 export const useUserInfo = () => {
-  const { tenantId, tenantName, userId, email, name, role, loading } = usePermissions();
-  return { tenantId, tenantName, userId, email, name, role, loading };
+  const { wheelGroupId, wheelGroupName, userId, email, name, role, loading } = usePermissions();
+  return { wheelGroupId, wheelGroupName, userId, email, name, role, loading };
 };
 
 export default PermissionProvider;

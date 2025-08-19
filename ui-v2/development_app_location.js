@@ -1,1 +1,1 @@
-module.exports = 'https://s0xa1lbfuf.execute-api.us-west-2.amazonaws.com/dev';
+module.exports = 'https://d2ug6nyunvxc97.cloudfront.net';

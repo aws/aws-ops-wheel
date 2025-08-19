@@ -47,7 +47,7 @@ export const WHEEL_COLORS = [
     '#ff5746',
 ];
 
-// V2 API Configuration for Multi-tenant Architecture  
+// V2 API Configuration for Multi-Wheel-Group Architecture
 // Config is loaded dynamically from /app/config.json deployed by CloudFormation
 let dynamicConfig = null;
 
@@ -136,7 +136,7 @@ export const authenticatedFetch = async (url, options = {}) => {
   }
 };
 
-// Tenant context utilities
+// Wheel Group context utilities
 export const getTenantContext = () => {
   const idToken = localStorage.getItem('idToken');
   if (idToken) {
@@ -144,13 +144,13 @@ export const getTenantContext = () => {
       // Decode JWT payload (this is safe for reading, not for validation)
       const payload = JSON.parse(atob(idToken.split('.')[1]));
       return {
-        tenant_id: payload['custom:tenant_id'],
-        tenant_name: payload['custom:tenant_name'],
+      wheel_group_id: payload['custom:wheel_group_id'],
+      wheel_group_name: payload['custom:wheel_group_name'],
         role: payload['custom:role'],
         user_id: payload.sub
       };
     } catch (error) {
-      console.error('Failed to decode tenant context:', error);
+      console.error('Failed to decode wheel group context:', error);
       return null;
     }
   }

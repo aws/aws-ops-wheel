@@ -6,11 +6,65 @@ import random
 from typing import Dict, Any, List, Optional
 from decimal import Decimal
 from base import BadRequestError, NotFoundError
-from tenant_middleware import tenant_middleware, require_tenant_permission, get_tenant_context
+from wheel_group_middleware import wheel_group_middleware, require_wheel_group_permission, get_wheel_group_context
 from utils_v2 import (
     WheelRepository, ParticipantRepository, check_string, get_uuid, 
     get_utc_timestamp, decimal_to_float
 )
+
+# Constants
+HTTP_STATUS_CODES = {
+    'OK': 200,
+    'CREATED': 201,
+    'BAD_REQUEST': 400,
+    'NOT_FOUND': 404,
+    'INTERNAL_ERROR': 500
+}
+
+CORS_HEADERS = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*'
+}
+
+VALIDATION_MESSAGES = {
+    'WHEEL_ID_REQUIRED': "wheel_id is required",
+    'NO_PARTICIPANTS': "Wheel has no participants",
+    'NO_PARTICIPANTS_AVAILABLE': "No participants available for selection"
+}
+
+
+def create_api_response(status_code: int, body: Any, additional_headers: Dict = None) -> Dict:
+    """Create standardized API response with CORS headers"""
+    headers = CORS_HEADERS.copy()
+    if additional_headers:
+        headers.update(additional_headers)
+    
+    return {
+        'statusCode': status_code,
+        'headers': headers,
+        'body': json.dumps(decimal_to_float(body) if isinstance(body, (dict, list)) else body) if body != '' else ''
+    }
+
+
+def create_error_response(status_code: int, error_message: str) -> Dict:
+    """Create standardized error response"""
+    return create_api_response(status_code, {'error': error_message})
+
+
+def handle_api_exceptions(func):
+    """Decorator to handle common API exceptions"""
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except BadRequestError as e:
+            return create_error_response(HTTP_STATUS_CODES['BAD_REQUEST'], str(e))
+        except NotFoundError as e:
+            return create_error_response(HTTP_STATUS_CODES['NOT_FOUND'], str(e))
+        except Exception as e:
+            print(f"[ERROR] {func.__name__} error: {str(e)}")
+            return create_error_response(HTTP_STATUS_CODES['INTERNAL_ERROR'], f'Internal server error: {str(e)}')
+    
+    return wrapper
 
 
 def calculate_selection_probabilities(participants: List[Dict]) -> Dict[str, float]:
@@ -105,7 +159,8 @@ def apply_single_selection_weight_redistribution(participants: List[Dict], selec
                 participant['weight'] = Decimal(str(current_weight + weight_slice))
 
 
-@require_tenant_permission('spin_wheel')
+@require_wheel_group_permission('spin_wheel')
+@handle_api_exceptions
 def suggest_participant(event, context=None):
     """
     Single participant selection endpoint (v1 compatible)
@@ -116,208 +171,153 @@ def suggest_participant(event, context=None):
       "apply_changes": true
     }
     """
-    try:
-        tenant_context = get_tenant_context(event)
+    wheel_group_context = get_wheel_group_context(event)
+    
+    # Safe extraction of wheel_id
+    path_params = event.get('pathParameters') or {}
+    wheel_id = path_params.get('wheel_id') if path_params else None
+    body = event.get('body') or {}
+    
+    # Handle case where body might be a JSON string
+    if isinstance(body, str):
+        try:
+            body = json.loads(body)
+        except json.JSONDecodeError:
+            body = {}
+    
+    if not wheel_id:
+        raise BadRequestError(VALIDATION_MESSAGES['WHEEL_ID_REQUIRED'])
+    
+    # Get wheel and check permissions
+    wheel = WheelRepository.get_wheel(wheel_group_context['wheel_group_id'], wheel_id)
+    
+    # Get participants
+    participants = ParticipantRepository.list_wheel_participants(
+        wheel_group_context['wheel_group_id'], 
+        wheel_id
+    )
+    
+    if not participants:
+        raise BadRequestError(VALIDATION_MESSAGES['NO_PARTICIPANTS'])
+    
+    # Check for rigging
+    rigging_data = wheel.get('rigging') if wheel else None
+    
+    # Select participant using legacy algorithm
+    selected_participant = suggest_participant_legacy(participants, rigging_data)
+    
+    # Calculate probabilities for UI display
+    probabilities = calculate_selection_probabilities(participants)
+    
+    # Apply changes if requested
+    apply_changes = body.get('apply_changes', False)
+    
+    if apply_changes:
+        # Apply weight redistribution (single selection)
+        apply_single_selection_weight_redistribution(participants, selected_participant)
         
-        # Safe extraction of wheel_id
-        path_params = event.get('pathParameters') or {}
-        wheel_id = path_params.get('wheel_id') if path_params else None
-        body = event.get('body') or {}
-        
-        # Handle case where body might be a JSON string
-        if isinstance(body, str):
-            try:
-                body = json.loads(body)
-            except json.JSONDecodeError:
-                body = {}
-        
-        if not wheel_id:
-            raise BadRequestError("wheel_id is required")
-        
-        # Get wheel and check permissions
-        wheel = WheelRepository.get_wheel(tenant_context['tenant_id'], wheel_id)
-        
-        # Get participants
-        participants = ParticipantRepository.list_wheel_participants(
-            tenant_context['tenant_id'], 
-            wheel_id
-        )
-        
-        if not participants:
-            raise BadRequestError("Wheel has no participants")
-        
-        # Check for rigging
-        rigging_data = wheel.get('rigging') if wheel else None
-        
-        # Select participant using legacy algorithm
-        selected_participant = suggest_participant_legacy(participants, rigging_data)
-        
-        # Calculate probabilities for UI display
-        probabilities = calculate_selection_probabilities(participants)
-        
-        # Apply changes if requested
-        apply_changes = body.get('apply_changes', False)
-        
-        if apply_changes:
-            # Apply weight redistribution (single selection)
-            apply_single_selection_weight_redistribution(participants, selected_participant)
-            
-            # Update participants in database
-            updates = []
-            for participant in participants:
-                is_selected = participant['participant_id'] == selected_participant['participant_id']
-                update_data = {
-                    'participant_id': participant['participant_id'],
-                    'weight': Decimal(str(participant['weight'])) if not isinstance(participant['weight'], Decimal) else participant['weight'],
-                    'selection_count': Decimal(str((participant.get('selection_count', 0) + 1) if is_selected else participant.get('selection_count', 0)))
-                }
-                
-                # Only set last_selected_at for selected participants to avoid GSI issues
-                if is_selected:
-                    update_data['last_selected_at'] = get_utc_timestamp()
-                elif participant.get('last_selected_at'):
-                    # Only include last_selected_at if it already exists (not None)
-                    update_data['last_selected_at'] = participant['last_selected_at']
-                
-                updates.append(update_data)
-            
-            ParticipantRepository.batch_update_participants(
-                tenant_context['tenant_id'],
-                wheel_id,
-                updates
-            )
-            
-            # Update wheel spin information
-            wheel_updates = {
-                'last_spun_at': get_utc_timestamp(),
-                'last_spun_by': tenant_context['user_id'],
-                'total_spins': wheel.get('total_spins', 0) + 1
+        # Update participants in database
+        updates = []
+        for participant in participants:
+            is_selected = participant['participant_id'] == selected_participant['participant_id']
+            update_data = {
+                'participant_id': participant['participant_id'],
+                'weight': Decimal(str(participant['weight'])) if not isinstance(participant['weight'], Decimal) else participant['weight'],
+                'selection_count': Decimal(str((participant.get('selection_count', 0) + 1) if is_selected else participant.get('selection_count', 0)))
             }
             
-            # Clear rigging after use
-            if rigging_data:
-                wheel_updates['rigging'] = None
-                
-            WheelRepository.update_wheel(
-                tenant_context['tenant_id'],
-                wheel_id,
-                wheel_updates
-            )
+            # Only set last_selected_at for selected participants to avoid GSI issues
+            if is_selected:
+                update_data['last_selected_at'] = get_utc_timestamp()
+            elif participant.get('last_selected_at'):
+                # Only include last_selected_at if it already exists (not None)
+                update_data['last_selected_at'] = participant['last_selected_at']
+            
+            updates.append(update_data)
         
-        # Determine rigging visibility (v1 compatibility)
-        # Only show rigged: True if rigging exists and is NOT hidden
-        show_rigged = bool(rigging_data and not rigging_data.get('hidden', False))
+        ParticipantRepository.batch_update_participants(
+            wheel_group_context['wheel_group_id'],
+            wheel_id,
+            updates
+        )
         
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps({
-                'selected_participant': decimal_to_float(selected_participant),
-                'selection_type': 'single',
-                'rigged': show_rigged,
-                'probabilities': probabilities,
-                'changes_applied': apply_changes
-            })
+        # Update wheel spin information
+        wheel_updates = {
+            'last_spun_at': get_utc_timestamp(),
+            'last_spun_by': wheel_group_context['user_id'],
+            'total_spins': wheel.get('total_spins', 0) + 1
         }
         
-    except (BadRequestError, NotFoundError) as e:
-        status_code = getattr(e, 'status_code', 400) if hasattr(e, 'status_code') else (404 if isinstance(e, NotFoundError) else 400)
-        return {
-            'statusCode': status_code,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps({'error': str(e)})
-        }
-    except Exception as e:
-        return {
-            'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps({'error': f'Internal server error: {str(e)}'})
-        }
+        # Clear rigging after use
+        if rigging_data:
+            wheel_updates['rigging'] = None
+            
+        WheelRepository.update_wheel(
+            wheel_group_context['wheel_group_id'],
+            wheel_id,
+            wheel_updates
+        )
+    
+    # Determine rigging visibility (v1 compatibility)
+    # Only show rigged: True if rigging exists and is NOT hidden
+    show_rigged = bool(rigging_data and not rigging_data.get('hidden', False))
+    
+    return create_api_response(HTTP_STATUS_CODES['OK'], {
+        'selected_participant': selected_participant,
+        'selection_type': 'single',
+        'rigged': show_rigged,
+        'probabilities': probabilities,
+        'changes_applied': apply_changes
+    })
 
 
-@require_tenant_permission('view_wheels')
+@require_wheel_group_permission('view_wheels')
+@handle_api_exceptions
 def get_selection_probabilities(event, context=None):
     """
     Get current selection probabilities for all participants
     
     GET /v2/wheels/{wheel_id}/probabilities
     """
-    try:
-        tenant_context = get_tenant_context(event)
-        wheel_id = event.get('pathParameters', {}).get('wheel_id')
-        
-        if not wheel_id:
-            raise BadRequestError("wheel_id is required")
-        
-        # Verify wheel exists
-        wheel = WheelRepository.get_wheel(tenant_context['tenant_id'], wheel_id)
-        
-        # Get participants
-        participants = ParticipantRepository.list_wheel_participants(
-            tenant_context['tenant_id'], 
-            wheel_id
-        )
-        
-        if not participants:
-            raise BadRequestError("Wheel has no participants")
-        
-        # Calculate probabilities
-        probabilities = calculate_selection_probabilities(participants)
-        
-        # Format response with participant details
-        participant_probabilities = []
-        for participant in participants:
-            participant_probabilities.append({
-                'participant_id': participant['participant_id'],
-                'participant_name': participant['participant_name'],
-                'current_weight': float(participant.get('weight', 1.0)),
-                'selection_probability': probabilities.get(participant['participant_id'], 0.0),
-                'selection_count': participant.get('selection_count', 0),
-                'last_selected_at': participant.get('last_selected_at')
-            })
-        
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps({
-                'wheel_id': wheel_id,
-                'participants': participant_probabilities,
-                'rigged': bool(wheel.get('rigging')),
-                'rigged_participant': wheel.get('rigging', {}).get('rigged_participant_name') if wheel.get('rigging') else None
-            })
-        }
-        
-    except (BadRequestError, NotFoundError) as e:
-        status_code = getattr(e, 'status_code', 400) if hasattr(e, 'status_code') else (404 if isinstance(e, NotFoundError) else 400)
-        return {
-            'statusCode': status_code,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps({'error': str(e)})
-        }
-    except Exception as e:
-        return {
-            'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps({'error': f'Internal server error: {str(e)}'})
-        }
+    wheel_group_context = get_wheel_group_context(event)
+    wheel_id = event.get('pathParameters', {}).get('wheel_id')
+    
+    if not wheel_id:
+        raise BadRequestError(VALIDATION_MESSAGES['WHEEL_ID_REQUIRED'])
+    
+    # Verify wheel exists
+    wheel = WheelRepository.get_wheel(wheel_group_context['wheel_group_id'], wheel_id)
+    
+    # Get participants
+    participants = ParticipantRepository.list_wheel_participants(
+        wheel_group_context['wheel_group_id'], 
+        wheel_id
+    )
+    
+    if not participants:
+        raise BadRequestError(VALIDATION_MESSAGES['NO_PARTICIPANTS'])
+    
+    # Calculate probabilities
+    probabilities = calculate_selection_probabilities(participants)
+    
+    # Format response with participant details
+    participant_probabilities = []
+    for participant in participants:
+        participant_probabilities.append({
+            'participant_id': participant['participant_id'],
+            'participant_name': participant['participant_name'],
+            'current_weight': float(participant.get('weight', 1.0)),
+            'selection_probability': probabilities.get(participant['participant_id'], 0.0),
+            'selection_count': participant.get('selection_count', 0),
+            'last_selected_at': participant.get('last_selected_at')
+        })
+    
+    return create_api_response(HTTP_STATUS_CODES['OK'], {
+        'wheel_id': wheel_id,
+        'participants': participant_probabilities,
+        'rigged': bool(wheel.get('rigging')),
+        'rigged_participant': wheel.get('rigging', {}).get('rigged_participant_name') if wheel.get('rigging') else None
+    })
 
 
 # Export Lambda handler functions  

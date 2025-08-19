@@ -13,14 +13,13 @@
  * permissions and limitations under the License.
  */
 
-import React, {PropTypes, Component} from 'react';
+import React, {Component} from 'react';
 import connect from 'react-redux-fetch';
 import WheelRow from './wheel_row';
 import WheelModal from './wheel_modal';
 import {Card, Table, Button} from 'react-bootstrap';
-import {WheelType} from '../../types';
 // import '../../static_content/favicon.ico'; // Favicon handled by HTML template
-import {apiURL, authenticatedFetch, getAuthHeaders} from '../../util';
+import {apiURL, getAuthHeaders} from '../../util';
 import PermissionGuard from '../PermissionGuard';
 
 // Constants

@@ -13,7 +13,8 @@
  * permissions and limitations under the License.
  */
 
-import React, {PureComponent, PropTypes} from 'react';
+import React, {PureComponent} from 'react';
+import PropTypes from 'prop-types';
 import ReactDOM from 'react-dom';
 import connect from 'react-redux-fetch';
 import {Button} from 'react-bootstrap';
@@ -24,8 +25,192 @@ import '../static_content/wheel_click.mp3';
 import 'isomorphic-fetch';
 import * as PIXI from 'pixi.js';
 
-
+// Mathematical Constants
 const QUARTER_CIRCLE = Math.PI / 2;
+const FULL_CIRCLE = Math.PI * 2;
+const DEGREES_TO_RADIANS = Math.PI / 180;
+const HALF_CIRCLE = Math.PI;
+const DEFAULT_ROTATIONS = 20;
+const DEGREES_IN_CIRCLE = 360;
+
+// Canvas and Drawing Constants
+const CANVAS_SIZE = 1000;
+const CANVAS_CENTER = CANVAS_SIZE / 2;
+const INNER_RADIUS = 10;
+const OUTER_RADIUS = CANVAS_SIZE / 2;
+const TEXT_RADIUS = OUTER_RADIUS - 15;
+const TEXT_WORD_WRAP_RATIO = 0.8;
+const BASE_FONT_SIZE = 16;
+const FONT_SIZE_MULTIPLIER = 80;
+
+// Canvas Colors and Styling
+const CANVAS_BACKGROUND_COLOR = 0xFAFAFA;
+const WHEEL_BORDER_COLOR = '#FAFAFA';
+const ARROW_COLOR = '#FF9900';
+const COLOR_PALETTE_SIZE = 16;
+
+// Animation Constants
+const EASE_OUT_FRAMES = 125;
+const LINEAR_FRAMES = 125;
+const RIGGING_PAUSE_FRAMES = 50;
+const MIN_FRAMES_BETWEEN_CLICKS = 5;
+
+// Text and Participant Constants
+const MAX_PARTICIPANT_NAME_LENGTH = 32;
+const MIN_PARTICIPANT_NAME_LENGTH = 4;
+const FIXED_TRUNCATION_MAX_PARTICIPANTS = 50;
+const TRUNCATION_INCREMENT = 2;
+const TRUNCATION_STEP = 5;
+const ELLIPSIS = '...';
+const ELLIPSIS_LENGTH = 3;
+
+// Audio Constants
+const AUDIO_VOLUME = 1;
+const AUDIO_RESET_TIME = 0;
+const AUDIO_MIME_TYPE = 'audio/mpeg';
+const AUDIO_FILE = 'wheel_click.mp3';
+
+// UI Layout Constants
+const BUTTON_HEIGHT = '38px';
+const WHEEL_SIZE_VMIN = '75vmin';
+const WHEEL_RADIUS_VMIN = '37.5vmin';
+const SPIN_BUTTON_SIZE = '10vmin';
+const SPIN_BUTTON_RADIUS = '5vmin';
+const ARROW_SIZE = '2vmin';
+const ARROW_WIDTH = '4vmin';
+const BORDER_SIZE = '1vmin';
+const SPIN_BUTTON_FONT_SIZE = '2vmin';
+const BUTTON_GAP = '10px';
+const BUTTON_MARGIN = '5px';
+
+// Local Storage Keys
+const STORAGE_KEYS = {
+  IS_MUTED: 'isMuted'
+};
+
+// Permission Constants
+const REQUIRED_PERMISSIONS = {
+  MANAGE_PARTICIPANTS: 'manage_participants'
+};
+
+// Error Messages
+const ERROR_MESSAGES = {
+  WHEEL_LOAD_ERROR: 'Error: Wheel or wheel participants could not be loaded!',
+  PARTICIPANT_SELECT_ERROR: 'Error: Participant Selection could not be loaded!',
+  AUDIO_PLAY_ERROR: 'Audio play failed:',
+  AUDIO_ERROR: 'Audio error:'
+};
+
+// Loading and UI Messages
+const UI_MESSAGES = {
+  LOADING_WHEEL: 'Loading the Wheel and its Participants...',
+  NO_PARTICIPANTS: "You don't have any participants!",
+  EDIT_PARTICIPANTS: 'Edit participants',
+  CHOOSE: 'Choose',
+  SPIN: 'Spin',
+  SOUND_ON: '🔊',
+  SOUND_OFF: '🔇'
+};
+
+// Animation Configuration
+const ANIMATION_CONFIG = {
+  EASE_OUT_MULTIPLIER: -3,
+  LINEAR_RANDOM_OFFSET: 0.5,
+  RIGGED_CENTER_OFFSET: 0
+};
+
+// CSS Styles as Constants
+const STYLES = {
+  pageRoot: {
+    textAlign: 'center'
+  },
+  loadingContainer: {
+    padding: '15px'
+  },
+  titleContainer: {
+    position: 'relative'
+  },
+  noParticipantsWarning: {
+    display: 'inline-flex'
+  },
+  controlsContainer: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '0 0 10px 0'
+  },
+  soundButton: {
+    position: 'absolute',
+    left: '1em',
+    height: BUTTON_HEIGHT,
+    display: 'flex',
+    alignItems: 'center'
+  },
+  buttonsContainer: {
+    textAlign: 'center',
+    display: 'flex',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    gap: BUTTON_GAP
+  },
+  editButton: {
+    margin: BUTTON_MARGIN,
+    height: BUTTON_HEIGHT,
+    display: 'flex',
+    alignItems: 'center'
+  },
+  chooseButton: {
+    margin: BUTTON_MARGIN,
+    height: BUTTON_HEIGHT,
+    display: 'flex',
+    alignItems: 'center'
+  },
+  wheelContainer: {
+    position: 'relative'
+  },
+  arrow: {
+    position: 'absolute',
+    height: '0',
+    width: '0',
+    fontSize: '0',
+    borderTop: `${ARROW_SIZE} solid transparent`,
+    borderBottom: `${ARROW_SIZE} solid transparent`,
+    borderLeft: `${ARROW_WIDTH} solid ${ARROW_COLOR}`,
+    top: `calc(${WHEEL_RADIUS_VMIN} - ${ARROW_SIZE})`,
+    right: `calc(50vw + ${WHEEL_RADIUS_VMIN})`
+  },
+  canvas: {
+    position: 'absolute',
+    top: 0,
+    left: `calc(50vw - ${WHEEL_RADIUS_VMIN})`,
+    height: WHEEL_SIZE_VMIN,
+    width: WHEEL_SIZE_VMIN,
+    overflow: 'hidden',
+    borderRadius: '50%'
+  },
+  spinButton: {
+    position: 'absolute',
+    top: `calc(${WHEEL_RADIUS_VMIN} - ${SPIN_BUTTON_RADIUS})`,
+    left: `calc(50vw - ${SPIN_BUTTON_RADIUS})`,
+    height: SPIN_BUTTON_SIZE,
+    width: SPIN_BUTTON_SIZE,
+    borderRadius: '50%',
+    border: `${BORDER_SIZE} solid ${WHEEL_BORDER_COLOR}`,
+    overflow: 'hidden',
+    padding: 0,
+    zIndex: 100,
+    fontSize: SPIN_BUTTON_FONT_SIZE,
+    textAlign: 'center'
+  }
+};
+
+// Debug Configuration
+const DEBUG_CONFIG = {
+  ENABLE_WHEEL_FETCH_DEBUG: true,
+  ENABLE_SUGGEST_DEBUG: true,
+  ENABLE_SPIN_DEBUG: true
+};
 
 /**
  * Ease out function for spin animation
@@ -35,10 +220,10 @@ const QUARTER_CIRCLE = Math.PI / 2;
  * @param duration   Total Duration
  * @returns {number}  Angle to be at at this point in time
  */
-function easeOut(currentTime: number, startAngle: number, incrementAngle: number, duration: number): number {
+function easeOut(currentTime, startAngle, incrementAngle, duration) {
   let multiplier = (currentTime /= duration) * currentTime;
   let increment = multiplier * currentTime;
-  return startAngle + incrementAngle * (increment + -3 * multiplier + 3 * currentTime);
+  return startAngle + incrementAngle * (increment + ANIMATION_CONFIG.EASE_OUT_MULTIPLIER * multiplier + 3 * currentTime);
 }
 
 /**
@@ -49,25 +234,9 @@ function easeOut(currentTime: number, startAngle: number, incrementAngle: number
  * @param duration   Total Duration
  * @returns {number}  Angle to be at at this point in time
  */
-function linear(currentTime: number, startAngle: number, incrementAngle: number, duration: number): number {
+function linear(currentTime, startAngle, incrementAngle, duration) {
   return incrementAngle * currentTime / duration + startAngle;
 }
-
-
-const CANVAS_SIZE = 1000;
-const INNER_RADIUS = 10;
-const OUTER_RADIUS = CANVAS_SIZE / 2;
-const TEXT_RADIUS = OUTER_RADIUS - 15;
-const EASE_OUT_FRAMES = 125;
-const LINEAR_FRAMES = 125;
-const RIGGING_PAUSE_FRAMES = 50;
-const MIN_FRAMES_BETWEEN_CLICKS = 5;
-const MAX_PARTICIPANT_NAME_LENGTH = 32;
-const MIN_PARTICIPANT_NAME_LENGTH = 4;
-// Dynamically truncate participant name length if number of participants crosses this number
-const FIXED_TRUNCATION_MAX_PARTICIPANTS = 50;
-// Number of characters to truncate at a time by
-const TRUNCATION_INCREMENT = 2;
 
 /**
  * Permission-aware EditParticipantsButton component
@@ -109,7 +278,7 @@ export class Wheel extends PureComponent {
       isSpinning: false,
       fetching: true,
       rigExtra: undefined,
-      isMuted: (this.storage.getItem('isMuted') === 'true' ? true : false),
+      isMuted: (this.storage.getItem(STORAGE_KEYS.IS_MUTED) === 'true' ? true : false),
     };
     this.lastSector = 0;
   }
@@ -209,7 +378,7 @@ export class Wheel extends PureComponent {
 
   drawInitialWheel() {
     const {participants, sectorSize} = this.state;
-    const fontSize = 16 + (80 / participants.length);
+    const fontSize = BASE_FONT_SIZE + (FONT_SIZE_MULTIPLIER / participants.length);
     const renderelement = ReactDOM.findDOMNode(this.refs.canvas);
 
     this.application = new PIXI.Application({
@@ -217,20 +386,20 @@ export class Wheel extends PureComponent {
        height: CANVAS_SIZE,
        view: renderelement,
        antialias: true,
-       backgroundColor: 0xFAFAFA,
+       backgroundColor: CANVAS_BACKGROUND_COLOR,
     });
 
     this.spinTicker = this.application.ticker;
     this.wheelGraphic = new PIXI.Container();
     const graphics = new PIXI.Graphics();
-    this.wheelGraphic.x = CANVAS_SIZE / 2;
-    this.wheelGraphic.y = CANVAS_SIZE / 2;
+    this.wheelGraphic.x = CANVAS_CENTER;
+    this.wheelGraphic.y = CANVAS_CENTER;
     this.wheelGraphic.addChild(graphics);
 
     // If the wheel is too crowded, dynamically truncate the participant names based on the number of participants
     let maxParticipantNameLength = MAX_PARTICIPANT_NAME_LENGTH;
     if(participants.length > FIXED_TRUNCATION_MAX_PARTICIPANTS) {
-      for (let i = participants.length; i > FIXED_TRUNCATION_MAX_PARTICIPANTS; i -= 5) {
+      for (let i = participants.length; i > FIXED_TRUNCATION_MAX_PARTICIPANTS; i -= TRUNCATION_STEP) {
         maxParticipantNameLength -= TRUNCATION_INCREMENT;
         if(maxParticipantNameLength <= MIN_PARTICIPANT_NAME_LENGTH)
           break;
@@ -240,20 +409,20 @@ export class Wheel extends PureComponent {
     for (let i in participants) {
       i = parseInt(i);
       graphics.moveTo(0, 0);
-      graphics.beginFill(parseInt(WHEEL_COLORS[i % 16].replace('#', '0x')));
-      graphics.arc(0, 0, OUTER_RADIUS, (i - 0.5) * sectorSize + Math.PI, (i + 0.5) * sectorSize + Math.PI);
+      graphics.beginFill(parseInt(WHEEL_COLORS[i % COLOR_PALETTE_SIZE].replace('#', '0x')));
+      graphics.arc(0, 0, OUTER_RADIUS, (i - 0.5) * sectorSize + HALF_CIRCLE, (i + 0.5) * sectorSize + HALF_CIRCLE);
       graphics.endFill();
       graphics.closePath();
 
-      let textPositionAngle = sectorSize * i - Math.atan(-0.5 * fontSize / OUTER_RADIUS) + Math.PI;
+      let textPositionAngle = sectorSize * i - Math.atan(-0.5 * fontSize / OUTER_RADIUS) + HALF_CIRCLE;
       let participantName = participants[i].participant_name;
       if(participantName.length > maxParticipantNameLength) {
         // Name should not exceed maximum length (minus 3 characters for the ellipsis)
-        participantName = participantName.substring(0, (maxParticipantNameLength - 3)) + '...';
+        participantName = participantName.substring(0, (maxParticipantNameLength - ELLIPSIS_LENGTH)) + ELLIPSIS;
       }
       let basicText = new PIXI.Text(participantName, {fontSize});
       basicText.style.wordWrap = true;
-      basicText.style.wordWrapWidth = TEXT_RADIUS * 0.8;
+      basicText.style.wordWrapWidth = TEXT_RADIUS * TEXT_WORD_WRAP_RATIO;
       basicText.style.align = 'center';
 
       basicText.x = TEXT_RADIUS * Math.cos(textPositionAngle);
@@ -266,7 +435,7 @@ export class Wheel extends PureComponent {
     // random start location so that specific projects don't always see their name at the starting point
     // Note that this does not change the selection of the project (i.e. the project that the wheel
     // points to at first load is still not selected)
-    this.wheelGraphic.rotation = (Math.random() * 360) * Math.PI / 180;
+    this.wheelGraphic.rotation = (Math.random() * DEGREES_IN_CIRCLE) * DEGREES_TO_RADIANS;
 
     this.application.stage.addChild(this.wheelGraphic);
   }
@@ -378,9 +547,9 @@ export class Wheel extends PureComponent {
     var newMuted = !this.state.isMuted;
 
     this.setState({isMuted: newMuted});
-    this.storage.setItem('isMuted', newMuted);
+    this.storage.setItem(STORAGE_KEYS.IS_MUTED, newMuted);
 
-    this.refs.clickSound.volume = (!newMuted ? 1 : 0);
+    this.refs.clickSound.volume = (!newMuted ? AUDIO_VOLUME : AUDIO_RESET_TIME);
   }
 
   render() {
@@ -396,101 +565,56 @@ export class Wheel extends PureComponent {
     let header;
     if (wheel === undefined || participants === undefined) {
       if (wheelFetch.rejected || allParticipantsFetch.rejected) {
-        header = <div>Error: Wheel or wheel participants could not be loaded!</div>;
+        header = <div>{ERROR_MESSAGES.WHEEL_LOAD_ERROR}</div>;
       } else if (participantSuggestFetch.rejected) {
-        header = <div>Error: Participant Selection could not be loaded!</div>;
+        header = <div>{ERROR_MESSAGES.PARTICIPANT_SELECT_ERROR}</div>;
       } else {
-        header = <div style={{padding: '15px'}}>Loading the Wheel and its Participants...</div>;
+        header = <div style={STYLES.loadingContainer}>{UI_MESSAGES.LOADING_WHEEL}</div>;
       }
     } else {
-      header = <div style={{position: 'relative'}}>
+      header = <div style={STYLES.titleContainer}>
         <h1 className='title'>
           <div className='title-text'>{wheel.wheel_name || wheel.name}</div>
         </h1>
         <h3 style={{display: participants.length === 0 ? 'inline-flex' : 'none'}}>
-          You don't have any partcipants!
+          {UI_MESSAGES.NO_PARTICIPANTS}
         </h3>
       </div>;
     }
 
     return (
-      <div className='pageRoot' style={{textAlign: 'center'}}>
+      <div className='pageRoot' style={STYLES.pageRoot}>
         <audio ref='clickSound'
                preload='auto'
                src={this.state.clickUrl}
-               type='audio/mpeg' />
+               type={AUDIO_MIME_TYPE} />
         {header}
-        <div style={{position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 0 10px 0'}}>
+        <div style={STYLES.controlsContainer}>
           <Button
             id='btnSoundToggle'
             onClick={this.toggleSound}
             ref='btnSoundToggle'
             size='md'
-            style={{
-              position: 'absolute',
-              left: '1em',
-              height: '38px',
-              display: 'flex',
-              alignItems: 'center'
-            }}
+            style={STYLES.soundButton}
           >
-            {isMuted ? '🔇' : '🔊'}
+            {isMuted ? UI_MESSAGES.SOUND_OFF : UI_MESSAGES.SOUND_ON}
           </Button>
-          <div style={{textAlign: 'center', display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: '10px'}}>
+          <div style={STYLES.buttonsContainer}>
             <EditParticipantsButton wheelId={this.props.match.params.wheel_id} />
             <Button variant='primary' size='md' disabled={participantName === undefined} onClick={this.openParticipantPage}
-            style={{margin: '5px', height: '38px', display: 'flex', alignItems: 'center'}}>
-                Choose{participantName && <>&nbsp;<b>{participantName}</b></>}
+            style={STYLES.chooseButton}>
+                {UI_MESSAGES.CHOOSE}{participantName && <>&nbsp;<b>{participantName}</b></>}
             </Button>
           </div>
         </div>
-        <div style={{
-          display: participants !== undefined && participants.length > 0 ? 'block' : 'none',
-          position: 'relative'
-        }}>
-          <span style={{
-            position: 'absolute',
-            height: '0',
-            width: '0',
-            fontSize: '0',
-            borderTop: '2vmin solid transparent',
-            borderBottom: '2vmin solid transparent',
-            borderLeft: '4vmin solid #FF9900',
-            // Top position should always be wheel height * 0.5 - borderLeft size * 0.5
-            top: 'calc(37.5vmin - 2vmin)',
-            // Right position should always be 50vw - wheel width * 0.5
-            right: 'calc(50vw + 37.5vmin)',
-           }}/>
-          <canvas ref='canvas' width={CANVAS_SIZE} height={CANVAS_SIZE}
-            style={{
-              position: 'absolute',
-              top: 0,
-              // Left position should always be 50vw - wheel height / 2
-              left: 'calc(50vw - 37.5vmin)',
-              height: '75vmin',
-              width: '75vmin',
-              overflow: 'hidden',
-              borderRadius: '50%',
-            }} />
+        <div style={STYLES.wheelContainer}>
+          <span style={STYLES.arrow}/>
+          <canvas ref='canvas' width={CANVAS_SIZE} height={CANVAS_SIZE} style={STYLES.canvas} />
           <Button variant='primary' disabled={isSpinning || participants === undefined || participants.length === 0}
             id='btnSpin'
-            style={{
-            position: 'absolute',
-            // Top position should always be wheel height * 0.5 - button height * 0.5
-            top: 'calc(37.5vmin - 5vmin)',
-            // Left position should always be 50vw - button width * 0.5
-            left: 'calc(50vw - 5vmin)',
-            height: '10vmin',
-            width: '10vmin',
-            borderRadius: '50%',
-            border: '1vmin solid #FAFAFA',
-            overflow: 'hidden',
-            padding: 0,
-            zIndex: 100,
-            fontSize: '2vmin',
-            textAlign: 'center',
-            }} onClick={this.startSpinningWheel}>
-            Spin
+            style={STYLES.spinButton} 
+            onClick={this.startSpinningWheel}>
+            {UI_MESSAGES.SPIN}
           </Button>
         </div>
       </div>

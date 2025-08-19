@@ -13,13 +13,12 @@
  * permissions and limitations under the License.
  */
 
-import React, {PropTypes, Component} from 'react';
+import React, {Component} from 'react';
 import {Card, Table, Button, ButtonGroup, ButtonToolbar} from 'react-bootstrap';
 import connect from 'react-redux-fetch';
 import ParticipantRow from './participant_row';
 import ParticipantModal from './participant_modal';
 import ConfirmationModal from '../confirmation_modal';
-import {WheelType, ParticipantType} from '../../types';
 import {apiURL, getAuthHeaders} from '../../util';
 import {LinkWrapper} from '../../util';
 import PermissionGuard from '../PermissionGuard';
@@ -37,6 +36,7 @@ const INITIAL_STATE = {
   resetPending: false,
   fetchPending: false,
   unrigCompleted: false,
+  showLastParticipantMessage: false,
 };
 
 const TABLE_HEADERS = [
@@ -80,11 +80,32 @@ export class ParticipantTable extends Component {
   }
 
   componentWillMount() {
+    // Safety check before calling fetchWheelAndParticipants
+    if (!this.props.match || !this.props.match.params || !this.props.match.params.wheel_id) {
+      console.error('componentWillMount: Missing route parameters:', {
+        match: this.props.match,
+        params: this.props.match?.params,
+        wheel_id: this.props.match?.params?.wheel_id
+      });
+      this.setState({
+        fetchPending: false,
+        participants: [],
+        wheel: { wheel_name: 'Error: Missing wheel ID in componentWillMount' },
+        rigging: {}
+      });
+      return;
+    }
     this.fetchWheelAndParticipants();
   }
 
   componentDidUpdate() {
     try {
+      // Safety check - if no route params, don't do anything
+      if (!this.props.match?.params?.wheel_id) {
+        console.warn('componentDidUpdate: No wheel_id available, skipping updates');
+        return;
+      }
+
       console.log('ParticipantTable componentDidUpdate:', {
         fetchPending: this.state.fetchPending,
         wheelFulfilled: this.props.wheelFetch.fulfilled,
@@ -146,6 +167,23 @@ export class ParticipantTable extends Component {
 
   fetchWheelAndParticipants() {
     this.setState({fetchPending: true});
+    
+    // Safety check for props.match
+    if (!this.props.match || !this.props.match.params || !this.props.match.params.wheel_id) {
+      console.error('Missing route parameters:', {
+        match: this.props.match,
+        params: this.props.match?.params,
+        wheel_id: this.props.match?.params?.wheel_id
+      });
+      this.setState({
+        fetchPending: false,
+        participants: [],
+        wheel: { wheel_name: 'Error: Missing wheel ID' },
+        rigging: {}
+      });
+      return;
+    }
+    
     this.props.dispatchWheelGet(this.props.match.params.wheel_id);
     this.props.dispatchListParticipantsGet(this.props.match.params.wheel_id);
   }
@@ -159,21 +197,53 @@ export class ParticipantTable extends Component {
   };
 
   handleCreateParticipant = (participant) => {
+    if (!this.props.match?.params?.wheel_id) {
+      console.error('Cannot create participant: missing wheel_id');
+      return;
+    }
     this.props.dispatchCreateParticipantPost(this.props.match.params.wheel_id, participant);
     this.setState({createPending: true});
   };
 
   handleUpdateParticipant = (participant) => {
+    if (!this.props.match?.params?.wheel_id) {
+      console.error('Cannot update participant: missing wheel_id');
+      return;
+    }
     this.props.dispatchUpdateParticipantPut(this.props.match.params.wheel_id, participant);
     this.setState({updatePending: true});
   };
 
   handleDeleteParticipant = (participant) => {
+    if (!this.props.match?.params?.wheel_id) {
+      console.error('Cannot delete participant: missing wheel_id');
+      return;
+    }
+    
+    // Check if this is the last participant
+    if (this.state.participants && this.state.participants.length <= 1) {
+      this.showLastParticipantMessage();
+      return;
+    }
+    
     this.props.dispatchDeleteParticipantDelete(this.props.match.params.wheel_id, participant.participant_id);
     this.setState({deletePending: true});
   };
 
+  showLastParticipantMessage = () => {
+    this.setState({showLastParticipantMessage: true});
+    // Hide the message after 2 seconds
+    setTimeout(() => {
+      this.setState({showLastParticipantMessage: false});
+    }, 2000);
+  };
+
   handleRigParticipant = (participant) => {
+    if (!this.props.match?.params?.wheel_id) {
+      console.error('Cannot rig participant: missing wheel_id');
+      return;
+    }
+
     let {participant_id} = this.state.rigging;
 
     // Do nothing if we're already rigged
@@ -187,6 +257,11 @@ export class ParticipantTable extends Component {
   };
 
   handleHiddenRigParticipant = (participant) => {
+    if (!this.props.match?.params?.wheel_id) {
+      console.error('Cannot toggle hidden rig: missing wheel_id');
+      return;
+    }
+
     let {participant_id, hidden} = this.state.rigging;
     // Change the hidden rig state if this participant is already rigged, otherwise do nothing
     if (participant_id === participant.participant_id) {
@@ -196,16 +271,46 @@ export class ParticipantTable extends Component {
   };
 
   unrigWheel = () => {
+    if (!this.props.match?.params?.wheel_id) {
+      console.error('Cannot unrig wheel: missing wheel_id');
+      return;
+    }
     this.props.dispatchUnrigParticipantDelete(this.props.match.params.wheel_id);
     this.setState({rigging: {}, unrigCompleted: false});
   };
 
   handleResetWheel = () => {
+    if (!this.props.match?.params?.wheel_id) {
+      console.error('Cannot reset wheel: missing wheel_id');
+      return;
+    }
     this.props.dispatchResetWheelPost(this.props.match.params.wheel_id);
     this.setState({resetPending: true});
   };
 
   render() {
+    // Safety check for routing props
+    if (!this.props.match || !this.props.match.params || !this.props.match.params.wheel_id) {
+      return (
+        <div className='pageRoot'>
+          <h1 className='title'>
+            <div className='title-text'>Error: Invalid Route</div>
+          </h1>
+          <div className='container-fluid'>
+            <div className='alert alert-danger'>
+              Unable to load participant data. Please navigate back and try again.
+              <br />
+              Debug info: {JSON.stringify({
+                hasMatch: !!this.props.match,
+                hasParams: !!this.props.match?.params,
+                wheelId: this.props.match?.params?.wheel_id
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     const {participantModalOpen, resetModalOpen, rigging, wheel, participants} = this.state;
     const {wheelFetch, listParticipantsFetch} = this.props;
     let participantRows = [];
@@ -310,7 +415,7 @@ export class ParticipantTable extends Component {
                     Back
                   </Button>
                 </LinkWrapper>
-                <LinkWrapper to={`wheel/${this.props.match.params.wheel_id}`}>
+                <LinkWrapper to={`wheel/${this.props.match?.params?.wheel_id || ''}`}>
                   <Button size='sm'>
                     Go to Wheel
                   </Button>
@@ -360,6 +465,26 @@ export class ParticipantTable extends Component {
             </Table>
           </Card>
         </div>
+        
+        {/* Popup message for last participant deletion attempt */}
+        {this.state.showLastParticipantMessage && (
+          <div style={{
+            position: 'fixed',
+            bottom: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: '#dc3545',
+            color: 'white',
+            padding: '12px 24px',
+            borderRadius: '6px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            zIndex: 9999,
+            fontSize: '14px',
+            fontWeight: '500'
+          }}>
+            Cannot delete the last participant from a wheel
+          </div>
+        )}
       </div>
     )
   }

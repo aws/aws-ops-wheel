@@ -38,7 +38,7 @@ const WheelManagementExample = () => {
 // Example 2: Using Permission Hook Directly
 const UserDashboard = () => {
   const { hasPermission, role, loading } = usePermissions();
-  const { tenantName, email } = useUserInfo();
+  const { wheelGroupName, email } = useUserInfo();
   
   if (loading) {
     return <div>Loading permissions...</div>;
@@ -48,7 +48,7 @@ const UserDashboard = () => {
     <div>
       <h3>User Dashboard</h3>
       <p>Welcome, {email}</p>
-      <p>Tenant: {tenantName}</p>
+      <p>Wheel Group: {wheelGroupName}</p>
       <p>Role: {role}</p>
       
       <div>
@@ -76,7 +76,7 @@ const ModeratorActions = () => {
       {/* Show if user has ANY of these permissions */}
       <PermissionGuard permission={['create_wheel', 'delete_wheel', 'manage_participants']}>
         <div className="alert alert-info">
-          You have moderator privileges in this tenant.
+          You have moderator privileges in this wheel group.
         </div>
       </PermissionGuard>
     </div>
@@ -91,13 +91,13 @@ const AdminOnlySection = () => {
       
       {/* Show only if user has ALL of these permissions */}
       <PermissionGuard 
-        permission={['manage_users', 'manage_tenant']} 
+        permission={['manage_users', 'manage_wheel_group']} 
         requireAll={true}
       >
         <div className="alert alert-warning">
-          <h4>Tenant Administration</h4>
-          <p>You have full administrative access to this tenant.</p>
-          <Button variant="danger">Delete Tenant</Button>
+          <h4>Wheel Group Administration</h4>
+          <p>You have full administrative access to this wheel group.</p>
+          <Button variant="danger">Delete Wheel Group</Button>
         </div>
       </PermissionGuard>
     </div>

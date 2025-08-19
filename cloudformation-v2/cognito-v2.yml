@@ -5,13 +5,17 @@ Parameters:
   Environment:
     Type: String
     Default: dev
-    AllowedValues: [dev, staging, prod]
-    Description: Environment for deployment
+    Description: Deployment suffix for naming resources
 
   AdminEmail:
     Type: String
     Description: Admin email for Cognito notifications
     Default: admin@example.com
+
+  ForceUpdateTimestamp:
+    Type: String
+    Default: '1'
+    Description: Timestamp parameter to force nested stack updates
 
 Resources:
   # =================== COGNITO USER POOL ===================
@@ -31,12 +35,23 @@ Resources:
           RequireLowercase: true
           RequireNumbers: true
           RequireSymbols: false
+      VerificationMessageTemplate:
+        DefaultEmailOption: CONFIRM_WITH_CODE
+        EmailMessage: 'Your AWS Ops Wheel password reset code is {####}. This code will expire in 24 hours. If you did not request this, please ignore this email.'
+        EmailSubject: 'AWS Ops Wheel - Password Reset Code'
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
       Schema:
         - Name: email
           AttributeDataType: String
           Required: true
           Mutable: true
-        - Name: tenant_id
+        - Name: wheel_group_id
+          AttributeDataType: String
+          Mutable: true
+        - Name: deployment_admin
           AttributeDataType: String
           Mutable: true
 
@@ -56,6 +71,9 @@ Resources:
       IdTokenValidity: 24
       AccessTokenValidity: 24
       RefreshTokenValidity: 30
+
+  # Note: Deployment admin user will be created post-deployment via AWS CLI
+  # This avoids CloudFormation validation issues with custom attributes
 
 Outputs:
   UserPoolId:

@@ -13,30 +13,17 @@
  * permissions and limitations under the License.
  */
 
-import React, {PropTypes, Component} from 'react';
+import React, {Component} from 'react';
 import {Modal, Button, Form} from 'react-bootstrap';
-import {WheelType} from '../../types';
 
-export interface WheelModalProps {
-  isModalOpen: bool;
-  wheel: WheelType | undefined;
-  onClose: PropTypes.func;
-  onSubmit: PropTypes.func;
-}
-
-interface WheelModalState {
-  wheel: WheelType;
-  isAdd: bool;
-}
-
-const defaultWheel: WheelType = {
+const defaultWheel = {
   id: '',
   name: '',
   participant_count: 0,
 };
 
-export default class WheelModal extends Component<WheelModalProps, WheelModalState> {
-  constructor(props: WheelModalProps) {
+export default class WheelModal extends Component {
+  constructor(props) {
     super(props);
     this.state = {
       wheel: Object.assign({}, defaultWheel),
@@ -48,7 +35,7 @@ export default class WheelModal extends Component<WheelModalProps, WheelModalSta
     this.onClose = this.onClose.bind(this);
   }
 
-  onSubmit(event: React.MouseEvent<HTMLButtonElement>) {
+  onSubmit(event) {
     event.preventDefault();
     // For updates, only send the fields that can be updated
     const wheelData = this.state.isAdd ? {
@@ -65,7 +52,7 @@ export default class WheelModal extends Component<WheelModalProps, WheelModalSta
     this.props.onClose();
   }
 
-  onChange(event: any) {
+  onChange(event) {
     const {wheel} = this.state;
     this.setState({wheel: Object.assign({}, wheel, {[event.target.name]: event.target.value})});
   };
@@ -89,8 +76,8 @@ export default class WheelModal extends Component<WheelModalProps, WheelModalSta
     const {isModalOpen} = this.props;
     const {wheel, isAdd} = this.state;
 
-    const heading: string = isAdd ? 'Add a new wheel' : 'Edit an existing wheel';
-    const submitText: string = isAdd ? 'Add Wheel' : 'Update Wheel';
+    const heading = isAdd ? 'Add a new wheel' : 'Edit an existing wheel';
+    const submitText = isAdd ? 'Add Wheel' : 'Update Wheel';
     
     // Create unique IDs to avoid conflicts when multiple modals exist
     const wheelNameId = isAdd ? 'wheel-name-add' : `wheel-name-edit-${wheel.wheel_id || 'new'}`;

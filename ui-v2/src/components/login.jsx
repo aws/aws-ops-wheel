@@ -13,25 +13,65 @@
  * permissions and limitations under the License.
  */
 
-import React, { Component, PropTypes } from "react";
+import React, { Component } from "react";
+import PropTypes from "prop-types";
 import {Alert, Button, Form} from "react-bootstrap";
-import {AuthenticationDetails, CognitoUser, CognitoUserPool} from "amazon-cognito-identity-js";
+import {AuthenticationDetails, CognitoUser} from "amazon-cognito-identity-js";
+import { withRouter } from 'react-router-dom';
 
-interface LoginProps {
+// Login Component Constants
+const LOGIN_CONFIG = {
+  MIN_PASSWORD_LENGTH: 6,
+  MIN_USERNAME_LENGTH: 1,
+  CONTAINER_PADDING: '60px 0',
+  FORM_MAX_WIDTH: '320px',
+  INFO_MARGIN_TOP: '15px'
+};
+
+const LOGIN_MESSAGES = {
+  LOGIN_BUTTON: 'Login',
+  CREATE_WHEEL_GROUP_BUTTON: 'Create Wheel Group',
+  USERNAME_LABEL: 'Username',
+  PASSWORD_LABEL: 'Password',
+  FIRST_TIME_TITLE: 'Account used for the first time.',
+  FIRST_TIME_MESSAGE: 'You need to change your password.',
+  INFO_MESSAGE: 'Use your username (not email) to log in. You can manage Users using the User Pool in AWS Cognito.'
+};
+
+const FORM_CONFIG = {
+  USERNAME_FIELD: 'username',
+  PASSWORD_FIELD: 'password',
+  CONTROL_SIZE: 'lg'
+};
+
+const ALERT_VARIANTS = {
+  WARNING: 'warning',
+  DANGER: 'danger',
+  INFO: 'info'
+};
+
+const LOGIN_STYLES = {
+  container: {
+    padding: LOGIN_CONFIG.CONTAINER_PADDING
+  },
+  form: {
+    margin: '0 auto',
+    maxWidth: LOGIN_CONFIG.FORM_MAX_WIDTH
+  },
+  infoAlert: {
+    marginTop: LOGIN_CONFIG.INFO_MARGIN_TOP
+  }
+};
+
+// PropTypes definitions (moved out of TypeScript interfaces)
+const LOGIN_PROP_TYPES = {
   userHasAuthenticated: PropTypes.func,
-  userPool: CognitoUserPool | undefined,
-}
+  userPool: PropTypes.object,
+  onCreateTenant: PropTypes.func
+};
 
-interface LoginState {
-  username: string,
-  password: string,
-  passwordChangeAttributes: Object,
-  error: Object,
-  isInFlight: boolean,
-  user: CognitoUser | undefined,
-}
-
-export default class Login extends Component<LoginProps, LoginState> {
+class Login extends Component {
+  static propTypes = LOGIN_PROP_TYPES;
   constructor(props) {
     super(props);
 
@@ -57,7 +97,7 @@ export default class Login extends Component<LoginProps, LoginState> {
   };
 
   // amazon-cognito-identity-js CognitoUser.authenticateUser() Callback
-  newPasswordRequired = (userAttributes: Object) => {
+  newPasswordRequired = (userAttributes) => {
     // User was signed up by an admin and must provide new
     // password and required attributes, if any, to complete
     // authentication.
@@ -87,28 +127,37 @@ export default class Login extends Component<LoginProps, LoginState> {
     this.setState({user}, () => user.authenticateUser(authenticationDetails, this));
   };
 
+  handleCreateTenant = () => {
+    // Navigate to wheel group creation page
+    this.props.history.push('/app/createtenant');
+  };
+
+  handleForgotPassword = () => {
+    // Navigate to forgot password page
+    this.props.history.push('/forgot-password');
+  };
+
   render() {
     const {isInFlight} = this.state;
     const errorString = this.state.error === undefined ? '' : this.state.error.message;
     let userElement, formSubmit;
     if (this.state.passwordChangeAttributes !== undefined) {
       formSubmit = this.submitNewPassword;
-      userElement = <Alert
-                      variant="warning">
-                        <strong>Account used for the first time.</strong> <br />
-                        You need to change your password.
+      userElement = <Alert variant={ALERT_VARIANTS.WARNING}>
+                        <strong>{LOGIN_MESSAGES.FIRST_TIME_TITLE}</strong> <br />
+                        {LOGIN_MESSAGES.FIRST_TIME_MESSAGE}
                       </Alert>
 
     } else {
       formSubmit = this.login;
-      userElement = <Form.Group controlId="username" className="mb-3">
-        <Form.Label>Username</Form.Label>
+      userElement = <Form.Group controlId={FORM_CONFIG.USERNAME_FIELD} className="mb-3">
+        <Form.Label>{LOGIN_MESSAGES.USERNAME_LABEL}</Form.Label>
         <Form.Control
           autoFocus
-          type="username"
+          type={FORM_CONFIG.USERNAME_FIELD}
           value={this.state.username}
           onChange={this.handleChange}
-          size="lg"
+          size={FORM_CONFIG.CONTROL_SIZE}
         />
       </Form.Group>;
     }
@@ -116,36 +165,63 @@ export default class Login extends Component<LoginProps, LoginState> {
     let warning;
 
     if (errorString !== '') {
-      warning = <div key='error' className='alert alert-danger'>{errorString}</div>
+      warning = <div key='error' className={`alert alert-${ALERT_VARIANTS.DANGER}`}>{errorString}</div>
     }
 
     return (
-      <div className="Login" style={{padding: '60px 0'}}>
-        <form onSubmit={formSubmit} style={{margin: '0 auto', maxWidth: '320px'}}>
+      <div className="Login" style={LOGIN_STYLES.container}>
+        <form onSubmit={formSubmit} style={LOGIN_STYLES.form}>
           {userElement}
-          <Form.Group controlId="password" className="mb-3">
-            <Form.Label>Password</Form.Label>
+          <Form.Group controlId={FORM_CONFIG.PASSWORD_FIELD} className="mb-3">
+            <Form.Label>{LOGIN_MESSAGES.PASSWORD_LABEL}</Form.Label>
             <Form.Control
               value={this.state.password}
               onChange={this.handleChange}
-              type="password"
-              size="lg"
+              type={FORM_CONFIG.PASSWORD_FIELD}
+              size={FORM_CONFIG.CONTROL_SIZE}
             />
           </Form.Group>
 
           {warning}
 
-          <Button
-            className="d-grid"
-            size="lg"
-            disabled={isInFlight || this.state.username.length === 0 || this.state.password.length < 6}
-            type="submit"
-          >
-            Login
-          </Button>
+          <div className="d-flex gap-2">
+            <Button
+              className="flex-fill"
+              size={FORM_CONFIG.CONTROL_SIZE}
+              disabled={isInFlight || this.state.username.length < LOGIN_CONFIG.MIN_USERNAME_LENGTH || this.state.password.length < LOGIN_CONFIG.MIN_PASSWORD_LENGTH}
+              type="submit"
+            >
+              {LOGIN_MESSAGES.LOGIN_BUTTON}
+            </Button>
 
-          <div key='informationWindow' className='alert alert-info' style={{marginTop: '15px'}}>
-            You can manage Users using the User Pool in AWS Cognito.
+            {this.state.passwordChangeAttributes === undefined && (
+              <Button
+                className="flex-fill"
+                size={FORM_CONFIG.CONTROL_SIZE}
+                disabled={isInFlight}
+                onClick={this.handleCreateTenant}
+              >
+                {LOGIN_MESSAGES.CREATE_WHEEL_GROUP_BUTTON}
+              </Button>
+            )}
+          </div>
+
+          {this.state.passwordChangeAttributes === undefined && (
+            <div style={{ textAlign: 'center', marginTop: '15px' }}>
+              <Button
+                variant="link"
+                size="sm"
+                disabled={isInFlight}
+                onClick={this.handleForgotPassword}
+                style={{ textDecoration: 'none' }}
+              >
+                Forgot Password?
+              </Button>
+            </div>
+          )}
+
+          <div key='informationWindow' className={`alert alert-${ALERT_VARIANTS.INFO}`} style={LOGIN_STYLES.infoAlert}>
+            {LOGIN_MESSAGES.INFO_MESSAGE}
           </div>
         </form>
 
@@ -153,3 +229,5 @@ export default class Login extends Component<LoginProps, LoginState> {
     );
   }
 }
+
+export default withRouter(Login);

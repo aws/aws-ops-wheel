@@ -13,7 +13,7 @@
  * permissions and limitations under the License.
  */
 
-import React, {PropTypes, Component} from 'react';
+import React, {Component} from 'react';
 import {Modal, Button, Form, Alert} from 'react-bootstrap';
 import {apiURL, getAuthHeaders} from '../../util';
 
@@ -109,7 +109,7 @@ export default class UserModal extends Component {
 
   async checkUsernameUniqueness(username) {
     try {
-      const response = await fetch(apiURL('tenant/users'), {
+      const response = await fetch(apiURL('wheel-group/users'), {
         method: 'GET',
         headers: getAuthHeaders()
       });
@@ -252,7 +252,7 @@ export default class UserModal extends Component {
                   ))}
                 </Form.Select>
                 <Form.Text className="text-muted">
-                  {user.role === 'ADMIN' && 'Can manage all tenant settings and users'}
+                  {user.role === 'ADMIN' && 'Can manage all wheel group settings and users'}
                   {user.role === 'WHEEL_ADMIN' && 'Can manage wheels and participants'}
                   {user.role === 'USER' && 'Can view and spin wheels'}
                 </Form.Text>

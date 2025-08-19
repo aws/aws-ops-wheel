@@ -1,5 +1,5 @@
 """
-DynamoDB-based tenant middleware that looks up tenant information from DynamoDB
+DynamoDB-based wheel group middleware that looks up wheel group information from DynamoDB
 instead of relying on JWT custom attributes
 """
 
@@ -10,7 +10,6 @@ import time
 import boto3
 from functools import wraps
 from typing import Dict, Any, Optional
-from utils_v2 import UserRepository, TenantRepository
 
 # Initialize DynamoDB client
 dynamodb = boto3.resource('dynamodb', region_name=os.environ.get('AWS_DEFAULT_REGION', 'us-west-2'))
@@ -75,38 +74,54 @@ def validate_token_basic(token: str, user_pool_id: str, client_id: str) -> Dict[
     except Exception as e:
         raise ValueError(f"Token validation failed: {str(e)}")
 
-def lookup_user_tenant_info(user_email: str) -> Dict[str, Any]:
+def lookup_user_wheel_group_info(user_email: str) -> Dict[str, Any]:
     """
-    Look up tenant information from DynamoDB based on user email
+    Look up wheel group information from DynamoDB based on user email
     """
     try:
-        # Find user by email using repository
-        user_record = UserRepository.get_user_by_email(user_email)
+        # Direct DynamoDB queries to avoid import issues
+        users_table_name = os.environ.get('USERS_TABLE', 'OpsWheelV2-Users-dev')
+        wheel_groups_table_name = os.environ.get('WHEEL_GROUPS_TABLE', 'OpsWheelV2-WheelGroups-dev')
         
-        if not user_record:
+        users_table = dynamodb.Table(users_table_name)
+        wheel_groups_table = dynamodb.Table(wheel_groups_table_name)
+        
+        # Find user by email using GSI
+        response = users_table.query(
+            IndexName='email-index',
+            KeyConditionExpression=boto3.dynamodb.conditions.Key('email').eq(user_email)
+        )
+        
+        items = response.get('Items', [])
+        if not items:
             raise ValueError(f"User not found in database: {user_email}")
-        
-        tenant_id = user_record['tenant_id']
+            
+        user_record = items[0]
+        wheel_group_id = user_record['wheel_group_id']
         user_role = user_record.get('role', 'USER')
         
-        # Get tenant information using repository
-        tenant_record = TenantRepository.get_tenant(tenant_id)
+        # Get wheel group information
+        wheel_group_response = wheel_groups_table.get_item(
+            Key={'wheel_group_id': wheel_group_id}
+        )
+        
+        wheel_group_record = wheel_group_response.get('Item', {})
         
         return {
             'user_id': user_record['user_id'],
-            'tenant_id': tenant_id,
-            'tenant_name': tenant_record.get('tenant_name', tenant_id),
+            'wheel_group_id': wheel_group_id,
+            'wheel_group_name': wheel_group_record.get('wheel_group_name', wheel_group_id),
             'role': user_role,
             'email': user_email,
             'name': user_record.get('name', user_email)
         }
         
     except Exception as e:
-        raise ValueError(f"Failed to lookup user tenant info: {str(e)}")
+        raise ValueError(f"Failed to lookup user wheel group info: {str(e)}")
 
-def tenant_middleware(event, context):
+def wheel_group_middleware(event, context):
     """
-    Hybrid tenant middleware: Uses JWT custom attributes first, falls back to DynamoDB lookup
+    Hybrid wheel group middleware: Uses JWT custom attributes first, falls back to DynamoDB lookup
     """
     try:
         # Extract Authorization header
@@ -160,41 +175,67 @@ def tenant_middleware(event, context):
                 'body': json.dumps({'error': 'Token missing required claims (email or sub)'})
             }
         
-        # Always get latest user info from DynamoDB to ensure roles are up-to-date
-        try:
-            tenant_info = lookup_user_tenant_info(user_email)
-        except Exception as db_error:
-            # For /auth/me endpoint, allow access without tenant info
-            path = event.get('path', '')
-            if '/auth/me' in path:
-                tenant_info = {
-                    'user_id': user_id,
-                    'tenant_id': None,
-                    'tenant_name': None,
-                    'role': 'USER',
-                    'email': user_email,
-                    'name': user_name
-                }
-            else:
-                return {
-                    'statusCode': 401,
-                    'headers': {
-                        'Content-Type': 'application/json',
-                        'Access-Control-Allow-Origin': '*'
-                    },
-                    'body': json.dumps({'error': f'User not associated with any tenant. Please join a tenant first.'})
-                }
+        # Check if this is a deployment admin user
+        is_deployment_admin = payload.get('custom:deployment_admin') == 'true'
+        print(f"[DEBUG] JWT payload custom:deployment_admin: {payload.get('custom:deployment_admin')}")
+        print(f"[DEBUG] is_deployment_admin: {is_deployment_admin}")
+        print(f"[DEBUG] Full JWT payload: {json.dumps(payload, default=str)}")
         
-        # Add tenant context to event
-        event['tenant_context'] = {
-            'tenant_id': tenant_info['tenant_id'],
-            'tenant_name': tenant_info['tenant_name'],
-            'user_id': tenant_info['user_id'],
-            'email': tenant_info['email'],
-            'name': tenant_info['name'],
-            'role': tenant_info['role'],
-            'permissions': get_role_permissions(tenant_info['role'])
+        if is_deployment_admin:
+            print(f"[DEBUG] Processing deployment admin user: {user_email}")
+            # Deployment admin doesn't belong to any wheel group
+            wheel_group_info = {
+                'user_id': user_id,
+                'wheel_group_id': None,
+                'wheel_group_name': None,
+                'role': 'DEPLOYMENT_ADMIN',
+                'email': user_email,
+                'name': user_name,
+                'deployment_admin': True
+            }
+            print(f"[DEBUG] Deployment admin wheel_group_info: {wheel_group_info}")
+        else:
+            # Regular user - get latest user info from DynamoDB to ensure roles are up-to-date
+            try:
+                wheel_group_info = lookup_user_wheel_group_info(user_email)
+                wheel_group_info['deployment_admin'] = False
+            except Exception as db_error:
+                # For /auth/me endpoint, allow access without wheel group info
+                path = event.get('path', '')
+                if '/auth/me' in path:
+                    wheel_group_info = {
+                        'user_id': user_id,
+                        'wheel_group_id': None,
+                        'wheel_group_name': None,
+                        'role': 'USER',
+                        'email': user_email,
+                        'name': user_name,
+                        'deployment_admin': False
+                    }
+                else:
+                    return {
+                        'statusCode': 401,
+                        'headers': {
+                            'Content-Type': 'application/json',
+                            'Access-Control-Allow-Origin': '*'
+                        },
+                        'body': json.dumps({'error': f'User not associated with any wheel group. Please join a wheel group first.'})
+                    }
+        
+        # Add wheel group context to event
+        event['wheel_group_context'] = {
+            'wheel_group_id': wheel_group_info['wheel_group_id'],
+            'wheel_group_name': wheel_group_info['wheel_group_name'],
+            'user_id': wheel_group_info['user_id'],
+            'email': wheel_group_info['email'],
+            'name': wheel_group_info['name'],
+            'role': wheel_group_info['role'],
+            'deployment_admin': wheel_group_info.get('deployment_admin', False),
+            'permissions': get_role_permissions(wheel_group_info['role'])
         }
+        
+        # Also add user_info for admin operations compatibility
+        event['user_info'] = wheel_group_info
         
         return event
         
@@ -211,6 +252,21 @@ def tenant_middleware(event, context):
 def get_role_permissions(role: str) -> Dict[str, bool]:
     """Get permissions for a user role"""
     permissions_map = {
+        'DEPLOYMENT_ADMIN': {
+            # Deployment admin specific permissions
+            'view_all_wheel_groups': True,
+            'delete_wheel_group': True,
+            'manage_deployment': True,
+            # All regular admin permissions
+            'create_wheel': True,
+            'delete_wheel': True,
+            'manage_participants': True,
+            'spin_wheel': True,
+            'view_wheels': True,
+            'manage_users': True,
+            'manage_wheel_group': True,
+            'rig_wheel': True
+        },
         'ADMIN': {
             'create_wheel': True,
             'delete_wheel': True,
@@ -218,7 +274,7 @@ def get_role_permissions(role: str) -> Dict[str, bool]:
             'spin_wheel': True,
             'view_wheels': True,
             'manage_users': True,
-            'manage_tenant': True,
+            'manage_wheel_group': True,
             'rig_wheel': True
         },
         'WHEEL_ADMIN': {
@@ -228,7 +284,7 @@ def get_role_permissions(role: str) -> Dict[str, bool]:
             'spin_wheel': True,
             'view_wheels': True,
             'manage_users': False,
-            'manage_tenant': False,
+            'manage_wheel_group': False,
             'rig_wheel': True
         },
         'USER': {
@@ -238,7 +294,7 @@ def get_role_permissions(role: str) -> Dict[str, bool]:
             'spin_wheel': True,
             'view_wheels': True,
             'manage_users': False,
-            'manage_tenant': False,
+            'manage_wheel_group': False,
             'rig_wheel': False
         },
     }
@@ -249,24 +305,24 @@ def require_auth():
     def decorator(func):
         @wraps(func)
         def wrapper(event, context):
-            auth_result = tenant_middleware(event, context)
+            auth_result = wheel_group_middleware(event, context)
             if isinstance(auth_result, dict) and auth_result.get('statusCode'):
                 return auth_result
             return func(auth_result, context)
         return wrapper
     return decorator
 
-def require_tenant_permission(permission: str):
-    """Decorator requiring specific tenant permission"""
+def require_wheel_group_permission(permission: str):
+    """Decorator requiring specific wheel group permission"""
     def decorator(func):
         @wraps(func)
         def wrapper(event, context):
-            auth_result = tenant_middleware(event, context)
+            auth_result = wheel_group_middleware(event, context)
             if isinstance(auth_result, dict) and auth_result.get('statusCode'):
                 return auth_result
                 
-            tenant_context = auth_result.get('tenant_context', {})
-            permissions = tenant_context.get('permissions', {})
+            wheel_group_context = auth_result.get('wheel_group_context', {})
+            permissions = wheel_group_context.get('permissions', {})
             
             if not permissions.get(permission, False):
                 return {
@@ -285,9 +341,9 @@ def require_tenant_permission(permission: str):
         return wrapper
     return decorator
 
-def get_tenant_context(event) -> Optional[Dict[str, Any]]:
-    """Get tenant context from event"""
-    return event.get('tenant_context')
+def get_wheel_group_context(event) -> Optional[Dict[str, Any]]:
+    """Get wheel group context from event"""
+    return event.get('wheel_group_context')
 
 # Export for backwards compatibility
 lambda_handlers = {}
