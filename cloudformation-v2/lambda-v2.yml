@@ -12,11 +12,10 @@ Parameters:
     Type: String
     Description: S3 bucket where nested CloudFormation templates and lambda layer are stored
 
-  # Lambda Layer Version Parameter - automatically updated by deployment script
-  LayerVersion:
+  # Lambda Layer ARN Parameter - passed from deployment script with content-hash layer
+  LayerArn:
     Type: String
-    Default: "1"
-    Description: Version identifier to force Lambda layer recreation when code changes (auto-managed)
+    Description: ARN of the content-hash based Lambda layer created by deployment script
 
   ForceUpdateTimestamp:
     Type: String
@@ -124,21 +123,8 @@ Resources:
                 Resource:
                   - !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPoolId}'
 
-  # =================== LAMBDA LAYER ===================
-
-  PythonDependenciesLayer:
-    Type: AWS::Lambda::LayerVersion
-    Properties:
-      LayerName: !Sub 'ops-wheel-v2-python-dependencies-${Environment}-v${LayerVersion}'
-      Description: !Sub 'Shared Python dependencies and api-v2 code for AWS Ops Wheel v2 - Version ${LayerVersion}'
-      Content:
-        S3Bucket: !Ref TemplatesBucketName
-        S3Key: 'lambda-layer-v2.zip'
-      CompatibleRuntimes:
-        - python3.9
-      LicenseInfo: 'Apache-2.0'
-
   # =================== LAMBDA FUNCTIONS ===================
+  # Note: Lambda layer is created externally by deployment script using content-hash versioning
 
   TenantManagementFunction:
     Type: AWS::Lambda::Function
@@ -150,7 +136,7 @@ Resources:
       Timeout: 30
       MemorySize: 256
       Layers:
-        - !Ref PythonDependenciesLayer
+        - !Ref LayerArn
       Environment:
         Variables:
           ENVIRONMENT: !Ref Environment
@@ -174,7 +160,7 @@ Resources:
       Timeout: 30
       MemorySize: 256
       Layers:
-        - !Ref PythonDependenciesLayer
+        - !Ref LayerArn
       Environment:
         Variables:
           ENVIRONMENT: !Ref Environment
@@ -198,7 +184,7 @@ Resources:
       Timeout: 30
       MemorySize: 256
       Layers:
-        - !Ref PythonDependenciesLayer
+        - !Ref LayerArn
       Environment:
         Variables:
           ENVIRONMENT: !Ref Environment
@@ -222,7 +208,7 @@ Resources:
       Timeout: 30
       MemorySize: 256
       Layers:
-        - !Ref PythonDependenciesLayer
+        - !Ref LayerArn
       Environment:
         Variables:
           ENVIRONMENT: !Ref Environment
@@ -246,7 +232,7 @@ Resources:
       Timeout: 30
       MemorySize: 256
       Layers:
-        - !Ref PythonDependenciesLayer
+        - !Ref LayerArn
       Environment:
         Variables:
           ENVIRONMENT: !Ref Environment

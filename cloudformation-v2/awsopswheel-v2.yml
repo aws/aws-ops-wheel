@@ -17,10 +17,9 @@ Parameters:
     Description: S3 bucket where nested CloudFormation templates are stored
     Default: ops-wheel-v2-deployment-dev-us-west-2
 
-  LayerVersion:
+  LayerArn:
     Type: String
-    Default: "3"
-    Description: Version identifier to force Lambda layer recreation when code changes
+    Description: ARN of the content-hash based Lambda layer created by deployment script
 
 Resources:
   # =================== DYNAMODB STACK (No Dependencies) ===================
@@ -30,7 +29,7 @@ Resources:
       TemplateURL: !Sub 'https://${TemplatesBucketName}.s3.${AWS::Region}.amazonaws.com/templates/dynamodb-v2.yml'
       Parameters:
         Environment: !Ref Environment
-        ForceUpdateTimestamp: !Ref LayerVersion
+        ForceUpdateTimestamp: !Ref LayerArn
 
   # =================== COGNITO STACK (No Dependencies) ===================
   CognitoStack:
@@ -40,7 +39,7 @@ Resources:
       Parameters:
         Environment: !Ref Environment
         AdminEmail: !Ref AdminEmail
-        ForceUpdateTimestamp: !Ref LayerVersion
+        ForceUpdateTimestamp: !Ref LayerArn
 
   # =================== LAMBDA STACK (Depends on DynamoDB + Cognito) ===================
   LambdaStack:
@@ -53,8 +52,8 @@ Resources:
       Parameters:
         Environment: !Ref Environment
         TemplatesBucketName: !Ref TemplatesBucketName
-        LayerVersion: !Ref LayerVersion
-        ForceUpdateTimestamp: !Ref LayerVersion
+        LayerArn: !Ref LayerArn
+        ForceUpdateTimestamp: !Ref LayerArn
         WheelGroupsTableName: !GetAtt DynamoDBStack.Outputs.WheelGroupsTableName
         UsersTableName: !GetAtt DynamoDBStack.Outputs.UsersTableName
         WheelsTableName: !GetAtt DynamoDBStack.Outputs.WheelsTableName
@@ -75,7 +74,7 @@ Resources:
       TemplateURL: !Sub 'https://${TemplatesBucketName}.s3.${AWS::Region}.amazonaws.com/templates/api-gateway-v2.yml'
       Parameters:
         Environment: !Ref Environment
-        ForceUpdateTimestamp: !Ref LayerVersion
+        ForceUpdateTimestamp: !Ref LayerArn
         TenantManagementFunctionArn: !GetAtt LambdaStack.Outputs.TenantManagementFunctionArn
         WheelOperationsFunctionArn: !GetAtt LambdaStack.Outputs.WheelOperationsFunctionArn
         ParticipantOperationsFunctionArn: !GetAtt LambdaStack.Outputs.ParticipantOperationsFunctionArn
@@ -95,7 +94,7 @@ Resources:
         ApiGatewayDomainName: !GetAtt ApiGatewayStack.Outputs.ApiGatewayDomainName
         UserPoolId: !GetAtt CognitoStack.Outputs.UserPoolId
         UserPoolClientId: !GetAtt CognitoStack.Outputs.UserPoolClientId
-        ForceUpdateTimestamp: !Ref LayerVersion
+        ForceUpdateTimestamp: !Ref LayerArn
 
 Outputs:
   # =================== DATABASE OUTPUTS ===================

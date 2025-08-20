@@ -203,9 +203,157 @@ validate_security_config() {
     log_success "Security configuration validation completed"
 }
 
-# Function to build and upload Lambda layer
+# Function to calculate content hash of layer directory
+calculate_layer_content_hash() {
+    local layer_dir="$1"
+    if [ ! -d "$layer_dir" ]; then
+        log_error "Layer directory not found: $layer_dir"
+        return 1
+    fi
+    
+    # Calculate hash of all files in the layer directory
+    # Sort files for consistent ordering across different systems
+    local content_hash=$(find "$layer_dir" -type f -exec sha256sum {} \; 2>/dev/null | sort | sha256sum | cut -d' ' -f1)
+    echo "$content_hash"
+}
+
+# Function to check if layer already exists
+check_layer_exists() {
+    local layer_name="$1"
+    
+    # Check if layer exists and get its version
+    local layer_info=$(aws lambda get-layer-version \
+        --layer-name "$layer_name" \
+        --version-number 1 \
+        --region "$REGION" 2>/dev/null || echo "")
+    
+    if [ -n "$layer_info" ]; then
+        echo "true"
+    else
+        echo "false"
+    fi
+}
+
+# Function to get layer ARN
+get_layer_arn() {
+    local layer_name="$1"
+    local account_id=$(aws sts get-caller-identity --query Account --output text)
+    echo "arn:aws:lambda:${REGION}:${account_id}:layer:${layer_name}:1"
+}
+
+# Function to cleanup unused layers
+cleanup_unused_layers() {
+    local days_old=${1:-30}  # Default to 30 days
+    
+    log_info "Cleaning up unused layer versions older than $days_old days..."
+    
+    # Get all ops-wheel layers
+    local all_layers=$(aws lambda list-layers --region "$REGION" \
+        --query 'Layers[?contains(LayerName, `ops-wheel`)].LayerName' \
+        --output text 2>/dev/null || echo "")
+    
+    if [ -z "$all_layers" ]; then
+        log_info "No ops-wheel layers found to clean up"
+        return 0
+    fi
+    
+    # Get all Lambda functions that use layers
+    local functions_with_layers=$(aws lambda list-functions --region "$REGION" \
+        --query 'Functions[?contains(FunctionName, `ops-wheel-v2`)].FunctionName' \
+        --output text 2>/dev/null || echo "")
+    
+    local layers_in_use=()
+    
+    # Check which layers are currently in use
+    if [ -n "$functions_with_layers" ]; then
+        for func in $functions_with_layers; do
+            local func_layers=$(aws lambda get-function --function-name "$func" --region "$REGION" \
+                --query 'Configuration.Layers[].Arn' --output text 2>/dev/null || echo "")
+            
+            if [ -n "$func_layers" ]; then
+                for layer_arn in $func_layers; do
+                    # Extract layer name from ARN
+                    local layer_name=$(echo "$layer_arn" | sed 's/.*:layer:\([^:]*\):.*/\1/')
+                    layers_in_use+=("$layer_name")
+                done
+            fi
+        done
+    fi
+    
+    log_info "Found ${#layers_in_use[@]} layers currently in use by Lambda functions"
+    
+    # Calculate cutoff date (30 days ago)
+    local cutoff_date=""
+    if command -v date >/dev/null 2>&1; then
+        if date --version 2>/dev/null | grep -q GNU; then
+            # GNU date
+            cutoff_date=$(date -d "$days_old days ago" --iso-8601=seconds)
+        else
+            # BSD/macOS date
+            cutoff_date=$(date -v-${days_old}d -u +"%Y-%m-%dT%H:%M:%S%z")
+        fi
+    fi
+    
+    local deleted_count=0
+    
+    # Check each layer for cleanup
+    for layer_name in $all_layers; do
+        # Skip if layer is currently in use
+        local is_in_use=false
+        for used_layer in "${layers_in_use[@]}"; do
+            if [ "$layer_name" = "$used_layer" ]; then
+                is_in_use=true
+                break
+            fi
+        done
+        
+        if [ "$is_in_use" = true ]; then
+            log_info "Keeping layer (in use): $layer_name"
+            continue
+        fi
+        
+        # Get layer versions
+        local layer_versions=$(aws lambda list-layer-versions \
+            --layer-name "$layer_name" \
+            --region "$REGION" \
+            --query 'LayerVersions[].[Version,CreatedDate]' \
+            --output text 2>/dev/null || echo "")
+        
+        if [ -n "$layer_versions" ]; then
+            while IFS=$'\t' read -r version created_date; do
+                # Skip if we can't parse the date or if it's recent
+                if [ -n "$cutoff_date" ] && [ -n "$created_date" ]; then
+                    if [[ "$created_date" < "$cutoff_date" ]]; then
+                        log_info "Deleting old unused layer: $layer_name version $version (created: $created_date)"
+                        aws lambda delete-layer-version \
+                            --layer-name "$layer_name" \
+                            --version-number "$version" \
+                            --region "$REGION" >/dev/null 2>&1
+                        if [ $? -eq 0 ]; then
+                            ((deleted_count++))
+                        else
+                            log_warning "Failed to delete layer version: $layer_name:$version"
+                        fi
+                    else
+                        log_info "Keeping recent layer: $layer_name version $version (created: $created_date)"
+                    fi
+                else
+                    log_info "Keeping layer (date check skipped): $layer_name version $version"
+                fi
+            done <<< "$layer_versions"
+        fi
+    done
+    
+    if [ $deleted_count -gt 0 ]; then
+        log_success "Cleaned up $deleted_count unused layer versions"
+    else
+        log_info "No unused layer versions found to clean up"
+    fi
+}
+
+# Function to build and upload Lambda layer with content-hash versioning
 build_and_upload_lambda_layer() {
-    log_info "Building Lambda layer with latest code and minimal dependencies..."
+    log_info "Building Lambda layer with content-hash versioning..."
     
     # Step 1: Delete ALL existing lambda layer zip files to ensure fresh build
     log_info "Cleaning up all existing lambda layer zip files..."
@@ -253,34 +401,128 @@ build_and_upload_lambda_layer() {
     fi
     log_success "✓ Layer code security verification passed"
     
-    # Step 6: Show what's in the layer for debugging
+    # Step 6: Calculate content hash of layer directory
+    log_info "Calculating content hash of layer..."
+    local content_hash=$(calculate_layer_content_hash "lambda-layer-fixed")
+    local short_hash=${content_hash:0:12}  # Use first 12 characters
+    
+    log_info "Layer content hash: $short_hash"
+    
+    # Step 7: Generate layer name with content hash
+    local layer_name="ops-wheel-v2-deps-${SUFFIX}-${short_hash}"
+    
+    # Step 8: Check if layer already exists
+    log_info "Checking if layer already exists: $layer_name"
+    local layer_exists=$(check_layer_exists "$layer_name")
+    
+    if [ "$layer_exists" = "true" ]; then
+        log_success "Layer already exists, reusing: $layer_name"
+        local layer_arn=$(get_layer_arn "$layer_name")
+        log_info "Using existing layer ARN: $layer_arn"
+        
+        # Store layer ARN for CloudFormation
+        export LAYER_ARN="$layer_arn"
+        export LAYER_NAME="$layer_name"
+        
+        # Still create the zip for backup/debugging purposes
+        log_info "Creating backup zip for debugging..."
+        cd lambda-layer-fixed
+        zip -r "../lambda-layer-${short_hash}.zip" . > /dev/null 2>&1
+        cd ..
+        
+        return 0
+    fi
+    
+    # Step 9: Create new layer since it doesn't exist
+    log_info "Creating new layer: $layer_name"
+    
+    # Show what's in the layer for debugging
     log_info "Layer contents summary:"
     log_info "Total size: $(du -sh lambda-layer-fixed | cut -f1)"
     log_info "Python packages: $(ls lambda-layer-fixed/python/ | grep -v api-v2 | wc -l | tr -d ' ')"
     log_info "API modules: $(ls lambda-layer-fixed/python/api-v2/ | wc -l | tr -d ' ')"
     
-    # Step 7: Create the zip file with timestamp for uniqueness
-    local layer_timestamp=$(date +%s)
-    local layer_zip_name="lambda-layer-v2-${layer_timestamp}.zip"
+    # Create the zip file with content hash
+    local layer_zip_name="lambda-layer-${short_hash}.zip"
     
     log_info "Creating layer zip: $layer_zip_name"
     cd lambda-layer-fixed
     zip -r "../$layer_zip_name" . > /dev/null 2>&1
     cd ..
     
-    # Step 8: Create consistent name for CloudFormation
+    # Create consistent name for CloudFormation and S3 upload
     cp "$layer_zip_name" "lambda-layer-v2.zip"
     
     if [ -f "lambda-layer-v2.zip" ]; then
         local zip_size=$(ls -lh lambda-layer-v2.zip | awk '{print $5}')
         log_info "Layer zip created successfully (size: $zip_size)"
         
+        # Upload to S3
         log_info "Uploading Lambda layer to S3..."
         aws s3 cp lambda-layer-v2.zip "s3://$TEMPLATES_BUCKET/lambda-layer-v2.zip" --region $REGION
-        log_success "Lambda layer uploaded with latest code and minimal dependencies (timestamp: $layer_timestamp)"
         
-        # Keep the timestamped version for debugging
-        log_info "Backup layer saved as: $layer_zip_name"
+        # Publish new layer version
+        log_info "Publishing new layer version: $layer_name"
+        local layer_response=$(aws lambda publish-layer-version \
+            --layer-name "$layer_name" \
+            --description "Content-hash layer for AWS Ops Wheel v2 - Hash: $short_hash" \
+            --content S3Bucket="$TEMPLATES_BUCKET",S3Key="lambda-layer-v2.zip" \
+            --compatible-runtimes python3.9 \
+            --license-info "Apache-2.0" \
+            --region "$REGION")
+        
+        if [ $? -eq 0 ]; then
+            # Extract layer ARN from response using AWS CLI query
+            local layer_arn=$(echo "$layer_response" | grep -o '"LayerVersionArn": "[^"]*"' | cut -d'"' -f4)
+            
+            # Fallback: construct ARN manually if extraction failed
+            if [ -z "$layer_arn" ]; then
+                log_warning "Could not extract LayerVersionArn from API response, constructing manually"
+                layer_arn=$(get_layer_arn "$layer_name")
+            fi
+            
+            # Validate layer ARN format (fix hyphen position in regex)
+            if [[ ! "$layer_arn" =~ ^arn:aws:lambda:[a-z0-9-]+:[0-9]+:layer:[a-zA-Z0-9_-]+:[0-9]+$ ]]; then
+                log_error "Invalid layer ARN format: $layer_arn"
+                log_error "Expected format: arn:aws:lambda:region:account:layer:name:version"
+                log_error "ARN length: ${#layer_arn} characters"
+                log_error "Debug - ARN breakdown:"
+                log_error "  Full ARN: '$layer_arn'"
+                log_error "  Ends with digit: $(echo "$layer_arn" | grep -o '[0-9]$' || echo 'NO')"
+                exit 1
+            fi
+            
+            log_success "Lambda layer created successfully: $layer_name"
+            log_info "Layer ARN: $layer_arn"
+            
+            # Verify layer actually exists before proceeding
+            log_info "Verifying layer exists..."
+            local verify_response=$(aws lambda get-layer-version-by-arn \
+                --arn "$layer_arn" \
+                --region "$REGION" 2>/dev/null || echo "")
+            
+            if [ -z "$verify_response" ]; then
+                log_error "Failed to verify layer exists: $layer_arn"
+                exit 1
+            fi
+            log_success "✓ Layer verified and accessible"
+            
+            # Store layer ARN for CloudFormation
+            export LAYER_ARN="$layer_arn"
+            export LAYER_NAME="$layer_name"
+            
+            # Add git commit info if available
+            if command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; then
+                local git_commit=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+                log_info "Git commit: $git_commit"
+            fi
+            
+            # Keep the hash-named version for debugging
+            log_info "Backup layer saved as: $layer_zip_name"
+        else
+            log_error "Failed to publish Lambda layer version"
+            exit 1
+        fi
     else
         log_error "Failed to create Lambda layer zip file"
         exit 1
@@ -396,9 +638,27 @@ force_api_gateway_deployment() {
 deploy_stack() {
     log_info "Deploying main orchestrator stack: $STACK_NAME"
     
-    # Generate timestamp-based layer version to force CloudFormation to update layer
-    local layer_version=$(date +%s)
-    log_info "Using LayerVersion: $layer_version (timestamp-based)"
+    # Use content-hash based layer ARN instead of timestamp versioning
+    if [ -z "$LAYER_ARN" ] || [ -z "$LAYER_NAME" ]; then
+        log_error "Layer ARN or Layer Name not set. build_and_upload_lambda_layer must be called first."
+        exit 1
+    fi
+    
+    # Validate layer ARN format before CloudFormation deployment
+    if [[ ! "$LAYER_ARN" =~ ^arn:aws:lambda:[a-z0-9-]+:[0-9]+:layer:[a-zA-Z0-9_-]+:[0-9]+$ ]]; then
+        log_error "Invalid layer ARN format before CloudFormation deployment: $LAYER_ARN"
+        log_error "Expected format: arn:aws:lambda:region:account:layer:name:version"
+        log_error "ARN length: ${#LAYER_ARN} characters"
+        log_error "Debug - ARN breakdown:"
+        log_error "  Full ARN: '$LAYER_ARN'"
+        log_error "  Ends with digit: $(echo "$LAYER_ARN" | grep -o '[0-9]$' || echo 'NO')"
+        log_error "This would cause CloudFormation deployment to fail with validation error"
+        exit 1
+    fi
+    
+    log_info "Using content-hash based layer: $LAYER_NAME"
+    log_info "Layer ARN: $LAYER_ARN"
+    log_success "✓ Layer ARN format validated for CloudFormation"
     
     # Force Lambda container refresh by updating configuration after deployment
     force_lambda_container_refresh() {
@@ -489,7 +749,7 @@ deploy_stack() {
         "ParameterKey=Environment,ParameterValue=$SUFFIX"
         "ParameterKey=AdminEmail,ParameterValue=$ADMIN_EMAIL"
         "ParameterKey=TemplatesBucketName,ParameterValue=$TEMPLATES_BUCKET"
-        "ParameterKey=LayerVersion,ParameterValue=$layer_version"
+        "ParameterKey=LayerArn,ParameterValue=$LAYER_ARN"
     )
     
     # Check if stack exists with more robust detection
@@ -876,6 +1136,7 @@ main() {
     create_and_upload_config
     build_and_upload_frontend
     cleanup_obsolete_build_files  # Clean up after deployment
+    cleanup_unused_layers         # Clean up old unused layer versions
     
     log_success "🎉 AWS Ops Wheel v2 deployment completed successfully!"
     

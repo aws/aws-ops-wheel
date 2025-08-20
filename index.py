@@ -182,15 +182,18 @@ class RouteRegistry:
         self.register_route(['/auth/me', '/v2/auth/me', '/app/api/v2/auth/me'], wheel_group_handlers['get_current_user'], [HttpMethod.GET])
         
         # Admin routes - MUST be registered BEFORE general wheel-group routes to avoid conflicts
+        # Admin routes use custom authentication logic and don't require wheel group middleware
         self.register_route(
             ['/admin/wheel-groups', '/v2/admin/wheel-groups', '/app/api/v2/admin/wheel-groups'], 
             admin_handlers['list_all_wheel_groups'], 
-            [HttpMethod.GET]
+            [HttpMethod.GET],
+            auth_required=False  # Admin routes handle their own authentication
         )
         self.register_route(
             ['/admin/wheel-groups/{wheel_group_id}', '/v2/admin/wheel-groups/{wheel_group_id}', '/app/api/v2/admin/wheel-groups/{wheel_group_id}'], 
             admin_handlers['delete_wheel_group'], 
-            [HttpMethod.DELETE]
+            [HttpMethod.DELETE],
+            auth_required=False  # Admin routes handle their own authentication
         )
         
         # Wheel group routes
