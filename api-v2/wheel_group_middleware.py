@@ -8,6 +8,7 @@ import base64
 import os
 import time
 import boto3
+import boto3.dynamodb.conditions
 from functools import wraps
 from typing import Dict, Any, Optional
 
@@ -177,12 +178,8 @@ def wheel_group_middleware(event, context):
         
         # Check if this is a deployment admin user
         is_deployment_admin = payload.get('custom:deployment_admin') == 'true'
-        print(f"[DEBUG] JWT payload custom:deployment_admin: {payload.get('custom:deployment_admin')}")
-        print(f"[DEBUG] is_deployment_admin: {is_deployment_admin}")
-        print(f"[DEBUG] Full JWT payload: {json.dumps(payload, default=str)}")
         
         if is_deployment_admin:
-            print(f"[DEBUG] Processing deployment admin user: {user_email}")
             # Deployment admin doesn't belong to any wheel group
             wheel_group_info = {
                 'user_id': user_id,
@@ -193,7 +190,6 @@ def wheel_group_middleware(event, context):
                 'name': user_name,
                 'deployment_admin': True
             }
-            print(f"[DEBUG] Deployment admin wheel_group_info: {wheel_group_info}")
         else:
             # Regular user - get latest user info from DynamoDB to ensure roles are up-to-date
             try:

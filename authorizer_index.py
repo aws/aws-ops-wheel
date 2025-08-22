@@ -29,9 +29,6 @@ def lambda_handler(event, context):
             return authorizer_handler(event, context)
             
     except Exception as e:
-        print(f"Authorizer error: {str(e)}")
-        import traceback
-        print(f"Full traceback: {traceback.format_exc()}")
         return {
             'principalId': 'user',
             'policyDocument': {

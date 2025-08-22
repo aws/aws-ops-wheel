@@ -6,10 +6,10 @@ import os
 import boto3
 from typing import Dict, Any
 from base import BadRequestError, NotFoundError
-from wheel_group_middleware import wheel_group_middleware, require_auth, require_wheel_group_permission, get_wheel_group_context
+from wheel_group_middleware import require_auth, require_wheel_group_permission, get_wheel_group_context
 from utils_v2 import (
     WheelGroupRepository, UserRepository, WheelRepository, ParticipantsTable, 
-    check_string, get_uuid, get_utc_timestamp, decimal_to_float
+    check_string, get_utc_timestamp, decimal_to_float
 )
 
 # Constants
@@ -36,9 +36,9 @@ USER_ROLES = {
 VALID_ROLES = list(USER_ROLES.values())
 
 DEFAULT_WHEEL_GROUP_QUOTAS = {
-    'max_wheels': 50,
-    'max_participants_per_wheel': 100,
-    'max_multi_select': 10
+    'max_wheels': 1000,
+    'max_participants_per_wheel': 1000,
+    'max_multi_select': 30
 }
 
 DEFAULT_WHEEL_GROUP_SETTINGS = {
@@ -98,7 +98,6 @@ def handle_api_exceptions(func):
         except NotFoundError as e:
             return create_error_response(HTTP_STATUS_CODES['NOT_FOUND'], str(e))
         except Exception as e:
-            print(f"[ERROR] {func.__name__} error: {str(e)}")
             return create_error_response(HTTP_STATUS_CODES['INTERNAL_ERROR'], f'Internal server error: {str(e)}')
     
     return wrapper
@@ -189,7 +188,8 @@ def create_wheel_group(event, context=None):
     validate_required_string(body.get('wheel_group_name'), 'wheel_group_name')
     
     admin_user = body.get('admin_user', {})
-    validate_required_string(admin_user.get('email'), 'admin_user.email')
+    if not check_string(admin_user.get('email')):
+        raise BadRequestError(VALIDATION_MESSAGES['ADMIN_EMAIL_REQUIRED'])
     
     # Get current user context (they will become the admin)
     user_context = get_wheel_group_context(event)
@@ -417,11 +417,8 @@ def create_wheel_group_user(event, context=None):
     }
     """
     try:
-        print(f"[DEBUG] create_wheel_group_user called with event: {json.dumps(event)}")
         wheel_group_context = get_wheel_group_context(event)
-        print(f"[DEBUG] wheel_group_context: {wheel_group_context}")
         body = event.get('body', {})
-        print(f"[DEBUG] request body: {body}")
         
         # Validate required fields
         if not check_string(body.get('email')):
@@ -466,8 +463,6 @@ def create_wheel_group_user(event, context=None):
                 MessageAction='SUPPRESS'  # Don't send welcome email automatically
             )
             
-            print(f"[DEBUG] Created Cognito user: {cognito_response}")
-            
             # Extract the Cognito user ID (sub) from the response
             cognito_user_id = None
             for attr in cognito_response['User']['Attributes']:
@@ -477,8 +472,6 @@ def create_wheel_group_user(event, context=None):
             
             if not cognito_user_id:
                 raise Exception("Failed to get Cognito user ID from response")
-            
-            print(f"[DEBUG] Cognito user ID (sub): {cognito_user_id}")
             
         except cognito_client.exceptions.UsernameExistsException:
             raise BadRequestError(f"A user with username {body['username']} already exists")
@@ -614,7 +607,7 @@ def get_config(event, context=None):
             'REGION': os.environ.get('AWS_DEFAULT_REGION', 'us-west-2'),
             'API_VERSION': '2.0',
             'MULTI_WHEEL_GROUP_ENABLED': True,
-            'MAX_MULTI_SELECT': 10,
+            'MAX_MULTI_SELECT': 30,
             'SUPPORTED_ROLES': ['ADMIN', 'WHEEL_ADMIN', 'USER']
         }
         
@@ -674,7 +667,6 @@ def get_current_user(event, context):
                 'status': 'ACTIVE'
             }
             
-            print(f"[DEBUG] Returning deployment admin user info: {response_data}")
             
             return {
                 'statusCode': 200,

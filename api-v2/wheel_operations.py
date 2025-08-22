@@ -5,10 +5,10 @@ import json
 from decimal import Decimal
 from typing import Dict, Any, List
 from base import BadRequestError, NotFoundError
-from wheel_group_middleware import wheel_group_middleware, require_wheel_group_permission, get_wheel_group_context
+from wheel_group_middleware import require_wheel_group_permission, get_wheel_group_context
 from utils_v2 import (
-    WheelRepository, ParticipantRepository, check_string, get_uuid, 
-    decimal_to_float, create_wheel_group_wheel_id, get_utc_timestamp
+    WheelRepository, ParticipantRepository, check_string, 
+    decimal_to_float, get_utc_timestamp
 )
 
 # Constants
@@ -82,7 +82,6 @@ def handle_api_exceptions(func):
         except NotFoundError as e:
             return create_error_response(HTTP_STATUS_CODES['NOT_FOUND'], str(e))
         except Exception as e:
-            print(f"[ERROR] {func.__name__} error: {str(e)}")
             return create_error_response(HTTP_STATUS_CODES['INTERNAL_ERROR'], f'Internal server error: {str(e)}')
     
     return wrapper
@@ -150,28 +149,17 @@ def list_wheel_group_wheels(event, context=None):
     
     GET /v2/wheels
     """
-    try:
-        print(f"[DEBUG] list_wheel_group_wheels called")
-        wheel_group_context = get_wheel_group_context(event)
-        print(f"[DEBUG] wheel_group_context: {wheel_group_context}")
-        
-        if not wheel_group_context or not wheel_group_context.get('wheel_group_id'):
-            print(f"[ERROR] Missing wheel_group_context or wheel_group_id")
-            raise BadRequestError("No wheel group associated with user")
-        
-        wheels = WheelRepository.list_wheel_group_wheels(wheel_group_context['wheel_group_id'])
-        print(f"[DEBUG] Found {len(wheels)} wheels")
-        
-        return create_api_response(HTTP_STATUS_CODES['OK'], {
-            'wheels': wheels,
-            'count': len(wheels)
-        })
-    except Exception as e:
-        print(f"[ERROR] list_wheel_group_wheels detailed error: {str(e)}")
-        print(f"[ERROR] Exception type: {type(e).__name__}")
-        import traceback
-        print(f"[ERROR] Traceback: {traceback.format_exc()}")
-        raise e
+    wheel_group_context = get_wheel_group_context(event)
+    
+    if not wheel_group_context or not wheel_group_context.get('wheel_group_id'):
+        raise BadRequestError("No wheel group associated with user")
+    
+    wheels = WheelRepository.list_wheel_group_wheels(wheel_group_context['wheel_group_id'])
+    
+    return create_api_response(HTTP_STATUS_CODES['OK'], {
+        'wheels': wheels,
+        'count': len(wheels)
+    })
 
 
 @require_wheel_group_permission('create_wheel')

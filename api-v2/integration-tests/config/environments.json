@@ -1,0 +1,19 @@
+{
+  "test": {
+    "api_base_url": "https://hqtbr232u7.execute-api.us-west-2.amazonaws.com/test",
+    "frontend_url": "https://d1jdjj710bh9n7.cloudfront.net/app",
+    "admin_username": "admin",
+    "admin_email": "admin@example.com",
+    "admin_password": "TempPass123!test",
+    "cognito_user_pool_id": "us-west-2_Wmq7q6TlY",
+    "cognito_client_id": "6qs2uogod8jp1mbjffk3tfk41a",
+    "cleanup_enabled": true,
+    "aggressive_testing": true,
+    "timeout_seconds": 30,
+    "parallel_safe": true,
+    "max_retries": 3,
+    "retry_delay": 1.0,
+    "request_timeout": 15,
+    "environment_suffix": "test"
+  }
+}

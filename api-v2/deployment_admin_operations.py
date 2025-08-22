@@ -10,6 +10,17 @@ import os
 from datetime import datetime
 import logging
 
+# Import Cognito exceptions
+try:
+    from botocore.exceptions import ClientError
+    # Try to get Cognito-specific exceptions
+    cognito_client_temp = boto3.client('cognito-idp')
+    UserNotFoundException = cognito_client_temp.exceptions.UserNotFoundException
+except Exception:
+    # Fallback if exceptions can't be imported (e.g., in test environment)
+    class UserNotFoundException(Exception):
+        pass
+
 # Import utilities and repositories
 from utils_v2 import (
     WheelGroupsTable, UsersTable, WheelsTable, ParticipantsTable,
@@ -107,105 +118,89 @@ def get_wheel_group_statistics(wheel_group_id):
     Get comprehensive statistics for a specific wheel group including actual last updated timestamp
     Returns user count, wheel count, created at, and calculated last_updated timestamp
     """
-    try:
-        logger.info(f"Getting statistics for wheel group: {wheel_group_id} (type: {type(wheel_group_id)})")
-        logger.info(f"wheel_group_id repr: {repr(wheel_group_id)}")
-        
-        # Validate input - defensive check for None values
-        if wheel_group_id is None:
-            logger.error(f"get_wheel_group_statistics called with None wheel_group_id - returning default stats")
-            return {
-                'user_count': 0,
-                'wheel_count': 0,
-                'created_at': None,
-                'last_updated': None
-            }
-        
-        if not wheel_group_id or not isinstance(wheel_group_id, str):
-            logger.error(f"Invalid wheel_group_id: {repr(wheel_group_id)} (type: {type(wheel_group_id)})")
-            return {
-                'user_count': 0,
-                'wheel_count': 0,
-                'created_at': None,
-                'last_updated': None
-            }
-        
-        # Debug the key that will be used for DynamoDB
-        key_for_dynamodb = {'wheel_group_id': wheel_group_id}
-        logger.info(f"DynamoDB key that will be used: {key_for_dynamodb}")
-        
-        # Get the wheel group info
-        logger.info(f"Calling WheelGroupRepository.get_wheel_group with: {wheel_group_id}")
-        wheel_group = WheelGroupRepository.get_wheel_group(wheel_group_id)
-        logger.info(f"Successfully retrieved wheel group: {wheel_group.get('wheel_group_name', 'Unknown')}")
-        
-        # Initialize timestamps list with wheel group created_at as fallback
-        timestamps = [wheel_group.get('created_at')]
-        
-        # Get users and their max updated_at timestamp
-        users = UserRepository.get_users_by_wheel_group(wheel_group_id)
-        user_count = len(users)
-        
-        # Find max updated_at from users
-        user_timestamps = [user.get('updated_at') for user in users if user.get('updated_at')]
-        if user_timestamps:
-            max_user_timestamp = max(user_timestamps)
-            timestamps.append(max_user_timestamp)
-            logger.info(f"Max user updated_at: {max_user_timestamp}")
-        
-        # Get wheels and their max last_spun_at timestamp
-        wheels = WheelRepository.list_wheel_group_wheels(wheel_group_id)
-        wheel_count = len(wheels)
-        
-        # Find max last_spun_at from wheels
-        wheel_timestamps = [wheel.get('last_spun_at') for wheel in wheels if wheel.get('last_spun_at')]
-        if wheel_timestamps:
-            max_wheel_timestamp = max(wheel_timestamps)
-            timestamps.append(max_wheel_timestamp)
-            logger.info(f"Max wheel last_spun_at: {max_wheel_timestamp}")
-        
-        # Get participants from all wheels and find max last_selected_at and updated_at
-        all_participant_timestamps = []
-        for wheel in wheels:
-            participants = ParticipantRepository.list_wheel_participants(wheel_group_id, wheel['wheel_id'])
-            
-            # Collect last_selected_at timestamps
-            participant_selected_timestamps = [p.get('last_selected_at') for p in participants if p.get('last_selected_at')]
-            all_participant_timestamps.extend(participant_selected_timestamps)
-            
-            # Collect updated_at timestamps
-            participant_updated_timestamps = [p.get('updated_at') for p in participants if p.get('updated_at')]
-            all_participant_timestamps.extend(participant_updated_timestamps)
-        
-        if all_participant_timestamps:
-            max_participant_timestamp = max(all_participant_timestamps)
-            timestamps.append(max_participant_timestamp)
-            logger.info(f"Max participant timestamp: {max_participant_timestamp}")
-        
-        # Filter out None values and find the maximum timestamp
-        valid_timestamps = [ts for ts in timestamps if ts is not None]
-        last_updated = max(valid_timestamps) if valid_timestamps else wheel_group.get('created_at')
-        
-        logger.info(f"Calculated last_updated for {wheel_group_id}: {last_updated}")
-        
-        return {
-            'user_count': user_count,
-            'wheel_count': wheel_count,
-            'created_at': wheel_group.get('created_at'),
-            'last_updated': last_updated
-        }
-        
-    except Exception as e:
-        logger.error(f"Error getting wheel group statistics for {wheel_group_id}: {str(e)}")
-        import traceback
-        logger.error(f"Stacktrace: {traceback.format_exc()}")
-        # Return basic stats on error
+    # Validate input - defensive check for None values
+    if not wheel_group_id or not isinstance(wheel_group_id, str) or len(wheel_group_id.strip()) < 10:
         return {
             'user_count': 0,
             'wheel_count': 0,
             'created_at': None,
             'last_updated': None
         }
+    
+    wheel_group_id = wheel_group_id.strip()
+    
+    # Get the wheel group info - if this fails, return default stats
+    try:
+        wheel_group = WheelGroupRepository.get_wheel_group(wheel_group_id)
+    except:
+        return {
+            'user_count': 0,
+            'wheel_count': 0,
+            'created_at': None,
+            'last_updated': None
+        }
+    
+    # Initialize timestamps list with wheel group created_at as fallback
+    timestamps = [wheel_group.get('created_at')]
+    
+    # Get users and their max updated_at timestamp (graceful failure)
+    user_count = 0
+    try:
+        users = UserRepository.get_users_by_wheel_group(wheel_group_id)
+        user_count = len(users)
+        
+        # Find max updated_at from users
+        user_timestamps = [user.get('updated_at') for user in users if user.get('updated_at')]
+        if user_timestamps:
+            timestamps.append(max(user_timestamps))
+    except Exception as e:
+        logger.warning(f"Error getting users for statistics: {str(e)}")
+    
+    # Get wheels and their max last_spun_at timestamp (graceful failure)
+    wheel_count = 0
+    try:
+        wheels = WheelRepository.list_wheel_group_wheels(wheel_group_id)
+        wheel_count = len(wheels)
+        
+        # Find max last_spun_at from wheels
+        wheel_timestamps = [wheel.get('last_spun_at') for wheel in wheels if wheel.get('last_spun_at')]
+        if wheel_timestamps:
+            timestamps.append(max(wheel_timestamps))
+        
+        # Get participants from all wheels and find max last_selected_at and updated_at (graceful failure)
+        try:
+            all_participant_timestamps = []
+            for wheel in wheels:
+                try:
+                    participants = ParticipantRepository.list_wheel_participants(wheel_group_id, wheel['wheel_id'])
+                    
+                    # Collect timestamps from participants
+                    for p in participants:
+                        if p.get('last_selected_at'):
+                            all_participant_timestamps.append(p['last_selected_at'])
+                        if p.get('updated_at'):
+                            all_participant_timestamps.append(p['updated_at'])
+                except:
+                    continue  # Skip this wheel's participants if error
+            
+            if all_participant_timestamps:
+                timestamps.append(max(all_participant_timestamps))
+        except:
+            pass  # Continue without participant timestamps
+            
+    except Exception as e:
+        logger.warning(f"Error getting wheels for statistics: {str(e)}")
+    
+    # Filter out None values and find the maximum timestamp
+    valid_timestamps = [ts for ts in timestamps if ts is not None]
+    last_updated = max(valid_timestamps) if valid_timestamps else wheel_group.get('created_at')
+    
+    return {
+        'user_count': user_count,
+        'wheel_count': wheel_count,
+        'created_at': wheel_group.get('created_at'),
+        'last_updated': last_updated
+    }
 
 
 def list_all_wheel_groups(event, context):
@@ -213,9 +208,6 @@ def list_all_wheel_groups(event, context):
     List all wheel groups in the system with statistics
     Only accessible to deployment admin
     """
-    logger.info("Admin request: List all wheel groups")
-    logger.info(f"[DEBUG] Full event received: {json.dumps(event, default=str)}")
-    
     try:
         # Check deployment admin permission
         if not check_deployment_admin_permission(event):
@@ -223,111 +215,42 @@ def list_all_wheel_groups(event, context):
                 'error': 'Access denied. Deployment admin privileges required.'
             })
         
-        logger.info("Deployment admin permission granted, fetching wheel groups from database")
-        
-        # Debug table names
-        logger.info(f"[DEBUG] WheelGroupsTable name: {WheelGroupsTable.name}")
-        logger.info(f"[DEBUG] Environment variables:")
-        for key, value in os.environ.items():
-            if 'TABLE' in key or 'ENVIRONMENT' in key:
-                logger.info(f"[DEBUG] {key}: {value}")
-        
         # Get all wheel groups from database
         wheel_groups_response = []
         
-        # Scan all wheel groups with error handling
-        try:
-            scan_count = 0
-            valid_wheel_groups = []
-            
-            for wheel_group in WheelGroupsTable.iter_scan():
-                scan_count += 1
-                wheel_group_id = wheel_group.get('wheel_group_id')
-                
-                # Debug the wheel group data
-                logger.info(f"Processing wheel group {scan_count}:")
-                logger.info(f"  - wheel_group_id: {wheel_group_id} (type: {type(wheel_group_id)})")
-                logger.info(f"  - wheel_group_id repr: {repr(wheel_group_id)}")
-                
-                # Validate wheel_group_id - skip items with null/invalid keys
-                if wheel_group_id is None:
-                    logger.warning(f"Skipping wheel group with None wheel_group_id. This indicates corrupted data that should be cleaned up.")
-                    continue
-                
-                if not wheel_group_id or not isinstance(wheel_group_id, str) or wheel_group_id.strip() == '':
-                    logger.warning(f"Skipping wheel group with invalid wheel_group_id: {repr(wheel_group_id)} (type: {type(wheel_group_id)})")
-                    continue
-                
-                # Additional validation for proper UUID format (optional but recommended)
-                wheel_group_id = wheel_group_id.strip()
-                if len(wheel_group_id) < 10:  # Basic sanity check for reasonable ID length
-                    logger.warning(f"Skipping wheel group with suspiciously short wheel_group_id: {repr(wheel_group_id)}")
-                    continue
-                
-                # Add to valid wheel groups list
-                valid_wheel_groups.append({
-                    'wheel_group_id': wheel_group_id,
-                    'wheel_group_name': wheel_group.get('wheel_group_name', 'Unknown'),
-                    'created_at': wheel_group.get('created_at')
-                })
-            
-            logger.info(f"Successfully scanned {scan_count} wheel groups, {len(valid_wheel_groups)} are valid")
-            
-            # Process only valid wheel groups
-            for wheel_group_data in valid_wheel_groups:
-                wheel_group_id = wheel_group_data['wheel_group_id']
-                
-                logger.info(f"Getting statistics for valid wheel group: {wheel_group_id}")
-                
-                # Get comprehensive statistics for this wheel group with error handling
-                try:
-                    stats = get_wheel_group_statistics(wheel_group_id)
-                except Exception as stats_error:
-                    logger.error(f"Error getting stats for wheel group {wheel_group_id}: {str(stats_error)}")
-                    logger.error(f"Stats error type: {type(stats_error)}")
-                    import traceback
-                    logger.error(f"Stats error traceback: {traceback.format_exc()}")
-                    # Use default stats if we can't get real ones
-                    stats = {
-                        'user_count': 0,
-                        'wheel_count': 0,
-                        'created_at': wheel_group_data.get('created_at'),
-                        'last_updated': wheel_group_data.get('created_at')
-                    }
-                
-                # Build response object using validated data
-                response_item = {
-                    'wheel_group_id': wheel_group_data['wheel_group_id'],
-                    'wheel_group_name': wheel_group_data['wheel_group_name'],
-                    'user_count': stats['user_count'],
-                    'wheel_count': stats['wheel_count'],
-                    'created_at': stats['created_at'],
-                    'last_updated': stats['last_updated']  # This is the calculated timestamp
-                }
-                
-                wheel_groups_response.append(response_item)
-            
-            logger.info(f"Successfully processed {len(wheel_groups_response)} valid wheel groups out of {scan_count} total")
-            
-        except ClientError as ce:
-            logger.error(f"DynamoDB ClientError during scan: {str(ce)}")
-            if ce.response['Error']['Code'] == 'ResourceNotFoundException':
-                logger.error(f"Table {WheelGroupsTable.name} not found! Check table name and environment suffix.")
-                return create_response(STATUS_CODES['INTERNAL_ERROR'], {
-                    'error': f'Database table not found. Expected table: {WheelGroupsTable.name}. Please check environment configuration.'
-                })
-            raise ce
+        # Get all wheel groups using repository method
+        wheel_groups = WheelGroupRepository.list_all_wheel_groups()
         
-        logger.info(f"Successfully retrieved {len(wheel_groups_response)} wheel groups")
+        for wheel_group in wheel_groups:
+            wheel_group_id = wheel_group.get('wheel_group_id')
+            
+            # Validate wheel_group_id - skip items with null/invalid keys
+            if not wheel_group_id or not isinstance(wheel_group_id, str) or len(wheel_group_id.strip()) < 10:
+                continue
+            
+            wheel_group_id = wheel_group_id.strip()
+            
+            # Get comprehensive statistics for this wheel group
+            stats = get_wheel_group_statistics(wheel_group_id)
+            
+            # Build response object
+            response_item = {
+                'wheel_group_id': wheel_group_id,
+                'wheel_group_name': wheel_group.get('wheel_group_name', 'Unknown'),
+                'user_count': stats['user_count'],
+                'wheel_count': stats['wheel_count'],
+                'created_at': stats['created_at'],
+                'last_updated': stats['last_updated']
+            }
+            
+            wheel_groups_response.append(response_item)
+        
         return create_response(STATUS_CODES['OK'], {
             'wheel_groups': wheel_groups_response
         })
         
     except Exception as e:
         logger.error(f"Error listing wheel groups: {str(e)}")
-        logger.error(f"Error type: {str(type(e))}")
-        import traceback
-        logger.error(f"Stacktrace: {traceback.format_exc()}")
         return create_response(STATUS_CODES['INTERNAL_ERROR'], {
             'error': f'Internal server error: {str(e)}'
         })
@@ -362,13 +285,16 @@ def delete_wheel_group(event, context):
             })
         
         # Get wheel group info for logging before deletion
+        # Also verify that the wheel group exists - fail if it doesn't
         try:
             wheel_group = WheelGroupRepository.get_wheel_group(wheel_group_id)
             wheel_group_name = wheel_group.get('wheel_group_name', 'Unknown')
             logger.info(f"Deleting wheel group '{wheel_group_name}' (ID: {wheel_group_id})")
         except Exception as e:
-            logger.warning(f"Could not get wheel group info: {str(e)}")
-            wheel_group_name = 'Unknown'
+            logger.error(f"Wheel group {wheel_group_id} not found: {str(e)}")
+            return create_response(STATUS_CODES['INTERNAL_ERROR'], {
+                'error': f'Wheel group {wheel_group_id} not found or could not be accessed: {str(e)}'
+            })
         
         # Perform the actual deletion
         logger.info(f"Starting recursive deletion of wheel group: {wheel_group_id}")
@@ -413,7 +339,7 @@ def delete_wheel_group(event, context):
                         Username=username  # Use username (stored in 'name' field) for Cognito
                     )
                     logger.info(f"Deleted Cognito user: {username}")
-                except cognito_client.exceptions.UserNotFoundException:
+                except UserNotFoundException:
                     logger.info(f"User {username} not found in Cognito (already deleted?)")
                 except Exception as e:
                     logger.error(f"Failed to delete Cognito user {username}: {str(e)}")

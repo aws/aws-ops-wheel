@@ -3,6 +3,7 @@
 
 import boto3
 import boto3.dynamodb.conditions
+from botocore.exceptions import ClientError
 import datetime
 import os
 import uuid
@@ -138,21 +139,35 @@ class WheelGroupRepository:
         """Create a new wheel group"""
         timestamp = get_utc_timestamp()
         
+        # Convert any float values to Decimal for DynamoDB compatibility
+        quotas = wheel_group_data.get('quotas', {
+            'max_wheels': 1000,
+            'max_participants_per_wheel': 1000,
+            'max_multi_select': 30
+        })
+        # Convert quota values to Decimal if they're numeric
+        for key, value in quotas.items():
+            if isinstance(value, (int, float)):
+                quotas[key] = Decimal(str(value))
+        
+        settings = wheel_group_data.get('settings', {
+            'allow_rigging': True,
+            'default_participant_weight': 1.0,
+            'theme': 'default',
+            'timezone': 'UTC'
+        })
+        # Convert settings values to Decimal if they're numeric floats
+        for key, value in settings.items():
+            if isinstance(value, float):
+                settings[key] = Decimal(str(value))
+        
         wheel_group = {
             'wheel_group_id': wheel_group_data.get('wheel_group_id') or get_uuid(),
             'wheel_group_name': wheel_group_data['wheel_group_name'],
             'created_at': timestamp,
-            'quotas': wheel_group_data.get('quotas', {
-                'max_wheels': 50,
-                'max_participants_per_wheel': 100,
-                'max_multi_select': 10
-            }),
-            'settings': wheel_group_data.get('settings', {
-                'allow_rigging': True,
-                'default_participant_weight': 1.0,
-                'theme': 'default',
-                'timezone': 'UTC'
-            })
+            'updated_at': timestamp,  # Initially same as created_at
+            'quotas': quotas,
+            'settings': settings
         }
         
         WheelGroupsTable.put_item(Item=wheel_group)
@@ -207,6 +222,26 @@ class WheelGroupRepository:
     def delete_wheel_group(wheel_group_id: str) -> None:
         """Delete a wheel group (admin operation)"""
         WheelGroupsTable.delete_item(Key={'wheel_group_id': wheel_group_id})
+    
+    @staticmethod  
+    def list_all_wheel_groups() -> List[Dict[str, Any]]:
+        """List all wheel groups in the system"""
+        try:
+            # Use scan operation to get all wheel groups
+            response = WheelGroupsTable.scan()
+            return response.get('Items', [])
+        except ClientError as ce:
+            if ce.response['Error']['Code'] == 'ResourceNotFoundException':
+                logger.warning(f"Wheel groups table not found - returning empty list")
+                # Return empty list when table doesn't exist (test environment)
+                return []
+            else:
+                # Re-raise other ClientErrors (like database connection issues)
+                raise ce
+        except Exception as e:
+            # Re-raise other database errors that should cause failures
+            logger.error(f"Error scanning wheel groups: {str(e)}")
+            raise e
 
 
 class UserRepository:

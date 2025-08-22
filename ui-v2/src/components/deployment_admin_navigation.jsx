@@ -46,10 +46,13 @@ const USER_INFO_LABELS = {
 
 class DeploymentAdminNavigation extends Component {
   static propTypes = {
-    userLogout: PropTypes.func.isRequired
+    userLogout: PropTypes.func.isRequired,
+    userPool: PropTypes.object.isRequired
   };
 
   render() {
+    const username = this.props.userPool.getCurrentUser().getUsername();
+    
     return (
       <Navbar expand="lg" className="px-3" style={{backgroundColor: NAVIGATION_CONSTANTS.BACKGROUND_COLOR, minHeight: NAVIGATION_CONSTANTS.MIN_HEIGHT}}>
         <Nav style={{height: '100%'}}>
@@ -62,7 +65,7 @@ class DeploymentAdminNavigation extends Component {
         </Nav>
         <Nav className="ms-auto">
           <Navbar.Text className="me-3">
-            {USER_INFO_LABELS.SIGNED_IN} <strong>{USER_INFO_LABELS.DEPLOYMENT_ADMIN}</strong>
+            {USER_INFO_LABELS.SIGNED_IN} <strong>{username}</strong>
           </Navbar.Text>
           <Nav.Link eventKey={EVENT_KEYS.LOGOUT} onClick={this.props.userLogout}>
             {NAV_LABELS.LOGOUT}

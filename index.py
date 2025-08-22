@@ -182,18 +182,18 @@ class RouteRegistry:
         self.register_route(['/auth/me', '/v2/auth/me', '/app/api/v2/auth/me'], wheel_group_handlers['get_current_user'], [HttpMethod.GET])
         
         # Admin routes - MUST be registered BEFORE general wheel-group routes to avoid conflicts
-        # Admin routes use custom authentication logic and don't require wheel group middleware
+        # Admin routes need middleware to populate authorization context for deployment admin checks
         self.register_route(
             ['/admin/wheel-groups', '/v2/admin/wheel-groups', '/app/api/v2/admin/wheel-groups'], 
             admin_handlers['list_all_wheel_groups'], 
             [HttpMethod.GET],
-            auth_required=False  # Admin routes handle their own authentication
+            auth_required=True  # Enable middleware to populate deployment admin context
         )
         self.register_route(
             ['/admin/wheel-groups/{wheel_group_id}', '/v2/admin/wheel-groups/{wheel_group_id}', '/app/api/v2/admin/wheel-groups/{wheel_group_id}'], 
             admin_handlers['delete_wheel_group'], 
             [HttpMethod.DELETE],
-            auth_required=False  # Admin routes handle their own authentication
+            auth_required=True  # Enable middleware to populate deployment admin context
         )
         
         # Wheel group routes
@@ -203,6 +203,8 @@ class RouteRegistry:
             [HttpMethod.POST], 
             auth_required=False
         )
+        
+        
         self.register_route(
             ['/wheel-group/delete-recursive', '/v2/wheel-group/delete-recursive', '/app/api/v2/wheel-group/delete-recursive'], 
             wheel_group_handlers['delete_wheel_group_recursive'], 

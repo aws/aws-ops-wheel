@@ -6,9 +6,9 @@ import random
 from typing import Dict, Any, List, Optional
 from decimal import Decimal
 from base import BadRequestError, NotFoundError
-from wheel_group_middleware import wheel_group_middleware, require_wheel_group_permission, get_wheel_group_context
+from wheel_group_middleware import require_wheel_group_permission, get_wheel_group_context
 from utils_v2 import (
-    WheelRepository, ParticipantRepository, check_string, get_uuid, 
+    WheelRepository, ParticipantRepository, 
     get_utc_timestamp, decimal_to_float
 )
 
@@ -61,7 +61,6 @@ def handle_api_exceptions(func):
         except NotFoundError as e:
             return create_error_response(HTTP_STATUS_CODES['NOT_FOUND'], str(e))
         except Exception as e:
-            print(f"[ERROR] {func.__name__} error: {str(e)}")
             return create_error_response(HTTP_STATUS_CODES['INTERNAL_ERROR'], f'Internal server error: {str(e)}')
     
     return wrapper
