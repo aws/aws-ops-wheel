@@ -288,7 +288,8 @@ export class Wheel extends PureComponent {
     // Fetch the wheel click MP3 for later playback
     fetch(staticURL('wheel_click.mp3'), { headers: {'Accept': 'audio/mpeg'} })
       .then(response => response.blob())
-      .then(result => this.setState({clickUrl: window.URL.createObjectURL(result)})).catch(err => console.log(err));
+      .then(result => this.setState({clickUrl: window.URL.createObjectURL(result)}))
+      .catch(err => console.error('Failed to load wheel click audio:', err));
   }
 
   componentWillUnmount() {
@@ -310,26 +311,9 @@ export class Wheel extends PureComponent {
 
     // Process gets for the wheel and participant data and draw the wheel
     if (wheelFetch.fulfilled && allParticipantsFetch.fulfilled && this.state.fetching) {
-      // DEBUG: Log the actual API responses
-      console.log('=== WHEEL FETCH DEBUG ===');
-      console.log('wheelFetch.value:', JSON.stringify(wheelFetch.value, null, 2));
-      console.log('allParticipantsFetch.value:', JSON.stringify(allParticipantsFetch.value, null, 2));
-      
       // We precompute and set up some canvas settings beforehand so they don't need fresh calculations every render
       // V2 API returns wheel with participants included, or participants as separate array
       const participants = wheelFetch.value.participants || allParticipantsFetch.value.participants || allParticipantsFetch.value || [];
-      
-      console.log('Final participants array:', JSON.stringify(participants, null, 2));
-      console.log('Participants count:', participants.length);
-      
-      if (participants.length > 0) {
-        console.log('First participant structure:', JSON.stringify(participants[0], null, 2));
-        console.log('Expected fields check:');
-        console.log('- participant_name:', participants[0].participant_name);
-        console.log('- participant_url:', participants[0].participant_url);
-        console.log('- participant_id:', participants[0].participant_id);
-      }
-      console.log('=== END WHEEL FETCH DEBUG ===');
 
       this.setState({
         participants: participants,
@@ -344,10 +328,6 @@ export class Wheel extends PureComponent {
     if (this.state.isSpinning && this.state.selectedParticipant === undefined && participantSuggestFetch.fulfilled) {
       const {participants} = this.state;
       
-      // DEBUG: Log the API response structure
-      console.log('=== SUGGEST API RESPONSE ===');
-      console.log('participantSuggestFetch.value:', JSON.stringify(participantSuggestFetch.value, null, 2));
-      console.log('=== END SUGGEST DEBUG ===');
       
       // Extract selected participant from API response (v2 API structure)
       const apiResponse = participantSuggestFetch.value;
@@ -471,11 +451,6 @@ export class Wheel extends PureComponent {
       return;
     }
     
-    console.log('=== SPIN BUTTON CLICKED ===');
-    console.log('wheel_id from params:', this.props.match.params.wheel_id);
-    console.log('wheelFetch.value:', this.props.wheelFetch.value);
-    console.log('state.wheel:', this.state.wheel);
-    console.log('=== END SPIN DEBUG ===');
     
     this.setState({selectedParticipant: undefined, isSpinning: true});
     this.props.dispatchParticipantSuggestPost(this.props.match.params.wheel_id);

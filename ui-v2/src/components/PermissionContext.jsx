@@ -95,12 +95,10 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
 
   const loadPermissions = async () => {
     if (loadingRef.current) {
-      console.log('🔒 loadPermissions already in progress, skipping...');
       return;
     }
     
     loadingRef.current = true;
-    console.log('🚀 Starting loadPermissions...');
     
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
@@ -124,17 +122,14 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
       let userInfo = tokenInfo;
       
       if (tokenInfo.deployment_admin) {
-        console.log('👑 Deployment admin detected from token, skipping backend API call');
         userInfo = tokenInfo;
       } else {
         // For regular users, fetch from backend API
         try {
-          console.log('🔍 Calling backend /auth/me API for regular user...');
           const response = await authenticatedFetch(apiURL('auth/me'));
           
           if (response && response.ok) {
             const backendUserInfo = await response.json();
-            console.log('📦 Backend user info:', backendUserInfo);
             
             userInfo = { 
               ...tokenInfo, 
@@ -143,16 +138,14 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
               permissions: backendUserInfo.permissions || {}
             };
           } else if (response && response.status === 401) {
-            console.warn('🚫 Backend returned 401, redirecting to login');
             localStorage.removeItem('idToken');
             window.location.href = '/app/login';
             return;
           } else {
-            console.warn('⚠️ Backend API failed, using token info with USER role');
             userInfo = { ...tokenInfo, role: 'USER' };
           }
         } catch (error) {
-          console.error('❌ Backend API error, using token info with USER role:', error);
+          console.error('Backend API error, using token info with USER role:', error);
           userInfo = { ...tokenInfo, role: 'USER' };
         }
       }
@@ -173,10 +166,8 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
         error: null
       });
 
-      console.log('✅ loadPermissions completed successfully');
-
     } catch (error) {
-      console.error('❌ loadPermissions failed:', error);
+      console.error('loadPermissions failed:', error);
       setState(prev => ({
         ...prev,
         loading: false,
@@ -184,7 +175,6 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
       }));
     } finally {
       loadingRef.current = false;
-      console.log('🔓 loadPermissions flag reset');
     }
   };
 
@@ -202,26 +192,19 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
     }
 
     if (!idToken) {
-      console.log('🚫 No ID token found in localStorage');
       return null;
     }
 
     try {
       const payload = JSON.parse(atob(idToken.split('.')[1]));
-      console.log('🔍 JWT payload decoded:', payload);
       
       const currentTime = Math.floor(Date.now() / 1000);
       if (payload.exp && payload.exp < currentTime) {
-        console.warn('⏰ Token has expired');
         localStorage.removeItem('idToken');
         return null;
       }
 
       const isDeploymentAdmin = payload['custom:deployment_admin'] === 'true';
-      console.log('👑 Deployment admin check:', {
-        'custom:deployment_admin': payload['custom:deployment_admin'],
-        isDeploymentAdmin
-      });
       
       const userInfo = {
         wheel_group_id: payload['custom:wheel_group_id'],
@@ -233,10 +216,9 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
         deployment_admin: isDeploymentAdmin
       };
       
-      console.log('📦 Extracted user info from token:', userInfo);
       return userInfo;
     } catch (error) {
-      console.error('❌ Failed to decode JWT token:', error);
+      console.error('Failed to decode JWT token:', error);
       throw new Error('Invalid token format');
     }
   };
@@ -266,7 +248,6 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
 
   // Load permissions on mount only
   useEffect(() => {
-    console.log('🎯 PermissionProvider useEffect running - component mounted');
     loadPermissions();
   }, []);
 
@@ -274,7 +255,6 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
   useEffect(() => {
     const handleStorageChange = (event) => {
       if (event.key === 'idToken' && !loadingRef.current) {
-        console.log('🔄 Token changed in another tab, reloading permissions');
         loadPermissions();
       }
     };
