@@ -188,13 +188,15 @@ class TestDataFactory:
             description = f"Integration test wheel created at {datetime.now().isoformat()}"
         
         return {
-            'name': name,
+            'wheel_name': name,  # API expects 'wheel_name', not 'name'
             'description': description,
             'settings': {
-                'allow_duplicates': False,
-                'selection_algorithm': 'weighted_random',
-                'auto_remove_selected': False,
-                'require_confirmation': False
+                'allow_rigging': True,
+                'multi_select_enabled': True,
+                'default_multi_select_count': 1,
+                'require_reason_for_rigging': False,
+                'show_weights': False,
+                'auto_reset_weights': False
             }
         }
     
@@ -223,7 +225,7 @@ class TestDataFactory:
             weight = random.randint(1, 10)
         
         return {
-            'name': name,
+            'participant_name': name,  # API expects 'participant_name', not 'name'
             'email': email,
             'weight': weight,
             'metadata': {
@@ -361,6 +363,190 @@ class TestDataFactory:
                 5: (total_items + 4) // 5,
                 10: (total_items + 9) // 10,
                 20: (total_items + 19) // 20
+            }
+        }
+    
+    def create_user_owned_wheel_group_data(self, owner_user_config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Create wheel group data for a specific user
+        
+        Args:
+            owner_user_config: User configuration from test config
+            
+        Returns:
+            Wheel group data dictionary
+        """
+        name = self.generate_wheel_group_name(f"UserGroup-{owner_user_config.get('username', 'User')}")
+        
+        return {
+            'wheel_group_name': name,
+            'description': f"Wheel group owned by {owner_user_config.get('username')} for role testing - {datetime.now().isoformat()}",
+            'admin_user': {
+                'username': owner_user_config['username'],
+                'email': owner_user_config['email'],
+                'password': owner_user_config['password']
+            }
+        }
+    
+    def create_wheel_data_for_user(self, wheel_group_id: str, user_id: str, 
+                                  name_prefix: str = "UserWheel") -> Dict[str, Any]:
+        """
+        Create wheel data for specific user and wheel group
+        
+        Args:
+            wheel_group_id: Wheel group ID
+            user_id: User ID creating the wheel
+            name_prefix: Prefix for wheel name
+            
+        Returns:
+            Wheel data dictionary
+        """
+        name = self.generate_wheel_name(name_prefix)
+        
+        return {
+            'name': name,
+            'description': f"Wheel created by user {user_id} for testing - {datetime.now().isoformat()}",
+            'created_by': user_id,
+            'settings': {
+                'allow_rigging': True,
+                'multi_select_enabled': True,
+                'default_multi_select_count': 1,
+                'require_reason_for_rigging': False,
+                'show_weights': True,
+                'auto_reset_weights': False
+            }
+        }
+    
+    def create_batch_participants(self, count: int = 5, wheel_id: Optional[str] = None,
+                                 name_prefix: str = "BatchParticipant") -> List[Dict[str, Any]]:
+        """
+        Create multiple participants for batch testing with default weight=1
+        
+        Args:
+            count: Number of participants to create
+            wheel_id: Optional wheel ID for reference
+            name_prefix: Prefix for participant names
+            
+        Returns:
+            List of participant data dictionaries
+        """
+        participants = []
+        for i in range(count):
+            participant = self.create_participant_data(
+                name=f"{name_prefix} {i+1} - {self._get_unique_suffix()}",
+                weight=1  # Default weight is 1, not random
+            )
+            if wheel_id:
+                participant['wheel_id'] = wheel_id
+            participants.append(participant)
+        
+        return participants
+    
+    def create_spinning_test_scenario(self, participant_count: int = 5) -> Dict[str, Any]:
+        """
+        Create test scenario for wheel spinning with controlled participants
+        
+        Args:
+            participant_count: Number of participants to include
+            
+        Returns:
+            Spinning test scenario data
+        """
+        participants = self.create_batch_participants(participant_count, name_prefix="SpinTest")
+        
+        # All participants start with weight=1 (equal probability)
+        # Tests can modify weights after creation if needed
+        for participant in participants:
+            participant['weight'] = 1  # Ensure all start with equal weight
+        
+        return {
+            'participants': participants,
+            'test_iterations': 20,  # Number of spins to test
+            'algorithm': 'weighted_random',
+            'expected_equal_probability': True  # All participants have equal chance initially
+        }
+    
+    def create_rigging_test_data(self, participant_id: str, participant_name: str,
+                                reason: str = None) -> Dict[str, Any]:
+        """
+        Create rigging test data for biased wheel spinning
+        
+        Args:
+            participant_id: ID of participant to rig
+            participant_name: Name of participant to rig
+            reason: Optional reason for rigging
+            
+        Returns:
+            Rigging test data
+        """
+        return {
+            'rigged_participant_id': participant_id,
+            'rigged_participant_name': participant_name,
+            'reason': reason or f"Test rigging for integration test - {datetime.now().isoformat()}",
+            'hidden': False,  # Show rigging status in responses
+            'algorithm': 'rigged_selection'
+        }
+    
+    def create_cross_user_permission_test_data(self) -> Dict[str, Any]:
+        """
+        Create test data for cross-user permission boundary testing
+        
+        Returns:
+            Permission test scenario data
+        """
+        return {
+            'scenarios': {
+                'wheel_group_isolation': {
+                    'description': 'Users cannot access other wheel groups',
+                    'test_operations': ['create_wheel', 'list_wheels', 'spin_wheel', 'manage_participants']
+                },
+                'role_permission_boundaries': {
+                    'description': 'Users cannot perform operations above their role level',
+                    'forbidden_operations': {
+                        'USER': ['create_wheel', 'delete_wheel', 'manage_participants', 'rig_wheel'],
+                        'WHEEL_ADMIN': ['manage_users', 'manage_wheel_group', 'delete_wheel_group'],
+                        'ADMIN': ['delete_wheel_group', 'manage_deployment']
+                    }
+                },
+                'shared_resource_access': {
+                    'description': 'Multiple roles in same wheel group with appropriate permissions',
+                    'role_hierarchy': ['ADMIN', 'WHEEL_ADMIN', 'USER']
+                }
+            }
+        }
+    
+    def create_multi_role_test_scenario(self, wheel_group_config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Create test scenario for multiple roles in same wheel group
+        
+        Args:
+            wheel_group_config: Wheel group configuration
+            
+        Returns:
+            Multi-role test scenario data
+        """
+        return {
+            'wheel_group': {
+                'name': wheel_group_config['name'],
+                'description': wheel_group_config['description']
+            },
+            'test_operations': {
+                'wheel_creation': {
+                    'allowed_roles': ['ADMIN', 'WHEEL_ADMIN'],
+                    'forbidden_roles': ['USER']
+                },
+                'participant_management': {
+                    'allowed_roles': ['ADMIN', 'WHEEL_ADMIN'],
+                    'forbidden_roles': ['USER']
+                },
+                'wheel_spinning': {
+                    'allowed_roles': ['ADMIN', 'WHEEL_ADMIN', 'USER'],
+                    'forbidden_roles': []
+                },
+                'user_management': {
+                    'allowed_roles': ['ADMIN'],
+                    'forbidden_roles': ['WHEEL_ADMIN', 'USER']
+                }
             }
         }
     

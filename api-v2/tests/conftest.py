@@ -146,10 +146,18 @@ def mock_wheel_groups_table(mock_dynamodb):
     table = mock_dynamodb.Table(TEST_TABLE_NAMES['WHEEL_GROUPS_TABLE'])
     add_extended_table_functions(table)  # Add extended functions
     yield table
-    # Cleanup after test
+    # Cleanup after test with pagination
     scan_response = table.scan()
+    items = scan_response.get('Items', [])
+    
+    # Handle pagination if more items exist
+    while 'LastEvaluatedKey' in scan_response:
+        scan_response = table.scan(ExclusiveStartKey=scan_response['LastEvaluatedKey'])
+        items.extend(scan_response.get('Items', []))
+    
+    # Delete all items in batches
     with table.batch_writer() as batch:
-        for item in scan_response.get('Items', []):
+        for item in items:
             batch.delete_item(Key={'wheel_group_id': item['wheel_group_id']})
 
 
@@ -266,7 +274,8 @@ def sample_participant_data():
         'original_weight': Decimal('1.0'),
         'created_at': get_utc_timestamp(),
         'updated_at': get_utc_timestamp(),
-        'selection_count': 0
+        'selection_count': 0,
+        'last_selected_at': '1970-01-01T00:00:00Z'  # Epoch timestamp for GSI compatibility
     }
 
 
@@ -350,7 +359,7 @@ def api_gateway_event():
                 'email': 'test@example.com',
                 'wheel_group_id': get_uuid(),
                 'role': 'USER',
-                'deployment_admin': 'false'
+                'deployment_admin': False  # Use boolean instead of string
             }
         },
         'pathParameters': {},
@@ -439,7 +448,8 @@ def isolated_wheel_group_setup(mock_wheel_groups_table, mock_users_table,
             'original_weight': Decimal('1.0'),
             'created_at': get_utc_timestamp(),
             'updated_at': get_utc_timestamp(),
-            'selection_count': 0
+            'selection_count': 0,
+            'last_selected_at': '1970-01-01T00:00:00Z'  # Epoch timestamp for GSI compatibility
         }
         mock_participants_table.put_item(Item=participant)
         participants.append(participant)

@@ -17,6 +17,7 @@
                 "dynamodb:Scan",
                 "dynamodb:UpdateItem",
                 "dynamodb:DeleteItem",
+                "dynamodb:BatchWriteItem",
                 "s3:GetBucketPolicy",
                 "iam:PassRole",
                 "iam:DetachRolePolicy",

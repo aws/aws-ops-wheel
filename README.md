@@ -105,7 +105,7 @@ def select_participant(chosen, wheel):
 ### Create a custom IAM Policy for the User
 
 - Go to the [AWS Create Policy Wizard](https://console.aws.amazon.com/iam/home?region=us-west-2#/policies$new?step=edit)
-- Go to the `JSON` tab and paste in the content of our [policy configuration](https://raw.githubusercontent.com/aws/aws-ops-wheel/master/cloudformation/awsopswheel-create-policy.json)
+- Go to the `JSON` tab and paste in the content of our [policy configuration](~/aws-ops-wheel/cloudformation/awsopswheel-create-policy.json)
 - Click `Review Policy`
 - Give it an identifying name (we'll need it for the next step) like *AWSOpsWheelDevelopment*
 
@@ -275,7 +275,7 @@ The output will be your resulting CloudFront Domain.
 echo "CloudFront Domain: $CLOUDFRONT_DOMAIN"
 ```
 
-For regular updates, just use `./update-app.sh`
+For regular updates, just use `./deploy-v2.sh --quick-update`
 
 
 ## Start Local Dev Server

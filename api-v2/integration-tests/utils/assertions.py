@@ -300,7 +300,7 @@ class APIAssertions:
         APIAssertions.assert_success_response(response)
         APIAssertions.assert_json_response(response)
         
-        required_fields = ['wheel_id', 'name', 'wheel_group_id', 'created_at']
+        required_fields = ['wheel_id', 'wheel_name', 'wheel_group_id', 'created_at']
         for field in required_fields:
             APIAssertions.assert_response_contains(response, field,
                 message or f"Wheel missing required field: {field}")
@@ -317,7 +317,7 @@ class APIAssertions:
         APIAssertions.assert_success_response(response)
         APIAssertions.assert_json_response(response)
         
-        required_fields = ['participant_id', 'name', 'wheel_id', 'created_at']
+        required_fields = ['participant_id', 'participant_name', 'wheel_group_wheel_id', 'created_at']
         for field in required_fields:
             APIAssertions.assert_response_contains(response, field,
                 message or f"Participant missing required field: {field}")

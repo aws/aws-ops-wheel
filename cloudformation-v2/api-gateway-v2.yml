@@ -5,46 +5,28 @@ Parameters:
   Environment:
     Type: String
     Default: dev
-    Description: Deployment suffix for naming resources
-
   ForceUpdateTimestamp:
     Type: String
     Default: '1'
-    Description: Timestamp parameter to force nested stack updates
-
-  # Lambda Function ARN Parameters
   TenantManagementFunctionArn:
     Type: String
-    Description: ARN of the Tenant Management Lambda function
-
   WheelOperationsFunctionArn:
     Type: String
-    Description: ARN of the Wheel Operations Lambda function
-
   ParticipantOperationsFunctionArn:
     Type: String
-    Description: ARN of the Participant Operations Lambda function
-
   SelectionAlgorithmsFunctionArn:
     Type: String
-    Description: ARN of the Selection Algorithms Lambda function
-
   ApiAuthorizerFunctionArn:
     Type: String
-    Description: ARN of the API Authorizer Lambda function
+
 
 Resources:
-  # =================== API GATEWAY ===================
-
   OpsWheelApiV2:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: !Sub 'aws-ops-wheel-api-v2-${Environment}'
       Description: 'Multi-tenant API for AWS Ops Wheel v2'
-      EndpointConfiguration:
-        Types:
-          - REGIONAL
-
+      EndpointConfiguration: {Types: [REGIONAL]}
   LambdaAuthorizer:
     Type: AWS::ApiGateway::Authorizer
     Properties:
@@ -54,7 +36,6 @@ Resources:
       RestApiId: !Ref OpsWheelApiV2
       AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiAuthorizerFunctionArn}/invocations'
       AuthorizerResultTtlInSeconds: 300
-
   AuthorizerLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -62,38 +43,18 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${OpsWheelApiV2}/authorizers/*'
-
-  # App Resource (for CloudFront routing)
   AppResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !GetAtt OpsWheelApiV2.RootResourceId
-      PathPart: 'app'
-
-  # API Resource (under /app/)
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !GetAtt OpsWheelApiV2.RootResourceId, PathPart: 'app'}
   ApiResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref AppResource
-      PathPart: 'api'
-
-  # V2 Resource (under /app/api/)
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref AppResource, PathPart: 'api'}
   V2Resource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref ApiResource
-      PathPart: 'v2'
-
-  # Wheel Group Resource and Methods
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref ApiResource, PathPart: 'v2'}
   WheelGroupResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref V2Resource
-      PathPart: 'wheel-group'
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref V2Resource, PathPart: 'wheel-group'}
 
   WheelGroupGetMethod:
     Type: AWS::ApiGateway::Method
@@ -160,14 +121,9 @@ Resources:
             method.response.header.Access-Control-Allow-Origin: true
             method.response.header.Access-Control-Max-Age: true
 
-  # Wheel Group Create Public Resource (/wheel-group/create-public)
   WheelGroupCreatePublicResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref WheelGroupResource
-      PathPart: 'create-public'
-
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref WheelGroupResource, PathPart: 'create-public'}
   WheelGroupCreatePublicPostMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -175,11 +131,7 @@ Resources:
       ResourceId: !Ref WheelGroupCreatePublicResource
       HttpMethod: POST
       AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
-
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'}
   WheelGroupCreatePublicOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -196,24 +148,13 @@ Resources:
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
               method.response.header.Access-Control-Max-Age: "'86400'"
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
+        RequestTemplates: {application/json: '{"statusCode": 200}'}
       MethodResponses:
         - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Max-Age: true
-
-  # Wheel Group Delete Recursive Resource (/wheel-group/delete-recursive)
+          ResponseParameters: {method.response.header.Access-Control-Allow-Headers: true, method.response.header.Access-Control-Allow-Methods: true, method.response.header.Access-Control-Allow-Origin: true, method.response.header.Access-Control-Max-Age: true}
   WheelGroupDeleteRecursiveResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref WheelGroupResource
-      PathPart: 'delete-recursive'
-
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref WheelGroupResource, PathPart: 'delete-recursive'}
   WheelGroupDeleteRecursiveDeleteMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -222,11 +163,7 @@ Resources:
       HttpMethod: DELETE
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
-
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'}
   WheelGroupDeleteRecursiveOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -243,23 +180,13 @@ Resources:
               method.response.header.Access-Control-Allow-Methods: "'DELETE,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
               method.response.header.Access-Control-Max-Age: "'86400'"
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
+        RequestTemplates: {application/json: '{"statusCode": 200}'}
       MethodResponses:
         - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Max-Age: true
-
-  # Wheel Group Users Resource (/wheel-group/users)
+          ResponseParameters: {method.response.header.Access-Control-Allow-Headers: true, method.response.header.Access-Control-Allow-Methods: true, method.response.header.Access-Control-Allow-Origin: true, method.response.header.Access-Control-Max-Age: true}
   WheelGroupUsersResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref WheelGroupResource
-      PathPart: 'users'
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref WheelGroupResource, PathPart: 'users'}
 
   WheelGroupUsersGetMethod:
     Type: AWS::ApiGateway::Method
@@ -313,14 +240,9 @@ Resources:
             method.response.header.Access-Control-Allow-Origin: true
             method.response.header.Access-Control-Max-Age: true
 
-  # Wheel Group Users by ID Resource (/wheel-group/users/{user_id})
   WheelGroupUserIdResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref WheelGroupUsersResource
-      PathPart: '{user_id}'
-
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref WheelGroupUsersResource, PathPart: '{user_id}'}
   WheelGroupUserIdDeleteMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -329,11 +251,7 @@ Resources:
       HttpMethod: DELETE
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
-
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'}
   WheelGroupUserIdOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -345,29 +263,14 @@ Resources:
         Type: MOCK
         IntegrationResponses:
           - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'DELETE,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.Access-Control-Max-Age: "'86400'"
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
+            ResponseParameters: {method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'", method.response.header.Access-Control-Allow-Methods: "'DELETE,OPTIONS'", method.response.header.Access-Control-Allow-Origin: "'*'", method.response.header.Access-Control-Max-Age: "'86400'"}
+        RequestTemplates: {application/json: '{"statusCode": 200}'}
       MethodResponses:
         - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Max-Age: true
-
-  # Wheel Group Users Role Resource (/wheel-group/users/{user_id}/role)
+          ResponseParameters: {method.response.header.Access-Control-Allow-Headers: true, method.response.header.Access-Control-Allow-Methods: true, method.response.header.Access-Control-Allow-Origin: true, method.response.header.Access-Control-Max-Age: true}
   WheelGroupUserRoleResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref WheelGroupUserIdResource
-      PathPart: 'role'
-
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref WheelGroupUserIdResource, PathPart: 'role'}
   WheelGroupUserRolePutMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -376,11 +279,7 @@ Resources:
       HttpMethod: PUT
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
-
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'}
   WheelGroupUserRoleOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -392,29 +291,14 @@ Resources:
         Type: MOCK
         IntegrationResponses:
           - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'PUT,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.Access-Control-Max-Age: "'86400'"
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
+            ResponseParameters: {method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'", method.response.header.Access-Control-Allow-Methods: "'PUT,OPTIONS'", method.response.header.Access-Control-Allow-Origin: "'*'", method.response.header.Access-Control-Max-Age: "'86400'"}
+        RequestTemplates: {application/json: '{"statusCode": 200}'}
       MethodResponses:
         - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Max-Age: true
-
-  # Config Resource and Methods
+          ResponseParameters: {method.response.header.Access-Control-Allow-Headers: true, method.response.header.Access-Control-Allow-Methods: true, method.response.header.Access-Control-Allow-Origin: true, method.response.header.Access-Control-Max-Age: true}
   ConfigResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref V2Resource
-      PathPart: 'config'
-
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref V2Resource, PathPart: 'config'}
   ConfigGetMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -422,11 +306,7 @@ Resources:
       ResourceId: !Ref ConfigResource
       HttpMethod: GET
       AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
-
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'}
   ConfigOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -438,36 +318,17 @@ Resources:
         Type: MOCK
         IntegrationResponses:
           - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.Access-Control-Max-Age: "'86400'"
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
+            ResponseParameters: {method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'", method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'", method.response.header.Access-Control-Allow-Origin: "'*'", method.response.header.Access-Control-Max-Age: "'86400'"}
+        RequestTemplates: {application/json: '{"statusCode": 200}'}
       MethodResponses:
         - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Max-Age: true
-
-  # Admin Resource and Methods
+          ResponseParameters: {method.response.header.Access-Control-Allow-Headers: true, method.response.header.Access-Control-Allow-Methods: true, method.response.header.Access-Control-Allow-Origin: true, method.response.header.Access-Control-Max-Age: true}
   AdminResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref V2Resource
-      PathPart: 'admin'
-
-  # Admin Wheel Groups Resource (/admin/wheel-groups)
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref V2Resource, PathPart: 'admin'}
   AdminWheelGroupsResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref AdminResource
-      PathPart: 'wheel-groups'
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref AdminResource, PathPart: 'wheel-groups'}
 
   AdminWheelGroupsGetMethod:
     Type: AWS::ApiGateway::Method
@@ -508,14 +369,9 @@ Resources:
             method.response.header.Access-Control-Allow-Origin: true
             method.response.header.Access-Control-Max-Age: true
 
-  # Admin Wheel Group by ID Resource (/admin/wheel-groups/{wheel_group_id})
   AdminWheelGroupIdResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref AdminWheelGroupsResource
-      PathPart: '{wheel_group_id}'
-
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref AdminWheelGroupsResource, PathPart: '{wheel_group_id}'}
   AdminWheelGroupIdDeleteMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -524,11 +380,7 @@ Resources:
       HttpMethod: DELETE
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
-
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'}
   AdminWheelGroupIdOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -540,37 +392,17 @@ Resources:
         Type: MOCK
         IntegrationResponses:
           - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'DELETE,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.Access-Control-Max-Age: "'86400'"
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
+            ResponseParameters: {method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'", method.response.header.Access-Control-Allow-Methods: "'DELETE,OPTIONS'", method.response.header.Access-Control-Allow-Origin: "'*'", method.response.header.Access-Control-Max-Age: "'86400'"}
+        RequestTemplates: {application/json: '{"statusCode": 200}'}
       MethodResponses:
         - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Max-Age: true
-
-  # Auth Resource and Methods
+          ResponseParameters: {method.response.header.Access-Control-Allow-Headers: true, method.response.header.Access-Control-Allow-Methods: true, method.response.header.Access-Control-Allow-Origin: true, method.response.header.Access-Control-Max-Age: true}
   AuthResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref V2Resource
-      PathPart: 'auth'
-
-  # Me Resource (under /auth/)
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref V2Resource, PathPart: 'auth'}
   MeResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref AuthResource
-      PathPart: 'me'
-
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref AuthResource, PathPart: 'me'}
   MeGetMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -579,11 +411,7 @@ Resources:
       HttpMethod: GET
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
-
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'}
   MeOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -595,28 +423,91 @@ Resources:
         Type: MOCK
         IntegrationResponses:
           - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.Access-Control-Max-Age: "'86400'"
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
+            ResponseParameters: {method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'", method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'", method.response.header.Access-Control-Allow-Origin: "'*'", method.response.header.Access-Control-Max-Age: "'86400'"}
+        RequestTemplates: {application/json: '{"statusCode": 200}'}
       MethodResponses:
         - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Max-Age: true
-
-  # Wheels Resource and Methods
-  WheelsResource:
+          ResponseParameters: {method.response.header.Access-Control-Allow-Headers: true, method.response.header.Access-Control-Allow-Methods: true, method.response.header.Access-Control-Allow-Origin: true, method.response.header.Access-Control-Max-Age: true}
+  WheelGroupsResource:
     Type: AWS::ApiGateway::Resource
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref V2Resource, PathPart: 'wheel-groups'}
+  WheelGroupIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref WheelGroupsResource, PathPart: '{wheel_group_id}'}
+  WheelGroupIdGetMethod:
+    Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref V2Resource
-      PathPart: 'wheels'
+      ResourceId: !Ref WheelGroupIdResource
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref LambdaAuthorizer
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'}
+  WheelGroupIdDeleteMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref OpsWheelApiV2
+      ResourceId: !Ref WheelGroupIdResource
+      HttpMethod: DELETE
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref LambdaAuthorizer
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'}
+  WheelGroupIdOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref OpsWheelApiV2
+      ResourceId: !Ref WheelGroupIdResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters: {method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'", method.response.header.Access-Control-Allow-Methods: "'GET,DELETE,OPTIONS'", method.response.header.Access-Control-Allow-Origin: "'*'", method.response.header.Access-Control-Max-Age: "'86400'"}
+        RequestTemplates: {application/json: '{"statusCode": 200}'}
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters: {method.response.header.Access-Control-Allow-Headers: true, method.response.header.Access-Control-Allow-Methods: true, method.response.header.Access-Control-Allow-Origin: true, method.response.header.Access-Control-Max-Age: true}
+  WheelGroupWheelsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref WheelGroupIdResource, PathPart: 'wheels'}
+  WheelGroupWheelsGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref OpsWheelApiV2
+      ResourceId: !Ref WheelGroupWheelsResource
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref LambdaAuthorizer
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WheelOperationsFunctionArn}/invocations'}
+  WheelGroupWheelsPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref OpsWheelApiV2
+      ResourceId: !Ref WheelGroupWheelsResource
+      HttpMethod: POST
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref LambdaAuthorizer
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WheelOperationsFunctionArn}/invocations'}
+  WheelGroupWheelsOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref OpsWheelApiV2
+      ResourceId: !Ref WheelGroupWheelsResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters: {method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'", method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'", method.response.header.Access-Control-Allow-Origin: "'*'", method.response.header.Access-Control-Max-Age: "'86400'"}
+        RequestTemplates: {application/json: '{"statusCode": 200}'}
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters: {method.response.header.Access-Control-Allow-Headers: true, method.response.header.Access-Control-Allow-Methods: true, method.response.header.Access-Control-Allow-Origin: true, method.response.header.Access-Control-Max-Age: true}
+  WheelsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref V2Resource, PathPart: 'wheels'}
 
   WheelsGetMethod:
     Type: AWS::ApiGateway::Method
@@ -670,14 +561,9 @@ Resources:
             method.response.header.Access-Control-Allow-Origin: true
             method.response.header.Access-Control-Max-Age: true
 
-  # Individual Wheel Resource (/wheels/{wheel_id})
   WheelIdResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref WheelsResource
-      PathPart: '{wheel_id}'
-
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref WheelsResource, PathPart: '{wheel_id}'}
   WheelIdGetMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -686,11 +572,7 @@ Resources:
       HttpMethod: GET
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
-
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'}
   WheelIdPutMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -699,11 +581,7 @@ Resources:
       HttpMethod: PUT
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
-
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'}
   WheelIdDeleteMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -712,11 +590,7 @@ Resources:
       HttpMethod: DELETE
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
-
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'}
   WheelIdOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -728,28 +602,14 @@ Resources:
         Type: MOCK
         IntegrationResponses:
           - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,PUT,DELETE,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.Access-Control-Max-Age: "'86400'"
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
+            ResponseParameters: {method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'", method.response.header.Access-Control-Allow-Methods: "'GET,PUT,DELETE,OPTIONS'", method.response.header.Access-Control-Allow-Origin: "'*'", method.response.header.Access-Control-Max-Age: "'86400'"}
+        RequestTemplates: {application/json: '{"statusCode": 200}'}
       MethodResponses:
         - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Max-Age: true
-
-  # Participants Resource (/wheels/{wheel_id}/participants)
+          ResponseParameters: {method.response.header.Access-Control-Allow-Headers: true, method.response.header.Access-Control-Allow-Methods: true, method.response.header.Access-Control-Allow-Origin: true, method.response.header.Access-Control-Max-Age: true}
   ParticipantsResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref WheelIdResource
-      PathPart: 'participants'
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref WheelIdResource, PathPart: 'participants'}
 
   ParticipantsGetMethod:
     Type: AWS::ApiGateway::Method
@@ -803,14 +663,9 @@ Resources:
             method.response.header.Access-Control-Allow-Origin: true
             method.response.header.Access-Control-Max-Age: true
 
-  # Individual Participant Resource (/wheels/{wheel_id}/participants/{participant_id})
   ParticipantIdResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref ParticipantsResource
-      PathPart: '{participant_id}'
-
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref ParticipantsResource, PathPart: '{participant_id}'}
   ParticipantIdGetMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -819,11 +674,7 @@ Resources:
       HttpMethod: GET
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ParticipantOperationsFunctionArn}/invocations'
-
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ParticipantOperationsFunctionArn}/invocations'}
   ParticipantIdPutMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -832,11 +683,7 @@ Resources:
       HttpMethod: PUT
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ParticipantOperationsFunctionArn}/invocations'
-
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ParticipantOperationsFunctionArn}/invocations'}
   ParticipantIdDeleteMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -845,11 +692,7 @@ Resources:
       HttpMethod: DELETE
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ParticipantOperationsFunctionArn}/invocations'
-
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ParticipantOperationsFunctionArn}/invocations'}
   ParticipantIdOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -861,29 +704,14 @@ Resources:
         Type: MOCK
         IntegrationResponses:
           - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,PUT,DELETE,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.Access-Control-Max-Age: "'86400'"
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
+            ResponseParameters: {method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'", method.response.header.Access-Control-Allow-Methods: "'GET,PUT,DELETE,OPTIONS'", method.response.header.Access-Control-Allow-Origin: "'*'", method.response.header.Access-Control-Max-Age: "'86400'"}
+        RequestTemplates: {application/json: '{"statusCode": 200}'}
       MethodResponses:
         - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Max-Age: true
-
-  # Participant Select Resource (/wheels/{wheel_id}/participants/{participant_id}/select)
+          ResponseParameters: {method.response.header.Access-Control-Allow-Headers: true, method.response.header.Access-Control-Allow-Methods: true, method.response.header.Access-Control-Allow-Origin: true, method.response.header.Access-Control-Max-Age: true}
   ParticipantSelectResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref ParticipantIdResource
-      PathPart: 'select'
-
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref ParticipantIdResource, PathPart: 'select'}
   ParticipantSelectPostMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -892,11 +720,7 @@ Resources:
       HttpMethod: POST
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ParticipantOperationsFunctionArn}/invocations'
-
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ParticipantOperationsFunctionArn}/invocations'}
   ParticipantSelectOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -908,29 +732,14 @@ Resources:
         Type: MOCK
         IntegrationResponses:
           - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.Access-Control-Max-Age: "'86400'"
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
+            ResponseParameters: {method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'", method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'", method.response.header.Access-Control-Allow-Origin: "'*'", method.response.header.Access-Control-Max-Age: "'86400'"}
+        RequestTemplates: {application/json: '{"statusCode": 200}'}
       MethodResponses:
         - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Max-Age: true
-
-  # Participant Rig Resource (/wheels/{wheel_id}/participants/{participant_id}/rig)
+          ResponseParameters: {method.response.header.Access-Control-Allow-Headers: true, method.response.header.Access-Control-Allow-Methods: true, method.response.header.Access-Control-Allow-Origin: true, method.response.header.Access-Control-Max-Age: true}
   ParticipantRigResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref ParticipantIdResource
-      PathPart: 'rig'
-
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref ParticipantIdResource, PathPart: 'rig'}
   ParticipantRigPostMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -939,11 +748,7 @@ Resources:
       HttpMethod: POST
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ParticipantOperationsFunctionArn}/invocations'
-
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ParticipantOperationsFunctionArn}/invocations'}
   ParticipantRigOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -955,29 +760,14 @@ Resources:
         Type: MOCK
         IntegrationResponses:
           - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.Access-Control-Max-Age: "'86400'"
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
+            ResponseParameters: {method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'", method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'", method.response.header.Access-Control-Allow-Origin: "'*'", method.response.header.Access-Control-Max-Age: "'86400'"}
+        RequestTemplates: {application/json: '{"statusCode": 200}'}
       MethodResponses:
         - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Max-Age: true
-
-  # Suggest Resource (/wheels/{wheel_id}/suggest)
+          ResponseParameters: {method.response.header.Access-Control-Allow-Headers: true, method.response.header.Access-Control-Allow-Methods: true, method.response.header.Access-Control-Allow-Origin: true, method.response.header.Access-Control-Max-Age: true}
   SuggestResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref WheelIdResource
-      PathPart: 'suggest'
-
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref WheelIdResource, PathPart: 'suggest'}
   SuggestPostMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -986,11 +776,7 @@ Resources:
       HttpMethod: POST
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SelectionAlgorithmsFunctionArn}/invocations'
-
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SelectionAlgorithmsFunctionArn}/invocations'}
   SuggestOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -1002,29 +788,14 @@ Resources:
         Type: MOCK
         IntegrationResponses:
           - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.Access-Control-Max-Age: "'86400'"
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
+            ResponseParameters: {method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'", method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'", method.response.header.Access-Control-Allow-Origin: "'*'", method.response.header.Access-Control-Max-Age: "'86400'"}
+        RequestTemplates: {application/json: '{"statusCode": 200}'}
       MethodResponses:
         - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Max-Age: true
-
-  # Reset Resource (/wheels/{wheel_id}/reset)
+          ResponseParameters: {method.response.header.Access-Control-Allow-Headers: true, method.response.header.Access-Control-Allow-Methods: true, method.response.header.Access-Control-Allow-Origin: true, method.response.header.Access-Control-Max-Age: true}
   ResetResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref WheelIdResource
-      PathPart: 'reset'
-
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref WheelIdResource, PathPart: 'reset'}
   ResetPostMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -1033,11 +804,7 @@ Resources:
       HttpMethod: POST
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'
-
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TenantManagementFunctionArn}/invocations'}
   ResetOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -1049,29 +816,14 @@ Resources:
         Type: MOCK
         IntegrationResponses:
           - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.Access-Control-Max-Age: "'86400'"
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
+            ResponseParameters: {method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'", method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'", method.response.header.Access-Control-Allow-Origin: "'*'", method.response.header.Access-Control-Max-Age: "'86400'"}
+        RequestTemplates: {application/json: '{"statusCode": 200}'}
       MethodResponses:
         - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Max-Age: true
-
-  # Unrig Resource (/wheels/{wheel_id}/unrig)
+          ResponseParameters: {method.response.header.Access-Control-Allow-Headers: true, method.response.header.Access-Control-Allow-Methods: true, method.response.header.Access-Control-Allow-Origin: true, method.response.header.Access-Control-Max-Age: true}
   UnrigResource:
     Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref OpsWheelApiV2
-      ParentId: !Ref WheelIdResource
-      PathPart: 'unrig'
-
+    Properties: {RestApiId: !Ref OpsWheelApiV2, ParentId: !Ref WheelIdResource, PathPart: 'unrig'}
   UnrigDeleteMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -1080,11 +832,7 @@ Resources:
       HttpMethod: DELETE
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref LambdaAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ParticipantOperationsFunctionArn}/invocations'
-
+      Integration: {Type: AWS_PROXY, IntegrationHttpMethod: POST, Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ParticipantOperationsFunctionArn}/invocations'}
   UnrigOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -1096,75 +844,18 @@ Resources:
         Type: MOCK
         IntegrationResponses:
           - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'DELETE,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.Access-Control-Max-Age: "'86400'"
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
+            ResponseParameters: {method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'", method.response.header.Access-Control-Allow-Methods: "'DELETE,OPTIONS'", method.response.header.Access-Control-Allow-Origin: "'*'", method.response.header.Access-Control-Max-Age: "'86400'"}
+        RequestTemplates: {application/json: '{"statusCode": 200}'}
       MethodResponses:
         - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Max-Age: true
+          ResponseParameters: {method.response.header.Access-Control-Allow-Headers: true, method.response.header.Access-Control-Allow-Methods: true, method.response.header.Access-Control-Allow-Origin: true, method.response.header.Access-Control-Max-Age: true}
 
-  # API Deployment (created before permissions to avoid circular dependency)
   ApiDeployment:
     Type: AWS::ApiGateway::Deployment
-    DependsOn:
-      - WheelGroupGetMethod
-      - WheelGroupPostMethod
-      - WheelGroupPutMethod
-      - WheelGroupOptionsMethod
-      - WheelGroupCreatePublicPostMethod
-      - WheelGroupCreatePublicOptionsMethod
-      - WheelGroupDeleteRecursiveDeleteMethod
-      - WheelGroupDeleteRecursiveOptionsMethod
-      - WheelGroupUsersGetMethod
-      - WheelGroupUsersPostMethod
-      - WheelGroupUsersOptionsMethod
-      - WheelGroupUserIdDeleteMethod
-      - WheelGroupUserIdOptionsMethod
-      - WheelGroupUserRolePutMethod
-      - WheelGroupUserRoleOptionsMethod
-      - ConfigGetMethod
-      - ConfigOptionsMethod
-      - AdminWheelGroupsGetMethod
-      - AdminWheelGroupsOptionsMethod
-      - AdminWheelGroupIdDeleteMethod
-      - AdminWheelGroupIdOptionsMethod
-      - MeGetMethod
-      - MeOptionsMethod
-      - WheelsGetMethod
-      - WheelsPostMethod
-      - WheelsOptionsMethod
-      - WheelIdGetMethod
-      - WheelIdPutMethod
-      - WheelIdDeleteMethod
-      - WheelIdOptionsMethod
-      - ParticipantsGetMethod
-      - ParticipantsPostMethod
-      - ParticipantsOptionsMethod
-      - ParticipantIdGetMethod
-      - ParticipantIdPutMethod
-      - ParticipantIdDeleteMethod
-      - ParticipantIdOptionsMethod
-      - ParticipantSelectPostMethod
-      - ParticipantSelectOptionsMethod
-      - ParticipantRigPostMethod
-      - ParticipantRigOptionsMethod
-      - SuggestPostMethod
-      - SuggestOptionsMethod
-      - ResetPostMethod
-      - ResetOptionsMethod
-      - UnrigDeleteMethod
-      - UnrigOptionsMethod
+    DependsOn: [WheelGroupGetMethod,WheelGroupPostMethod,WheelGroupPutMethod,WheelGroupOptionsMethod,WheelGroupCreatePublicPostMethod,WheelGroupCreatePublicOptionsMethod,WheelGroupDeleteRecursiveDeleteMethod,WheelGroupDeleteRecursiveOptionsMethod,WheelGroupUsersGetMethod,WheelGroupUsersPostMethod,WheelGroupUsersOptionsMethod,WheelGroupUserIdDeleteMethod,WheelGroupUserIdOptionsMethod,WheelGroupUserRolePutMethod,WheelGroupUserRoleOptionsMethod,ConfigGetMethod,ConfigOptionsMethod,AdminWheelGroupsGetMethod,AdminWheelGroupsOptionsMethod,AdminWheelGroupIdDeleteMethod,AdminWheelGroupIdOptionsMethod,MeGetMethod,MeOptionsMethod,WheelGroupIdGetMethod,WheelGroupIdDeleteMethod,WheelGroupIdOptionsMethod,WheelGroupWheelsGetMethod,WheelGroupWheelsPostMethod,WheelGroupWheelsOptionsMethod,WheelsGetMethod,WheelsPostMethod,WheelsOptionsMethod,WheelIdGetMethod,WheelIdPutMethod,WheelIdDeleteMethod,WheelIdOptionsMethod,ParticipantsGetMethod,ParticipantsPostMethod,ParticipantsOptionsMethod,ParticipantIdGetMethod,ParticipantIdPutMethod,ParticipantIdDeleteMethod,ParticipantIdOptionsMethod,ParticipantSelectPostMethod,ParticipantSelectOptionsMethod,ParticipantRigPostMethod,ParticipantRigOptionsMethod,SuggestPostMethod,SuggestOptionsMethod,ResetPostMethod,ResetOptionsMethod,UnrigDeleteMethod,UnrigOptionsMethod]
     Properties:
       RestApiId: !Ref OpsWheelApiV2
-      Description: !Sub 'Deployment for AWS Ops Wheel v2 API - ${Environment} - Updated ${AWS::StackId}'
+      Description: !Sub 'Deployment v2 API ${Environment} ${ForceUpdateTimestamp}'
 
   ApiStage:
     Type: AWS::ApiGateway::Stage
@@ -1286,6 +977,24 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${OpsWheelApiV2}/${Environment}/*/app/api/v2/admin*'
+
+  WheelGroupsApiPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn: ApiStage
+    Properties:
+      FunctionName: !Ref TenantManagementFunctionArn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${OpsWheelApiV2}/${Environment}/*/app/api/v2/wheel-groups*'
+
+  WheelGroupWheelsApiPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn: ApiStage
+    Properties:
+      FunctionName: !Ref WheelOperationsFunctionArn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${OpsWheelApiV2}/${Environment}/*/app/api/v2/wheel-groups/*/wheels*'
 
 Outputs:
   ApiGatewayId:

@@ -70,7 +70,7 @@ export class UserTable extends Component {
         this.setState({ wheelGroupName: wheelGroup.wheel_group_name });
       }
     } catch (error) {
-      console.error('Failed to fetch wheel group info:', error);
+      // Failed to fetch wheel group info
     }
   };
 

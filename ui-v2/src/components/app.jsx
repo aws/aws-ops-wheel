@@ -97,7 +97,6 @@ class App extends Component {
       const app = this;  // Necessary because of 'this' getting overridden in the callback
       currentUser.getSession(function(err, session) {
         if (err) {
-          console.error(err);
           return;
         }
         const idToken = session.getIdToken().getJwtToken();
@@ -161,9 +160,6 @@ class App extends Component {
     // After wheel group creation, go back to login page
     this.setState({ showTenantCreation: false });
     
-    // Instead of auto-login, we'll just show a success message and let user manually log in
-    // This avoids timing issues with Cognito user creation
-    console.log('Wheel group created successfully! Please log in with your credentials.');
   }
 
   renderRoutes = () => {

@@ -1,22 +1,40 @@
 # AWS Ops Wheel v2 Integration Tests
 
-This directory contains comprehensive integration tests for the AWS Ops Wheel v2 API. These tests validate critical functionality including authentication, wheel group management, and the public self-service onboarding endpoint.
+This directory contains comprehensive integration tests for AWS Ops Wheel v2 API, covering all major workflows and security scenarios with enhanced security and code quality improvements.
 
 ## Overview
 
-The integration test suite is designed to:
-- Test critical v2 functionality, especially the public wheel group creation endpoint
-- Validate authentication flows including admin login and password changes
-- Ensure API reliability through comprehensive CRUD testing
-- Maintain test environment cleanliness through automatic cleanup
-- Support multiple test environments (test, dev)
+The integration test suite validates complete end-to-end functionality across different user roles and permission levels:
+- **Deployment Admin Workflows** - System-wide monitoring and cross-tenant operations
+- **Admin Workflows** - Complete wheel group management and administration (*Recently enhanced with security improvements*)
+- **Wheel Admin Workflows** - Wheel and participant management within assigned groups
+- **User Workflows** - Read-only access and wheel spinning functionality
+- **Cross-Role Security Scenarios** - Security boundary testing and role isolation
+- **Setup Validation** - Environment health and configuration validation
+
+## Recent Security & Quality Improvements (v2.1)
+
+### High-Priority Security Fixes in test_01_admin_workflows.py
+- ✅ **Sensitive Information Protection**: Eliminated print statements that exposed temporary passwords and authentication tokens
+- ✅ **Robust Error Handling**: Fixed uninitialized response variables that could cause UnboundLocalError exceptions
+- ✅ **Enhanced API Safety**: Added comprehensive error handling with proper exception management
+
+### Code Quality Enhancements
+- ✅ **Timezone-Aware Operations**: All datetime operations now use UTC timezone-aware timestamps
+- ✅ **Safe Data Access**: Implemented helper methods for safe nested dictionary access and response parsing
+- ✅ **Reduced Code Duplication**: Added reusable utility methods for common operations
+- ✅ **Enhanced Type Safety**: Improved type hints with Optional types and concurrent.futures support
+- ✅ **Better Maintainability**: Structured helper methods make code more modular and easier to maintain
 
 ## Test Structure
 
 ### Test Files (run in order)
-- `test_00_environment.py` - Environment health and configuration validation
-- `test_01_authentication.py` - Authentication flows and JWT token validation
-- `test_02_wheel_groups.py` - **Critical** wheel group CRUD and public endpoint testing
+- `test_00_deployment_admin_workflows.py` - Deployment admin system-wide capabilities
+- `test_01_admin_workflows.py` - **Enhanced** Admin role comprehensive workflows with security improvements
+- `test_02_wheel_admin_workflows.py` - Wheel admin role-specific functionality
+- `test_03_user_workflows.py` - User role read-only access and basic operations
+- `test_04_cross_role_scenarios.py` - Cross-role security and isolation testing
+- `test_05_setup_validation.py` - Environment validation and setup verification
 
 ### Core Components
 - `config/` - Environment-specific configuration management

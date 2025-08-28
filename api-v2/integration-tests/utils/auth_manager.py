@@ -365,7 +365,7 @@ class AuthManager:
             user_data['wheel_group_id'] = wheel_group_id
         
         try:
-            response = self.api_client.post('/app/api/v2/admin/users', data=user_data)
+            response = self.api_client.post('/admin/users', data=user_data)
             
             if response.is_success:
                 self._log(f"Test user created successfully: {username}")
@@ -396,7 +396,7 @@ class AuthManager:
         self._log(f"Deleting test user: {user_id}")
         
         try:
-            response = self.api_client.delete(f'/app/api/v2/admin/users/{user_id}')
+            response = self.api_client.delete(f'/admin/users/{user_id}')
             
             if response.is_success:
                 self._log(f"Test user deleted successfully: {user_id}")

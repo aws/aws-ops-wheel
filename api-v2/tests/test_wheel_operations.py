@@ -804,8 +804,8 @@ def test_reset_wheel_weights_validates_v1_algorithm(mock_context, mock_middlewar
         
         # Verify timestamps
         assert participant['updated_at'] is not None, "updated_at should be set"
-        # last_selected_at should be None/removed after reset
-        assert participant.get('last_selected_at') is None, "last_selected_at should be cleared"
+        # last_selected_at should be reset to epoch placeholder for GSI compatibility
+        assert participant.get('last_selected_at') == '1970-01-01T00:00:00Z', "last_selected_at should be reset to epoch"
     
     # Verify wheel's total_spins was reset
     updated_wheel = WheelRepository.get_wheel(wheel_group_id, wheel['wheel_id'])
@@ -908,6 +908,6 @@ def test_validate_cors_headers_catches_missing_headers():
     
     try:
         validate_cors_headers(response_without_cors)
-        assert False, "Should raise assertion error for missing CORS headers"
+        assert False, "Should raise error for missing CORS headers"
     except KeyError as e:
         assert 'Content-Type' in str(e), "Should fail on missing Content-Type header"

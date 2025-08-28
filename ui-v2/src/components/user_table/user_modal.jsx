@@ -40,15 +40,23 @@ export default class UserModal extends Component {
         isChecking: false,
         isValid: true,
         message: ''
+      },
+      emailValidation: {
+        isChecking: false,
+        isValid: true,
+        message: ''
       }
     };
     this.onChange = this.onChange.bind(this);
     this.onUsernameChange = this.onUsernameChange.bind(this);
+    this.onEmailChange = this.onEmailChange.bind(this);
     this.onSubmit = this.onSubmit.bind(this);
     this.modalAfterOpen = this.modalAfterOpen.bind(this);
     this.onClose = this.onClose.bind(this);
     this.checkUsernameUniqueness = this.checkUsernameUniqueness.bind(this);
+    this.checkEmailUniqueness = this.checkEmailUniqueness.bind(this);
     this.usernameCheckTimeout = null;
+    this.emailCheckTimeout = null;
   }
 
   onSubmit(event) {
@@ -107,6 +115,38 @@ export default class UserModal extends Component {
     }
   };
 
+  onEmailChange(event) {
+    this.onChange(event);
+    
+    // Debounce email validation
+    if (this.emailCheckTimeout) {
+      clearTimeout(this.emailCheckTimeout);
+    }
+    
+    const email = event.target.value;
+    if (email && email.includes('@')) {
+      this.setState({
+        emailValidation: {
+          isChecking: true,
+          isValid: true,
+          message: ''
+        }
+      });
+      
+      this.emailCheckTimeout = setTimeout(() => {
+        this.checkEmailUniqueness(email);
+      }, 500);
+    } else {
+      this.setState({
+        emailValidation: {
+          isChecking: false,
+          isValid: true,
+          message: ''
+        }
+      });
+    }
+  };
+
   async checkUsernameUniqueness(username) {
     try {
       const response = await fetch(apiURL('wheel-group/users'), {
@@ -139,6 +179,38 @@ export default class UserModal extends Component {
     }
   };
 
+  async checkEmailUniqueness(email) {
+    try {
+      const response = await fetch(apiURL('wheel-group/users'), {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const existingEmails = data.users.map(u => u.email.toLowerCase());
+        const isUnique = !existingEmails.includes(email.toLowerCase());
+        
+        this.setState({
+          emailValidation: {
+            isChecking: false,
+            isValid: isUnique,
+            message: isUnique ? '' : 'Email address already exists'
+          }
+        });
+      }
+    } catch (error) {
+      // If check fails, don't block the user
+      this.setState({
+        emailValidation: {
+          isChecking: false,
+          isValid: true,
+          message: ''
+        }
+      });
+    }
+  };
+
   modalAfterOpen() {
     const {user} = this.props;
     const userForEditing = user ? {...user, password: ''} : defaultUser; // Don't pre-fill password
@@ -150,13 +222,18 @@ export default class UserModal extends Component {
         isChecking: false,
         isValid: true,
         message: ''
+      },
+      emailValidation: {
+        isChecking: false,
+        isValid: true,
+        message: ''
       }
     });
   };
 
   render() {
     const {isModalOpen} = this.props;
-    const {user, isAdd, usernameValidation} = this.state;
+    const {user, isAdd, usernameValidation, emailValidation} = this.state;
 
     const heading = isAdd ? 'Add a new user' : 'Edit user role';
     const submitText = isAdd ? 'Add User' : 'Update Role';
@@ -167,7 +244,7 @@ export default class UserModal extends Component {
     const userPasswordId = isAdd ? 'user-password-add' : `user-password-edit-${user.user_id || 'new'}`;
     const userRoleId = isAdd ? 'user-role-add' : `user-role-edit-${user.user_id || 'new'}`;
 
-    const isValid = isAdd ? (user.username && user.email && user.role && usernameValidation.isValid && !usernameValidation.isChecking) : user.role;
+    const isValid = isAdd ? (user.username && user.email && user.role && usernameValidation.isValid && !usernameValidation.isChecking && emailValidation.isValid && !emailValidation.isChecking) : user.role;
 
     return (
       <div>
@@ -218,11 +295,27 @@ export default class UserModal extends Component {
                       id={userEmailId}
                       type='email'
                       name='email'
-                      onChange={this.onChange}
+                      onChange={this.onEmailChange}
                       value={user.email}
                       placeholder="user@example.com"
                       required
+                      isInvalid={!emailValidation.isValid}
                     />
+                    {emailValidation.isChecking && (
+                      <Form.Text className="text-info">
+                        Checking email availability...
+                      </Form.Text>
+                    )}
+                    {!emailValidation.isChecking && emailValidation.message && (
+                      <Form.Text className={emailValidation.isValid ? "text-success" : "text-danger"}>
+                        {emailValidation.message}
+                      </Form.Text>
+                    )}
+                    {!emailValidation.message && !emailValidation.isChecking && (
+                      <Form.Text className="text-muted">
+                        Email must be unique across all users
+                      </Form.Text>
+                    )}
                   </Form.Group>
                   <div className="mb-3">
                     <div className="alert alert-info">

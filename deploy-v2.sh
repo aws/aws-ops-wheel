@@ -11,6 +11,7 @@ REGION=${AWS_REGION:-us-west-2}
 ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
 ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
 DELETE_STACKS=${DELETE_STACKS:-false}
+QUICK_UPDATE=${QUICK_UPDATE:-false}
 
 # Colors for output
 RED='\033[0;31m'
@@ -1315,8 +1316,46 @@ cleanup_on_error() {
     log_info "Stack events: https://console.aws.amazon.com/cloudformation/home?region=$REGION#/stacks/events?stackId=$STACK_NAME"
 }
 
+# Function to perform quick update (app-only)
+quick_update() {
+    log_info "🚀 AWS Ops Wheel v2 Quick Update (App Only)"
+    log_info "Suffix: $SUFFIX"
+    log_info "Region: $REGION"
+    log_info "Stack Name: $STACK_NAME"
+    echo
+    
+    # Verify stack exists
+    if ! aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region $REGION >/dev/null 2>&1; then
+        log_error "Stack does not exist: $STACK_NAME"
+        log_error "Run full deployment first: $0 --suffix $SUFFIX"
+        exit 1
+    fi
+    
+    check_aws_config
+    create_and_upload_config
+    build_and_upload_frontend
+    cleanup_obsolete_build_files
+    
+    log_success "🎉 Quick update completed successfully!"
+    
+    # Show frontend URL
+    local frontend_url=$(aws cloudformation describe-stacks \
+        --stack-name "$STACK_NAME" \
+        --region $REGION \
+        --query 'Stacks[0].Outputs[?OutputKey==`FrontendURL`].OutputValue' \
+        --output text)
+    
+    log_success "Frontend: $frontend_url"
+}
+
 # Main execution
 main() {
+    # Check if quick update was requested
+    if [ "$QUICK_UPDATE" = true ]; then
+        quick_update
+        return 0
+    fi
+    
     # Check if deletion was requested
     if [ "$DELETE_STACKS" = true ]; then
         log_info "🗑️  AWS Ops Wheel v2 Stack Deletion"
@@ -1415,6 +1454,10 @@ while [[ $# -gt 0 ]]; do
             DELETE_STACKS=true
             shift
             ;;
+        --quick-update)
+            QUICK_UPDATE=true
+            shift
+            ;;
         --help|-h)
             echo "AWS Ops Wheel v2 Modular Deployment Script"
             echo ""
@@ -1426,6 +1469,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --admin-email EMAIL       Admin email address [default: admin@example.com]"
             echo "  --admin-username USER     Admin username [default: admin or auto-generated from email]"
             echo "  --delete                 Delete all stacks and empty S3 buckets"
+            echo "  --quick-update           Quick app-only update (skip infrastructure)"
             echo "  -h, --help               Show this help message"
             echo ""
             echo "Environment Variables:"
@@ -1436,6 +1480,7 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Examples:"
             echo "  $0 --suffix dev --admin-email admin@example.com"
+            echo "  $0 --quick-update --suffix dev"
             echo "  $0 --delete --suffix dev"
             exit 0
             ;;

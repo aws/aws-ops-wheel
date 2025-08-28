@@ -78,16 +78,16 @@ def lookup_user_wheel_group_info(user_email: str) -> dict:
     Look up wheel group information from DynamoDB based on user email (inline copy)
     """
     import boto3
+    from boto3.dynamodb.conditions import Attr
     try:
         # Initialize DynamoDB
         dynamodb = boto3.resource('dynamodb', region_name=os.environ.get('AWS_DEFAULT_REGION', 'us-west-2'))
         users_table = dynamodb.Table(os.environ.get('USERS_TABLE'))
         wheel_groups_table = dynamodb.Table(os.environ.get('WHEEL_GROUPS_TABLE'))
         
-        # Query Users table by email
+        # Query Users table by email using safe condition
         response = users_table.scan(
-            FilterExpression='email = :email',
-            ExpressionAttributeValues={':email': user_email}
+            FilterExpression=Attr('email').eq(user_email)
         )
         
         items = response.get('Items', [])
@@ -140,9 +140,12 @@ def lambda_handler(event, context):
     try:
         # Extract token from event
         token = event.get('authorizationToken', '')
+        logger.info(f"Received authorization token: {token[:50]}...")  # Log first 50 chars
+        logger.info(f"Full token length: {len(token)}")
+        logger.info(f"Event keys: {list(event.keys())}")
         
         if not token.startswith('Bearer '):
-            logger.info("No Bearer token found")
+            logger.info(f"Token does not start with 'Bearer ': {token}")
             raise Exception('Unauthorized')
         
         # Remove 'Bearer ' prefix

@@ -2,7 +2,7 @@
 #  Copyright 2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 import boto3
-import boto3.dynamodb.conditions
+from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 import datetime
 import os
@@ -25,14 +25,9 @@ UsersTable = dynamodb.Table(os.environ.get('USERS_TABLE') or f'OpsWheelV2-Users-
 WheelsTable = dynamodb.Table(os.environ.get('WHEELS_TABLE') or f'OpsWheelV2-Wheels-{ENVIRONMENT}')
 ParticipantsTable = dynamodb.Table(os.environ.get('PARTICIPANTS_TABLE') or f'OpsWheelV2-Participants-{ENVIRONMENT}')
 
-# Debug logging for table names
+# Import logging for proper error handling
 import logging
 logger = logging.getLogger()
-logger.info(f"[DEBUG] Environment: {ENVIRONMENT}")
-logger.info(f"[DEBUG] WheelGroupsTable name: {WheelGroupsTable.name}")
-logger.info(f"[DEBUG] UsersTable name: {UsersTable.name}")
-logger.info(f"[DEBUG] WheelsTable name: {WheelsTable.name}")
-logger.info(f"[DEBUG] ParticipantsTable name: {ParticipantsTable.name}")
 
 
 def add_extended_table_functions(table):
@@ -94,7 +89,7 @@ def get_uuid() -> str:
 
 def get_utc_timestamp() -> str:
     """Get current UTC timestamp in ISO format"""
-    return datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def to_update_kwargs(attributes: Dict[str, Any]) -> Dict[str, Any]:
@@ -176,47 +171,33 @@ class WheelGroupRepository:
     @staticmethod
     def get_wheel_group(wheel_group_id: str) -> Dict[str, Any]:
         """Get wheel group by ID"""
-        logger.info(f"[WheelGroupRepository.get_wheel_group] Input: {wheel_group_id} (type: {type(wheel_group_id)})")
-        
         # Defensive check for None or invalid wheel_group_id
         if wheel_group_id is None:
-            import traceback
-            stack_trace = traceback.format_stack()
-            logger.error(f"[WheelGroupRepository.get_wheel_group] Called with None wheel_group_id - this indicates a logic error")
-            logger.error(f"[WheelGroupRepository.get_wheel_group] FULL STACK TRACE:")
-            for line in stack_trace:
-                logger.error(f"[STACK] {line.strip()}")
             raise ValueError("wheel_group_id cannot be None. This typically happens when a deployment admin's wheel_group_id is incorrectly used.")
         
         if not isinstance(wheel_group_id, str) or not wheel_group_id.strip():
-            logger.error(f"[WheelGroupRepository.get_wheel_group] Invalid wheel_group_id: {repr(wheel_group_id)}")
             raise ValueError(f"wheel_group_id must be a non-empty string, got: {repr(wheel_group_id)}")
         
         key = {'wheel_group_id': wheel_group_id}
-        logger.info(f"[WheelGroupRepository.get_wheel_group] DynamoDB Key: {key}")
-        logger.info(f"[WheelGroupRepository.get_wheel_group] Table name: {WheelGroupsTable.name}")
         
         try:
             result = WheelGroupsTable.get_existing_item(Key=key)
-            logger.info(f"[WheelGroupRepository.get_wheel_group] Success: Found wheel group")
             return result
         except Exception as e:
-            logger.error(f"[WheelGroupRepository.get_wheel_group] Error: {str(e)}")
-            logger.error(f"[WheelGroupRepository.get_wheel_group] Error type: {type(e)}")
-            import traceback
-            logger.error(f"[WheelGroupRepository.get_wheel_group] Traceback: {traceback.format_exc()}")
+            logger.error(f"Error retrieving wheel group {wheel_group_id}: {str(e)}")
             raise
     
     @staticmethod
     def update_wheel_group(wheel_group_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
         """Update wheel group information"""
         updates['updated_at'] = get_utc_timestamp()
-        WheelGroupsTable.update_item(
+        
+        response = WheelGroupsTable.update_item(
             Key={'wheel_group_id': wheel_group_id},
+            ReturnValues='ALL_NEW',
             **to_update_kwargs(updates)
         )
-        # Return updated wheel group
-        return WheelGroupsTable.get_existing_item(Key={'wheel_group_id': wheel_group_id})
+        return response['Attributes']
     
     @staticmethod
     def delete_wheel_group(wheel_group_id: str) -> None:
@@ -273,18 +254,17 @@ class UserRepository:
     @staticmethod
     def get_users_by_wheel_group(wheel_group_id: str) -> List[Dict[str, Any]]:
         """Get all users for a wheel group"""
-        response = UsersTable.query(
+        return list(UsersTable.iter_query(
             IndexName='wheel-group-role-index',
-            KeyConditionExpression=boto3.dynamodb.conditions.Key('wheel_group_id').eq(wheel_group_id)
-        )
-        return response.get('Items', [])
+            KeyConditionExpression=Key('wheel_group_id').eq(wheel_group_id)
+        ))
     
     @staticmethod
     def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
         """Get user by email"""
         response = UsersTable.query(
             IndexName='email-index',
-            KeyConditionExpression=boto3.dynamodb.conditions.Key('email').eq(email)
+            KeyConditionExpression=Key('email').eq(email)
         )
         items = response.get('Items', [])
         return items[0] if items else None
@@ -293,11 +273,13 @@ class UserRepository:
     def update_user(user_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
         """Update user information"""
         updates['updated_at'] = get_utc_timestamp()
-        UsersTable.update_item(
+        
+        response = UsersTable.update_item(
             Key={'user_id': user_id},
+            ReturnValues='ALL_NEW',
             **to_update_kwargs(updates)
         )
-        return UsersTable.get_existing_item(Key={'user_id': user_id})
+        return response['Attributes']
     
     @staticmethod
     def update_user_role(user_id: str, new_role: str) -> Dict[str, Any]:
@@ -321,6 +303,12 @@ class WheelRepository:
     @staticmethod
     def create_wheel(wheel_group_id: str, wheel_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new wheel for a wheel group"""
+        # Validate required fields
+        if not wheel_data.get('wheel_name'):
+            raise ValueError("wheel_name is required")
+        if not wheel_data.get('created_by'):
+            raise ValueError("created_by is required")
+        
         timestamp = get_utc_timestamp()
         
         wheel = {
@@ -361,20 +349,21 @@ class WheelRepository:
     @staticmethod
     def list_wheel_group_wheels(wheel_group_id: str) -> List[Dict[str, Any]]:
         """Get all wheels for a wheel group"""
-        response = WheelsTable.query(
-            KeyConditionExpression=boto3.dynamodb.conditions.Key('wheel_group_id').eq(wheel_group_id)
-        )
-        return response.get('Items', [])
+        return list(WheelsTable.iter_query(
+            KeyConditionExpression=Key('wheel_group_id').eq(wheel_group_id)
+        ))
     
     @staticmethod
     def update_wheel(wheel_group_id: str, wheel_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
         """Update wheel information"""
         updates['updated_at'] = get_utc_timestamp()
-        WheelsTable.update_item(
+        
+        response = WheelsTable.update_item(
             Key={'wheel_group_id': wheel_group_id, 'wheel_id': wheel_id},
+            ReturnValues='ALL_NEW',
             **to_update_kwargs(updates)
         )
-        return WheelsTable.get_existing_item(Key={'wheel_group_id': wheel_group_id, 'wheel_id': wheel_id})
+        return response['Attributes']
     
     @staticmethod
     def delete_wheel(wheel_group_id: str, wheel_id: str) -> None:
@@ -385,7 +374,7 @@ class WheelRepository:
         # Delete all participants
         wheel_group_wheel_id = create_wheel_group_wheel_id(wheel_group_id, wheel_id)
         participants = ParticipantsTable.query(
-            KeyConditionExpression=boto3.dynamodb.conditions.Key('wheel_group_wheel_id').eq(wheel_group_wheel_id),
+            KeyConditionExpression=Key('wheel_group_wheel_id').eq(wheel_group_wheel_id),
             ProjectionExpression='participant_id'
         )
         
@@ -436,11 +425,11 @@ class ParticipantRepository:
     def list_wheel_participants(wheel_group_id: str, wheel_id: str) -> List[Dict[str, Any]]:
         """Get all participants for a wheel"""
         wheel_group_wheel_id = create_wheel_group_wheel_id(wheel_group_id, wheel_id)
-        response = ParticipantsTable.query(
-            KeyConditionExpression=boto3.dynamodb.conditions.Key('wheel_group_wheel_id').eq(wheel_group_wheel_id)
-        )
+        participants = list(ParticipantsTable.iter_query(
+            KeyConditionExpression=Key('wheel_group_wheel_id').eq(wheel_group_wheel_id)
+        ))
         # Convert Decimal objects to float for JSON serialization
-        return [decimal_to_float(item) for item in response.get('Items', [])]
+        return [decimal_to_float(item) for item in participants]
     
     @staticmethod
     def update_participant(wheel_group_id: str, wheel_id: str, participant_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
@@ -454,14 +443,12 @@ class ParticipantRepository:
         if 'original_weight' in updates:
             updates['original_weight'] = Decimal(str(updates['original_weight']))
         
-        ParticipantsTable.update_item(
+        response = ParticipantsTable.update_item(
             Key={'wheel_group_wheel_id': wheel_group_wheel_id, 'participant_id': participant_id},
+            ReturnValues='ALL_NEW',
             **to_update_kwargs(updates)
         )
-        return ParticipantsTable.get_existing_item(Key={
-            'wheel_group_wheel_id': wheel_group_wheel_id,
-            'participant_id': participant_id
-        })
+        return response['Attributes']
     
     @staticmethod
     def delete_participant(wheel_group_id: str, wheel_id: str, participant_id: str) -> Optional[Dict[str, Any]]:

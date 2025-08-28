@@ -144,7 +144,6 @@ def create_cognito_user(email: str, username: str, wheel_group_id: str) -> str:
     except cognito_client.exceptions.UsernameExistsException:
         raise BadRequestError(f"A user with email {email} already exists")
     except Exception as e:
-        print(f"[ERROR] Failed to create Cognito user: {str(e)}")
         raise BadRequestError(f"Failed to create user in authentication system: {str(e)}")
 
 
@@ -158,12 +157,11 @@ def delete_cognito_user(email: str) -> None:
             UserPoolId=user_pool_id,
             Username=email
         )
-        print(f"[DEBUG] Deleted Cognito user: {email}")
     except cognito_client.exceptions.UserNotFoundException:
-        print(f"[DEBUG] User {email} not found in Cognito (already deleted?)")
-    except Exception as e:
-        print(f"[ERROR] Failed to delete Cognito user: {str(e)}")
+        pass  # User already deleted, that's ok
+    except Exception:
         # Don't fail the request if Cognito deletion fails
+        pass
 
 
 @require_auth()
@@ -439,9 +437,9 @@ def create_wheel_group_user(event, context=None):
             for existing_user in existing_users:
                 if existing_user.get('name', '').lower() == body['username'].lower():
                     raise BadRequestError(f"Username '{body['username']}' is already taken in this wheel group")
-        except Exception as e:
-            # If we can't check existing users, log the error but don't fail
-            print(f"[WARNING] Could not check existing usernames: {str(e)}")
+        except Exception:
+            # If we can't check existing users, continue with user creation
+            pass
         
         # Create user in Cognito first to get the Cognito sub (user ID)
         cognito_client = boto3.client('cognito-idp')
@@ -476,7 +474,6 @@ def create_wheel_group_user(event, context=None):
         except cognito_client.exceptions.UsernameExistsException:
             raise BadRequestError(f"A user with username {body['username']} already exists")
         except Exception as e:
-            print(f"[ERROR] Failed to create Cognito user: {str(e)}")
             raise BadRequestError(f"Failed to create user in authentication system: {str(e)}")
         
         # Create user data using the Cognito user ID as the DynamoDB user_id
@@ -560,7 +557,6 @@ def update_user_role(event, context=None):
         
         # Update Cognito user attributes (skip role since it's not in schema)
         # Role is stored in DynamoDB and used by authorizer
-        print(f"[DEBUG] Updated user role in DynamoDB: {user['email']} -> {new_role}")
         
         return {
             'statusCode': 200,
@@ -802,12 +798,10 @@ def delete_wheel_group_user(event, context=None):
                 UserPoolId=user_pool_id,
                 Username=user['name']  # Use username (stored in 'name' field) for Cognito
             )
-            print(f"[DEBUG] Deleted Cognito user: {user['name']}")
         except cognito_client.exceptions.UserNotFoundException:
             # User already deleted from Cognito, that's ok
-            print(f"[DEBUG] User {user['name']} not found in Cognito (already deleted?)")
-        except Exception as e:
-            print(f"[ERROR] Failed to delete Cognito user: {str(e)}")
+            pass
+        except Exception:
             # Don't fail the request if Cognito deletion fails
             pass
         
@@ -1001,38 +995,30 @@ def delete_wheel_group_recursive(event, context=None):
         wheel_group_id = wheel_group_context['wheel_group_id']
         current_user_id = wheel_group_context['user_id']
         
-        print(f"[DEBUG] Starting recursive deletion of wheel group: {wheel_group_id}")
-        
-        # Get wheel group info for logging
+        # Get wheel group info for response
         try:
             wheel_group = WheelGroupRepository.get_wheel_group(wheel_group_id)
             wheel_group_name = wheel_group.get('wheel_group_name', 'Unknown')
-            print(f"[DEBUG] Deleting wheel group '{wheel_group_name}' (ID: {wheel_group_id})")
-        except Exception as e:
-            print(f"[WARNING] Could not get wheel group info: {str(e)}")
+        except Exception:
             wheel_group_name = 'Unknown'
         
         cognito_client = boto3.client('cognito-idp')
         user_pool_id = os.environ.get('COGNITO_USER_POOL_ID')
         
         # Step 1: Delete all wheels for this wheel group (this will also delete their participants)
-        print(f"[DEBUG] Step 1: Deleting wheels for wheel group {wheel_group_id}")
         try:
             wheels = WheelRepository.list_wheel_group_wheels(wheel_group_id)
-            print(f"[DEBUG] Found {len(wheels)} wheels to delete")
             
             for wheel in wheels:
                 try:
                     WheelRepository.delete_wheel(wheel_group_id, wheel['wheel_id'])
-                    print(f"[DEBUG] Deleted wheel: {wheel['wheel_id']}")
-                except Exception as e:
-                    print(f"[ERROR] Failed to delete wheel {wheel['wheel_id']}: {str(e)}")
+                except Exception:
+                    pass  # Continue with other wheels if one fails
                     
-        except Exception as e:
-            print(f"[ERROR] Failed to delete wheels: {str(e)}")
+        except Exception:
+            pass  # Continue with cleanup
         
         # Step 2: Clean up any remaining participants (in case of orphaned records)
-        print(f"[DEBUG] Step 2: Cleaning up any remaining participants for wheel group {wheel_group_id}")
         try:
             # Scan participants table for any remaining records with this wheel_group_id
             # Since participant keys use wheel_group_wheel_id format, we need to scan
@@ -1041,26 +1027,21 @@ def delete_wheel_group_recursive(event, context=None):
                 if item.get('wheel_group_wheel_id', '').startswith(f"{wheel_group_id}#"):
                     remaining_participants.append(item)
             
-            print(f"[DEBUG] Found {len(remaining_participants)} remaining participants to clean up")
-            
             for participant in remaining_participants:
                 try:
                     ParticipantsTable.delete_item(Key={
                         'wheel_group_wheel_id': participant['wheel_group_wheel_id'],
                         'participant_id': participant['participant_id']
                     })
-                    print(f"[DEBUG] Cleaned up participant: {participant['participant_id']}")
-                except Exception as e:
-                    print(f"[ERROR] Failed to cleanup participant {participant['participant_id']}: {str(e)}")
+                except Exception:
+                    pass  # Continue with other participants
                     
-        except Exception as e:
-            print(f"[ERROR] Failed to cleanup participants: {str(e)}")
+        except Exception:
+            pass  # Continue with cleanup
         
         # Step 3: Delete all users for this wheel group (both DynamoDB and Cognito)
-        print(f"[DEBUG] Step 3: Deleting users for wheel group {wheel_group_id}")
         try:
             users = UserRepository.get_users_by_wheel_group(wheel_group_id)
-            print(f"[DEBUG] Found {len(users)} users to delete")
             
             for user in users:
                 user_id = user['user_id']
@@ -1072,32 +1053,25 @@ def delete_wheel_group_recursive(event, context=None):
                         UserPoolId=user_pool_id,
                         Username=username  # Use username (stored in 'name' field) for Cognito
                     )
-                    print(f"[DEBUG] Deleted Cognito user: {username}")
                 except cognito_client.exceptions.UserNotFoundException:
-                    print(f"[DEBUG] User {username} not found in Cognito (already deleted?)")
-                except Exception as e:
-                    print(f"[ERROR] Failed to delete Cognito user {username}: {str(e)}")
+                    pass  # User already deleted
+                except Exception:
+                    pass  # Continue with other users
                 
                 # Delete from DynamoDB
                 try:
                     UserRepository.delete_user(user_id)
-                    print(f"[DEBUG] Deleted DynamoDB user: {user_id}")
-                except Exception as e:
-                    print(f"[ERROR] Failed to delete DynamoDB user {user_id}: {str(e)}")
+                except Exception:
+                    pass  # Continue with other users
                     
-        except Exception as e:
-            print(f"[ERROR] Failed to delete users: {str(e)}")
+        except Exception:
+            pass  # Continue with cleanup
         
         # Step 4: Finally delete the wheel group itself
-        print(f"[DEBUG] Step 4: Deleting wheel group {wheel_group_id}")
         try:
             WheelGroupRepository.delete_wheel_group(wheel_group_id)
-            print(f"[DEBUG] Successfully deleted wheel group: {wheel_group_id}")
         except Exception as e:
-            print(f"[ERROR] Failed to delete wheel group {wheel_group_id}: {str(e)}")
             raise BadRequestError(f"Failed to delete wheel group: {str(e)}")
-        
-        print(f"[DEBUG] Recursive deletion completed for wheel group: {wheel_group_id}")
         
         return {
             'statusCode': 200,

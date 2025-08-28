@@ -184,6 +184,10 @@ def create_wheel(event, context=None):
     wheel_group_context = get_wheel_group_context(event)
     body = parse_request_body(event)
     
+    # Validate wheel group context exists and has valid wheel_group_id
+    if not wheel_group_context or not wheel_group_context.get('wheel_group_id'):
+        raise BadRequestError("No wheel group associated with user. Deployment admins cannot create wheels within wheel groups.")
+    
     # Validate required fields
     validate_wheel_name(body.get('wheel_name'))
     

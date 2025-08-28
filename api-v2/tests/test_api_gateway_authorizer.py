@@ -308,8 +308,8 @@ def test_lookup_user_wheel_group_info_database_error(mock_boto3_resource):
     mock_boto3_resource.return_value = mock_dynamodb_resource
     mock_dynamodb_resource.Table.return_value = mock_users_table
     
-    # Mock database error
-    mock_users_table.query.side_effect = Exception("DynamoDB connection failed")
+    # Mock database error - use scan method since that's what the implementation uses
+    mock_users_table.scan.side_effect = Exception("DynamoDB connection failed")
     
     with pytest.raises(ValueError, match="Failed to lookup user wheel group info"):
         lookup_user_wheel_group_info('test@example.com')

@@ -202,7 +202,7 @@ def test_lookup_user_wheel_group_info_user_not_found(mock_boto3_resource):
     mock_boto3_resource.return_value = mock_dynamodb_resource
     mock_dynamodb_resource.Table.return_value = mock_users_table
     
-    mock_users_table.query.return_value = {'Items': []}
+    mock_users_table.scan.return_value = {'Items': []}
     
     with pytest.raises(ValueError, match="User not found in database: nonexistent@example.com"):
         lookup_user_wheel_group_info('nonexistent@example.com')
@@ -217,7 +217,7 @@ def test_lookup_user_wheel_group_info_database_error(mock_boto3_resource):
     mock_boto3_resource.return_value = mock_dynamodb_resource
     mock_dynamodb_resource.Table.return_value = mock_users_table
     
-    mock_users_table.query.side_effect = Exception("DynamoDB connection failed")
+    mock_users_table.scan.side_effect = Exception("DynamoDB connection failed")
     
     with pytest.raises(ValueError, match="Failed to lookup user wheel group info"):
         lookup_user_wheel_group_info('test@example.com')
@@ -700,10 +700,17 @@ def test_middleware_handles_malicious_payloads(mock_lookup):
                 # If successful, ensure values are safely handled
                 context = result['wheel_group_context']
                 for key, value in context.items():
-                    assert isinstance(value, (str, bool, type(None))), f"Context value {key} should be safe type"
-        except Exception:
-            # Expected for malicious input
-            pass
+                    if key == 'permissions':
+                        # Permissions is a dictionary of boolean values
+                        assert isinstance(value, dict), f"Permissions should be a dictionary"
+                        for perm_key, perm_value in value.items():
+                            assert isinstance(perm_key, str), f"Permission key should be string"
+                            assert isinstance(perm_value, bool), f"Permission value should be boolean"
+                    else:
+                        assert isinstance(value, (str, bool, type(None))), f"Context value {key} should be safe type"
+        except (ValueError, KeyError) as e:
+            # Expected for malicious input - specific exceptions only
+            pytest.fail(f"Unexpected exception with malicious payload: {e}")
 
 
 @patch.dict(os.environ, {'COGNITO_USER_POOL_ID': 'us-west-2_TestPool', 'COGNITO_CLIENT_ID': 'test-client-id'})

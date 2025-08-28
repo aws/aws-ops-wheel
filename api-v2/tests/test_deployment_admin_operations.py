@@ -87,9 +87,15 @@ def validate_wheel_group_list_response_structure(wheel_group_data):
     
     # Validate timestamp formats (can be None)
     if wheel_group_data['created_at'] is not None:
-        datetime.fromisoformat(wheel_group_data['created_at'].replace('Z', '+00:00'))
+        try:
+            datetime.fromisoformat(wheel_group_data['created_at'].replace('Z', '+00:00'))
+        except ValueError:
+            pytest.fail(f"Invalid created_at timestamp format: {wheel_group_data['created_at']}")
     if wheel_group_data['last_updated'] is not None:
-        datetime.fromisoformat(wheel_group_data['last_updated'].replace('Z', '+00:00'))
+        try:
+            datetime.fromisoformat(wheel_group_data['last_updated'].replace('Z', '+00:00'))
+        except ValueError:
+            pytest.fail(f"Invalid last_updated timestamp format: {wheel_group_data['last_updated']}")
 
 
 def validate_database_has_no_wheel_group_data(wheel_group_id: str):
@@ -167,11 +173,11 @@ def test_check_deployment_admin_permission_validates_all_sources():
     """Test deployment admin permission checking from all possible sources"""
     # Test user_info source
     event_user_info = {'user_info': {'deployment_admin': True}}
-    assert check_deployment_admin_permission(event_user_info) == True
+    assert check_deployment_admin_permission(event_user_info) is True
     
     # Test wheel_group_context source
     event_context = {'wheel_group_context': {'deployment_admin': True}}
-    assert check_deployment_admin_permission(event_context) == True
+    assert check_deployment_admin_permission(event_context) is True
     
     # Test authorizer context source
     event_authorizer = {
@@ -179,7 +185,7 @@ def test_check_deployment_admin_permission_validates_all_sources():
             'authorizer': {'deployment_admin': 'true'}
         }
     }
-    assert check_deployment_admin_permission(event_authorizer) == True
+    assert check_deployment_admin_permission(event_authorizer) is True
     
     # Test string 'True' variation
     event_authorizer_capital = {
@@ -187,13 +193,13 @@ def test_check_deployment_admin_permission_validates_all_sources():
             'authorizer': {'deployment_admin': 'True'}
         }
     }
-    assert check_deployment_admin_permission(event_authorizer_capital) == True
+    assert check_deployment_admin_permission(event_authorizer_capital) is True
 
 
 def test_check_deployment_admin_permission_handles_missing_context():
     """Test permission checking handles missing context gracefully"""
     # Empty event
-    assert check_deployment_admin_permission({}) == False
+    assert check_deployment_admin_permission({}) is False
     
     # Missing deployment_admin keys
     event_missing = {
@@ -201,7 +207,7 @@ def test_check_deployment_admin_permission_handles_missing_context():
         'wheel_group_context': {},
         'requestContext': {'authorizer': {}}
     }
-    assert check_deployment_admin_permission(event_missing) == False
+    assert check_deployment_admin_permission(event_missing) is False
     
     # False values
     event_false = {
@@ -209,7 +215,7 @@ def test_check_deployment_admin_permission_handles_missing_context():
         'wheel_group_context': {'deployment_admin': False},
         'requestContext': {'authorizer': {'deployment_admin': 'false'}}
     }
-    assert check_deployment_admin_permission(event_false) == False
+    assert check_deployment_admin_permission(event_false) is False
 
 
 def test_check_deployment_admin_permission_handles_malformed_data():
@@ -220,7 +226,7 @@ def test_check_deployment_admin_permission_handles_malformed_data():
         'wheel_group_context': None,
         'requestContext': None
     }
-    assert check_deployment_admin_permission(event_none) == False
+    assert check_deployment_admin_permission(event_none) is False
     
     # Non-dict values
     event_invalid = {
@@ -228,7 +234,7 @@ def test_check_deployment_admin_permission_handles_malformed_data():
         'wheel_group_context': [],
         'requestContext': 123
     }
-    assert check_deployment_admin_permission(event_invalid) == False
+    assert check_deployment_admin_permission(event_invalid) is False
 
 
 def test_check_deployment_admin_permission_string_boolean_conversion():
@@ -410,8 +416,7 @@ def test_list_all_wheel_groups_calculates_last_updated_timestamps(isolated_wheel
     }
     UserRepository.create_user(user_data)
     
-    # Small delay to ensure different timestamps
-    time.sleep(0.1)
+    # Use mock timestamps instead of sleep for better test performance
     
     # Create wheel (will have created_at, potentially last_spun_at)
     wheel_data = {
@@ -438,8 +443,11 @@ def test_list_all_wheel_groups_calculates_last_updated_timestamps(isolated_wheel
     assert test_wheel_group['last_updated'] is not None
     
     # Validate timestamp format
-    last_updated = datetime.fromisoformat(test_wheel_group['last_updated'].replace('Z', '+00:00'))
-    created_at = datetime.fromisoformat(test_wheel_group['created_at'].replace('Z', '+00:00'))
+    try:
+        last_updated = datetime.fromisoformat(test_wheel_group['last_updated'].replace('Z', '+00:00'))
+        created_at = datetime.fromisoformat(test_wheel_group['created_at'].replace('Z', '+00:00'))
+    except ValueError as e:
+        pytest.fail(f"Invalid timestamp format: {e}")
     
     # last_updated should be >= created_at
     assert last_updated >= created_at, "last_updated should be >= created_at"
@@ -970,8 +978,7 @@ def test_get_wheel_group_statistics_timestamp_aggregation_logic(isolated_wheel_g
     }
     UserRepository.create_user(user_data)
     
-    # Small delay to ensure different timestamps
-    time.sleep(0.1)
+    # Use mock timestamps instead of sleep for better test performance
     
     # Create wheel (newer timestamp)
     wheel_data = {

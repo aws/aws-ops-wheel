@@ -1708,8 +1708,5 @@ def test_validate_participant_response_structure_catches_constraint_violations()
         'updated_at': '2023-01-01T00:00:00Z'
     }
     
-    try:
+    with pytest.raises(AssertionError):
         validate_participant_response_structure(constraint_violating_participant)
-        assert False, "Should raise assertion error for constraint violation"
-    except AssertionError:
-        pass  # Expected

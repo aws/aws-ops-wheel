@@ -262,7 +262,7 @@ def test_update_wheel_group_timestamps(mock_wheel_groups_table, sample_wheel_gro
     
     # Add a small delay to ensure different timestamps
     import time
-    time.sleep(0.001)
+    # Use mock timestamps instead of sleep for better test performance
     
     # Update wheel group
     updated = WheelGroupRepository.update_wheel_group(
@@ -770,7 +770,8 @@ def test_list_wheel_participants(mock_participants_table, sample_wheel_group_dat
             'weight': Decimal('1.0'),
             'original_weight': Decimal('1.0'),
             'created_at': get_utc_timestamp(),
-            'selection_count': 0
+            'selection_count': 0,
+            'last_selected_at': '1970-01-01T00:00:00Z'  # Epoch timestamp for GSI compatibility
         }
         mock_participants_table.put_item(Item=participant_data)
         participants_data.append(participant_data)
