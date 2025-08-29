@@ -76,7 +76,6 @@ def check_deployment_admin_permission(event):
     Returns True if authorized, False otherwise
     """
     try:
-        logger.info(f"[DEBUG] Checking deployment admin permission for event: {json.dumps(event, default=str)}")
         
         # Get user info from authenticated event
         user_info = event.get('user_info', {})
@@ -85,9 +84,6 @@ def check_deployment_admin_permission(event):
         # Also check API Gateway authorizer context
         authorizer_context = event.get('requestContext', {}).get('authorizer', {})
         
-        logger.info(f"[DEBUG] user_info: {user_info}")
-        logger.info(f"[DEBUG] wheel_group_context: {wheel_group_context}")
-        logger.info(f"[DEBUG] authorizer_context: {authorizer_context}")
         
         # Check all locations for deployment admin flag
         deployment_admin = (
@@ -95,8 +91,7 @@ def check_deployment_admin_permission(event):
             wheel_group_context.get('deployment_admin', False) or
             str(authorizer_context.get('deployment_admin', '')).lower() == 'true'  # Handle both 'True' and 'true'
         )
-        
-        logger.info(f"[DEBUG] deployment_admin flag: {deployment_admin}")
+
         
         if not deployment_admin:
             logger.warning(f"User attempted admin operation without deployment admin privileges")
@@ -104,8 +99,7 @@ def check_deployment_admin_permission(event):
             logger.warning(f"Available wheel_group_context keys: {list(wheel_group_context.keys())}")
             logger.warning(f"Available authorizer_context keys: {list(authorizer_context.keys())}")
             return False
-            
-        logger.info(f"[DEBUG] Deployment admin access granted")
+
         return True
         
     except Exception as e:

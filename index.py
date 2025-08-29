@@ -301,8 +301,6 @@ class RouteRegistry:
             if len(path_parts) > 2:
                 path_without_stage = '/' + '/'.join(path_parts[2:])
         
-        logger.info(f"[ROUTING DEBUG] Original path: {request_path}, Path without stage: {path_without_stage}")
-        
         for route in self.routes:
             if self._matches_pattern(path_without_stage, route.patterns) and HttpMethod(method) in route.methods:
                 return route
@@ -317,11 +315,9 @@ class RouteRegistry:
     
     def _match_single_pattern(self, request_path: str, pattern: str) -> bool:
         """Check if request path matches a single pattern"""
-        logger.info(f"[ROUTING DEBUG] Matching pattern '{pattern}' against path '{request_path}'")
         
         # Handle exact matches first
         if pattern == request_path:
-            logger.info(f"[ROUTING DEBUG] Exact match: {pattern} == {request_path}")
             return True
         
         # Handle patterns with path variables (e.g., {wheel_id})
@@ -330,25 +326,20 @@ class RouteRegistry:
             path_parts = request_path.split('/')
             
             if len(pattern_parts) != len(path_parts):
-                logger.info(f"[ROUTING DEBUG] Path variable pattern length mismatch: {len(pattern_parts)} != {len(path_parts)}")
                 return False
             
             for pattern_part, path_part in zip(pattern_parts, path_parts):
                 if pattern_part.startswith('{') and pattern_part.endswith('}'):
                     continue  # Skip path variables
                 elif pattern_part != path_part:
-                    logger.info(f"[ROUTING DEBUG] Path variable pattern part mismatch: {pattern_part} != {path_part}")
                     return False
-            logger.info(f"[ROUTING DEBUG] Path variable pattern matched!")
             return True
         
         # Handle special endpoint matching (but be precise to avoid conflicts)
         # Only use contains matching for very specific cases
         if pattern == '/config' and request_path.endswith('/config'):
-            logger.info(f"[ROUTING DEBUG] Config pattern matched")
             return True
         if pattern == '/auth/me' and request_path.endswith('/auth/me'):
-            logger.info(f"[ROUTING DEBUG] Auth/me pattern matched")
             return True
         
         # For wheel-group patterns, be more specific to avoid conflicts with admin routes
@@ -357,10 +348,7 @@ class RouteRegistry:
             match = (request_path.endswith('/wheel-group') and 
                     '/admin/wheel-group' not in request_path and
                     '/admin/wheel-groups' not in request_path)
-            logger.info(f"[ROUTING DEBUG] Wheel-group pattern check: ends with /wheel-group: {request_path.endswith('/wheel-group')}, has admin: {'/admin/wheel-group' in request_path or '/admin/wheel-groups' in request_path}, match: {match}")
             return match
-        
-        logger.info(f"[ROUTING DEBUG] No pattern match for '{pattern}' against '{request_path}'")
         return False
     
     # Handler creation methods for multi-method routes
@@ -485,7 +473,6 @@ class LambdaHandler:
 
 # Global handler instance
 _handler = LambdaHandler()
-
 
 def lambda_handler(event: Dict, context: Any) -> Dict:
     """

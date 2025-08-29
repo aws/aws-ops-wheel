@@ -1567,12 +1567,6 @@ class TestAdminWorkflows:
         else:
             print(f"[ADMIN] ⚠️ Admin user details failed: {response.status_code}")
         
-        # Optional: Admin can delete users (uncomment to test deletion)
-        # response = admin_client.delete(f'/wheel-group/users/{wheel_admin_user_id}')
-        # if response.is_success:
-        #     print(f"[ADMIN] ✅ Admin can delete users: {wheel_admin_username}")
-        # else:
-        #     print(f"[ADMIN] ⚠️ Admin user deletion failed: {response.status_code}")
         
         print("[ADMIN] ✅ User role management workflow completed successfully")
         print(f"[ADMIN] Summary: Created WHEEL_ADMIN → Verified permissions → Changed to USER → Verified restricted permissions")

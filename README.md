@@ -1,68 +1,41 @@
-# Introduction
-The AWS Ops Wheel is a tool that simulates a random selection from a group of participants that weights away from participants recently chosen. For any group, the selection can also be rigged to suggest a particular participant that will be selected in a blatantly obvious (and sometimes hilarious) way.
+# AWS Ops Wheel - Enhanced Multi-Tenant Edition
 
-Get your own in just a few clicks by starting here: [![Launch the Wheel](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-west-2.console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/create/review?filter=active&templateURL=https:%2F%2Fs3-us-west-2.amazonaws.com%2Faws-ops-wheel%2Fcloudformation-template.yml&stackName=AWSOpsWheel)
+The AWS Ops Wheel is a tool that simulates a random selection from a group of participants that weights away from participants recently chosen. For any group, the selection can also be rigged to suggest a particular participant that will be selected in a blatantly obvious (and sometimes hilarious) way. **Version 2.0** introduces multi-tenant architecture, advanced user management, and enterprise-grade security features.
 
-Or, simply set up a CloudFormation stack using the S3 template url: https://s3-us-west-2.amazonaws.com/aws-ops-wheel/cloudformation-template.yml
+## Quick Start (Recommended V2)
 
-**We are aware of an [issue](/../../issues/3) where you can only run this stack in us-west-2 if you launch from this template, we are working on removing this limitation. This limitation does not apply if you build your own stack using the Development Guide below.**
+Deploy the enhanced multi-tenant version with advanced features:
 
-The endpoint will then be in the CloudFormation Stack Output messages.
+**Option 1: V2 Deployment (Recommended)**
+```bash
+./deploy-v2.sh --suffix dev --admin-email your@email.com
+```
 
-## ScreenShots
-### Wheels Table
-![Wheels Table](screenshots/wheels_table.png)
-### Participants Table
-![Participants Table](screenshots/participants_table.png)
-### Wheel (pre-spin)
-![Participants Table](screenshots/wheel_pre_spin.png)
-### Wheel (post-spin)
-![Participants Table](screenshots/wheel_post_spin.png)
+**Option 2: Legacy V1 Deployment**
+```bash
+./deploy.sh --email your@email.com --suffix dev
+```
+## Version Comparison
 
-# User Guide
-## Concepts
-**Wheel**
-  A group of participants that can be selected from. Users can get a suggestion of a participant from a wheel that is weighted away from recently-chosen participants.
+| Feature | V1 (Legacy) | V2 (Enhanced) |
+|---------|-------------|---------------|
+| Architecture | Single-tenant | **Multi-tenant with Wheel Groups** |
+| User Management | Basic Cognito | **Advanced roles & permissions** |
+| Security | Standard | **Fine-grained access control** |
+| Data Isolation | None | **Complete organizational separation** |
+| Role System | Admin/User | **ADMIN, WHEEL_ADMIN, USER, DEPLOYMENT_ADMIN** |
 
-**Participant**
-  A member of a wheel identified by a name, which must be unique, and also a follow-through url when they are chosen. Participants all start with a weight of 1.0.
+## How It Works
 
-## Operations
-### Wheel Operations
-- Create a new wheel
-- Edit an existing wheel
-- Delete a wheel
-- Spin the wheel and suggest a participant
-  - ***Notes:*** This does not adjust weighting, so if you're unhappy with the result, you can spin again.
-- Proceed: Accept the suggested participant
-- Reset: Restart all participants to equal weights as 1.0
+### Core Concept
+The AWS Ops Wheel provides **fair random selection** with intelligent weighting that reduces the probability of selecting recently chosen participants. This ensures balanced distribution over time while maintaining the element of surprise.
 
-### Participant Operations
-***Notes:*** Participants aren't shared between wheels
-
-- Add a participant to a wheel
-	- This requires a name and url that will be opened in a new browser tab when the participant is chosen. A participant begin with a weight of 1.0 which will always be the average weight for all participants.
-- Edit a participant's name and/or url
-- Delete a specific participant from the wheel
-- Rig a specific participant to be selected next
-    - This doesn't change any weighting, but actually bypasses the suggestion algorithm to always suggest the participant until told to proceed.
-    - After proceeding, weights are adjusted as if the participant had been selected normally.
-    - The rigging can be hidden (deceptive) or non-hidden (comical).
-
-### Authentication and User management
-AWS Ops Wheel is protected by Amazon Cognito authentication. It uses [Cognito User Pools](http://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-identity-pools.html) to manage users that have access to the deployed application.
-By default, during the initial deployment phase, it creates an `admin` user with a random password that is sent to the email address provided to the `run` script.
-During the first attempt to login to the AWS Ops Wheel, the `admin` user will be asked to change the random password to a new one.
-
-If you need to add more users that have access to the wheel application, you can add them using AWS Cognito web console or using the AWS Cli.
-
-### The Weighting algorithm
-
-Assumption: `total_weight == number_of_participants == len(wheel)`. This is because we only redistribute weights among participants and all participants start with a weight of 1.0. The below is the algorithm in python pseudo-code:
+### Selection Algorithm
+The enhanced weighting system works as follows:
 
 ```python
 def suggest_participant(wheel):
-    target_number =  len(wheel) * random()  # Get a random floating point number between 0 and the total_weight
+    target_number = len(wheel) * random()  # Random number between 0 and total_weight
     participant = None
     for participant in wheel:
         target_number -= participant.weight
@@ -71,281 +44,498 @@ def suggest_participant(wheel):
     return participant
 
 def select_participant(chosen, wheel):
-    # When there is only one participant in the wheel, the selected participant's weight remains intact.
-    # Otherwise, the remaining participant(s) get a slice of the selected participant's weight. That participant will not be chosen on next spin unless it's rigged.
-	 if len(wheel) > 1:
-	    weight_slice = chosen.weight / (len(wheel) - 1)
-	    for participant in wheel:
-	        if participant == chosen:
-	            participant.weight = 0
-	        else:
-	            participant.weight += weight_slice
+    # Redistribute weight from chosen participant to others
+    if len(wheel) > 1:
+        weight_slice = chosen.weight / (len(wheel) - 1)
+        for participant in wheel:
+            if participant == chosen:
+                participant.weight = 0  # Chosen participant gets zero weight
+            else:
+                participant.weight += weight_slice  # Others get increased weight
 ```
 
-# Development Guide
+This algorithm ensures recently chosen participants have lower probability of being selected again, promoting fairness over time.
 
-***Notes:*** The development tools are currently only written to be Linux/OSX compatible
+# Operations Guide
+
+## V2 Enhanced Operations
+
+### Wheel Group Operations
+***Notes:*** Wheel Groups are isolated organizational containers in V2's multi-tenant architecture
+
+- **Create a wheel group**: Set up a new organization with custom settings, quotas, and branding
+  - Requires wheel group name and admin user email
+  - Automatically creates the first admin user for the group
+  - Configurable resource limits (max wheels, max participants per wheel)
+  - Custom themes and organizational settings
+- **Update wheel group settings**: Modify quotas, themes, and organizational preferences
+- **View wheel group statistics**: See user count, wheel count, activity metrics, and usage analytics
+- **Delete wheel group**: Permanently remove the entire organization and ALL associated data
+  - ***Warning:*** This is irreversible and deletes all wheels, participants, and users
+
+### Enhanced Wheel Operations
+***Notes:*** Wheels are scoped to their wheel group with advanced multi-tenant features
+
+- **Create a new wheel**: Set up participant selection groups within your wheel group
+  - Supports custom names, descriptions, and selection limits
+  - Configurable participant weight defaults
+  - Optional wheel templates for consistency
+- **Edit an existing wheel**: Modify settings, appearance, and selection parameters
+- **Delete a wheel**: Remove wheel and all associated participants
+- **Multi-Select Spin**: Select multiple participants simultaneously (up to 30)
+  - ***Notes:*** Weights are adjusted proportionally for all selected participants
+- **Single Spin**: Traditional single participant selection with enhanced animations
+  - ***Notes:*** This does not adjust weighting, so if you're unhappy with the result, you can spin again
+- **Proceed**: Accept the suggested participant(s) and adjust weights accordingly
+- **Reset**: Restart all participants to equal weights as 1.0
+- **Export wheel data**: Download participant lists and selection history
+- **Duplicate wheel**: Create copies with same participants but fresh weights
+
+### Advanced Participant Operations
+***Notes:*** Participants have enhanced profiles and are isolated within wheel groups
+
+- **Add participants to a wheel**: Create new participants with rich metadata
+  - Requires name and follow-through URL that opens in a new browser tab when selected
+  - Participants begin with configurable default weight (typically 1.0)
+  - Optional email, tags, and custom attributes
+  - Batch import support via CSV upload
+- **Edit participant details**: Update name, URL, weight, tags, and metadata
+- **Delete specific participants**: Remove individuals from wheels
+- **Bulk participant management**: Mass updates, imports, and exports
+- **Advanced rigging**: Configure participants to be selected next
+  - Doesn't change actual weighting - bypasses selection algorithm temporarily
+  - After proceeding, weights adjust as if participant was selected normally
+  - Can be hidden (deceptive) or visible (comical demonstration mode)
+  - Supports multi-participant rigging for complex scenarios
+- **Participant history**: View selection history, frequency, and weight changes over time
+- **Weight management**: Fine-tune individual participant probabilities
+
+### User Management Operations (V2 Multi-Tenant)
+***Notes:*** Users belong to wheel groups with role-based permissions
+
+- **Create users**: Add team members to your wheel group with appropriate roles
+  - Supports ADMIN, WHEEL_ADMIN, and USER roles
+  - Automatic Cognito user creation with temporary passwords
+  - Email verification and welcome workflows
+- **Update user roles**: Change permissions within the wheel group
+- **Delete users**: Remove users from both the wheel group and authentication system
+- **Invite users**: Send invitations to join the wheel group
+- **User activity monitoring**: Track login history and wheel usage
+- **Bulk user import**: CSV-based user creation for large teams
+
+### Deployment Admin Operations (Platform Management)
+***Notes:*** Deployment Admins have cross-group platform oversight
+
+- **List all wheel groups**: View every organization with statistics and activity metrics
+  - See user counts, wheel counts, creation dates, and last activity
+  - System-wide usage analytics and health monitoring
+- **Delete wheel groups**: Permanently remove entire organizations (emergency use)
+  - Deletes ALL associated wheels, participants, users, and data
+  - Removes users from both DynamoDB and Cognito
+  - Complete cleanup with no recovery option
+  - ***Warning:*** This is the most destructive operation in the system
+- **System monitoring**: Platform-wide health checks and performance metrics
+- **Cross-tenant troubleshooting**: Debug issues across organizations
+- **Platform maintenance**: System updates, cleanup, and optimization
+
+## V1 Legacy Operations
+
+### Basic Wheel Operations (V1)
+***Notes:*** V1 provides single-tenant wheel management
+
+- **Create a new wheel**: Set up basic participant selection groups
+- **Edit an existing wheel**: Modify wheel settings and appearance  
+- **Delete a wheel**: Remove wheel and associated participants
+- **Spin the wheel**: Traditional single participant selection
+  - ***Notes:*** This does not adjust weighting, so if you're unhappy with the result, you can spin again
+- **Proceed**: Accept the suggested participant and adjust weights
+- **Reset**: Restart all participants to equal weights as 1.0
+
+### Basic Participant Operations (V1)
+***Notes:*** Participants aren't shared between wheels in V1
+
+- **Add a participant to a wheel**: Create new participants with basic information
+  - Requires name and URL that opens in a new browser tab when selected
+  - Participants begin with weight of 1.0 (average weight for all participants)
+- **Edit participant's name and/or URL**: Update basic participant information
+- **Delete specific participants**: Remove individuals from the wheel
+- **Rig a specific participant**: Configure participant to be selected next
+  - Doesn't change weighting - bypasses suggestion algorithm until proceeding
+  - After proceeding, weights adjust as if participant was selected normally
+  - Can be hidden (deceptive) or non-hidden (comical demonstration)
+
+### Authentication and User Management (V1)
+***Notes:*** V1 uses basic Cognito authentication without multi-tenant features
+
+- **Admin user management**: Simple user creation through Cognito console
+- **Password management**: Basic password reset and recovery
+- **Single organization**: All users share the same wheel instance
+
+## Screenshots
+### Wheels Table (V2 Enhanced)
+![Wheels Table](screenshots/wheels_table.png)
+*Multi-tenant wheel management with group isolation*
+
+### Participants Table (V2 Enhanced)
+![Participants Table](screenshots/participants_table.png)
+*Advanced participant management with role-based access*
+
+### Wheel Interface (Pre-spin)
+![Wheel Pre-spin](screenshots/wheel_pre_spin.png)
+*Enhanced UI with improved user experience*
+
+### Wheel Interface (Post-spin)
+![Wheel Post-spin](screenshots/wheel_post_spin.png)
+*Real-time selection with smooth animations*
+
+# User Guide
+
+## V2 Core Concepts
+
+### Wheel Groups
+**Wheel Groups** are isolated organizational containers that provide:
+- **Data Isolation**: Complete separation between organizations
+- **User Management**: Role-based access control within groups
+- **Resource Quotas**: Configurable limits for wheels and participants
+- **Custom Settings**: Organization-specific configurations
+- **Multi-Tenant Security**: Zero data leakage between groups
+
+### User Roles & Permissions
+- **ADMIN**: Full wheel group management and user administration
+- **WHEEL_ADMIN**: Wheel and participant management within the group
+- **USER**: Basic wheel operation and viewing permissions
+- **DEPLOYMENT_ADMIN**: Cross-group administrative access for platform management
+
+### Enhanced Wheel Operations
+- **Create/Edit/Delete** wheels within your wheel group
+- **Multi-Select Spin**: Select multiple participants simultaneously (up to 30)
+- **Advanced Rigging**: Hide or display rigged selections for demonstrations
+- **Wheel Templates**: Reusable wheel configurations
+- **Audit Trail**: Complete history of all wheel operations
+- **Bulk Operations**: Mass updates and configurations
+
+### Participant Management
+- **Batch Import**: CSV upload for bulk participant creation
+- **Custom Weights**: Fine-tune selection probabilities
+- **Follow-through URLs**: Direct links when participants are selected
+- **Participant Profiles**: Enhanced metadata and history tracking
+- **Group-Scoped Participants**: Complete isolation per wheel group
+
+## Legacy V1 Concepts
+V1 provides the original single-tenant experience:
+- **Single Wheel Instance**: One wheel per deployment
+- **Basic Authentication**: Simple Cognito user management  
+- **Standard Operations**: Create, spin, proceed, reset functionality
+- **Simple Participant Management**: Add/edit/delete with basic weighting
+
+# 🛠️ Development Guide
 
 ## Development Dependencies
 
-- NodeJS 6.10+
-- Python 3
-	- boto3
-	- pyaml
-  - pytest
-  - pytest-cov
-  - moto
-- AWSCLI 1.11+
-- An AWS Account you have administrator privileges on
-
-
-## A dedicated IAM User (Optional, but highly-recommended)
-- You should create a dedicated IAM User for ``AWS Ops Wheel`` development
-
-### Create a custom IAM Policy for the User
-
-- Go to the [AWS Create Policy Wizard](https://console.aws.amazon.com/iam/home?region=us-west-2#/policies$new?step=edit)
-- Go to the `JSON` tab and paste in the content of our [policy configuration](~/aws-ops-wheel/cloudformation/awsopswheel-create-policy.json)
-- Click `Review Policy`
-- Give it an identifying name (we'll need it for the next step) like *AWSOpsWheelDevelopment*
-
-### Create an IAM user with the policy attached
-
-- Got to the [AWS Create User Wizard](https://console.aws.amazon.com/iam/home?region=us-west-2#/users$new?step=details)
-- Give it a descriptive name like *AWSOpsWheelDevelopmentUser* and check the `Programmatic access` checkbox.  **Note:** It doesn't need to be the same as the name of the policy, but it might help keep your things organized
-- Click `Next: Permissions`
-- Switch to the `Attach existing policies directly` tab and filter on the name you used during the *Create custom Policy* step
-- Click the checkbox next to the policy and click `Next: Review`
-- Click `Create user`
-- On the next page, save the Access key ID and the Secret access key (visible by clicking `Show`) for use in the `AWS Cli Configuration` step.  **Note**: This will be the only opportunity to copy the Secret Access Key for this Access Key ID.  if you don't copy the secret access key now, you'll need to create a new access-key, secret-key pair for the user.
-
-
-## AWS Cli Configuration
-For the purpose of our work, we will use AWS Cli to simplify management of the resources.
-Later we will add support for the `Launch Stack` button which will be displayed on the GitHub Repo page.
-
-In `$HOME/.aws/config` add in your credentials configuration and default region, replacing with your IAM user's credentials (or your own access key and secret key if you didn't follow our highly-recommended best-practice).  **Note**: The region can be whatever region you choose, but you should definitely set a default region.  We chose us-west-2 since we're in Seattle and it's close by.
-
-```
-[default]
-aws_access_key_id = ACCESS_KEY
-aws_secret_access_key = SECRET_KEY
-region = us-west-2
-```
-
-
-
-## Test the code
-
-Currently we have unit tests for the API and the UI. 
-
-To run the API unit tests: 
-* If you haven't already, go to the ``<PATH_TO_YOUR_WORKSPACE>`` directory and install the required dependencies using:
-  ```
+### V2 Requirements (Recommended)
+- **Node.js** 16.x+ (for enhanced UI features)
+- **Python** 3.9+ (for Lambda compatibility)
+- **AWS CLI** 2.x+ with proper permissions
+- **Dependencies**:
+  ```bash
+  # Python packages
   pip install -r requirements.txt
+  
+  # Node.js packages (for UI development)  
+  cd ui-v2 && npm install
   ```
-* Go to the ``<PATH_TO_YOUR_WORKSPACE>/api`` directory and run:
-  ```
-  pytest --verbose --cov-report term-missing --cov ./ -s
-  ```
-  * If you see this error `NoRegionError: You must specify a region. `, export the region environment variable as follows:
-    `export AWS_DEFAULT_REGION=us-west-2`
 
-To run the UI unit tests, go to the ``<PATH_TO_YOUR_WORKSPACE>/ui`` directory and run:
+### V1 Requirements (Legacy Support)
+- **Node.js** 6.10+
+- **Python** 3.x
+- **AWS CLI** 1.11+
 
+## AWS Permissions & Setup
+
+### Recommended: Dedicated IAM User
+Create a dedicated IAM user for development:
+
+1. **Create Custom Policy**: Use the policy in [`cloudformation/awsopswheel-create-policy.json`](cloudformation/awsopswheel-create-policy.json)
+2. **Create IAM User**: Attach the policy and enable programmatic access
+3. **Configure AWS CLI**:
+   ```bash
+   aws configure
+   # Enter your access key, secret key, and preferred region
+   ```
+
+### Required AWS Services
+- **CloudFormation**: Stack management and nested templates
+- **Lambda**: Serverless compute with layer optimization
+- **API Gateway**: REST API hosting with enhanced security
+- **DynamoDB**: Multi-tenant data storage with isolation
+- **Cognito**: Advanced authentication with custom attributes
+- **S3**: Static hosting and build artifacts
+- **CloudFront**: Global CDN distribution (V2 enhanced deployment)
+
+## Testing
+
+### V2 Comprehensive Testing
+```bash
+# Unit Tests
+cd api-v2 && python -m pytest tests/ -v
+
+# Integration Tests  
+
+# Update Deployment
+./deploy-v2.sh --suffix test
+cd api-v2/integration-tests 
+# Setup Test Env
+./setup-test-env.sh test
+python -m pytest --verbose
+
+# Cross-tenant isolation tests
+cd api-v2/integration-tests && python -m pytest tests/test_04_cross_role_scenarios.py
 ```
-npm run test
+
+### V1 Legacy Testing
+```bash
+# API Tests
+cd api && pytest --verbose --cov-report term-missing --cov ./ -s
+
+# UI Tests
+cd ui && npm run test
 ```
 
-## Build and deploy the code
+# 🚀 Deployment Guide
 
-### Option 1: Streamlined Deployment (Recommended)
+## V2 Enhanced Deployment (Recommended)
 
-**For initial deployment:**
-```
+### Quick Deployment
+```bash
 # Full deployment with CloudFront
+./deploy-v2.sh --suffix dev --admin-email your@email.com
+
+# Multiple environments
+./deploy-v2.sh --suffix staging --admin-email admin@company.com
+./deploy-v2.sh --suffix prod --admin-email prod-admin@company.com
+```
+
+### Advanced Options
+```bash
+# Custom configuration
+./deploy-v2.sh \
+  --suffix myteam \
+  --region us-east-1 \
+  --admin-email admin@myteam.com \
+  --admin-username teamadmin
+
+# Quick app updates (no infrastructure changes)
+./deploy-v2.sh --quick-update --suffix dev
+
+# Clean removal
+./deploy-v2.sh --delete --suffix dev
+```
+
+### V2 Deployment Features
+- **Modular CloudFormation**: Nested stacks for better organization
+- **Content-Hash Layers**: Efficient Lambda layer caching and versioning
+- **Security Validation**: Pre-deployment security checks
+- **CloudFront Integration**: Global CDN deployment with cache invalidation
+- **Multi-Environment**: Support for dev/staging/prod workflows
+- **Automated Cleanup**: Old resources and layer management
+
+## V1 Legacy Deployment
+
+### Option 1: CloudFormation Launch
+Use the launch button above or deploy directly:
+```bash
+aws cloudformation create-stack \
+  --stack-name AWSOpsWheel \
+  --template-url https://s3-us-west-2.amazonaws.com/aws-ops-wheel/cloudformation-template.yml \
+  --parameters ParameterKey=AdminEmail,ParameterValue=your@email.com \
+  --capabilities CAPABILITY_IAM
+```
+
+### Option 2: Manual Build & Deploy
+```bash
+# Traditional deployment
 ./deploy.sh --email your@email.com
 
-# With custom suffix (for multiple environments)
+# With custom suffix
 ./deploy.sh --email your@email.com --suffix dev
-
 ```
 
-**For app updates:**
-```
-# Quick app update (most common use case)
-./update-app.sh
+## Post-Deployment Setup
 
-# OR using the main deploy script
-./deploy.sh --update-only
-```
+### V2 Multi-Tenant Setup
+1. **Access Application**: Use the provided CloudFront URL
+2. **Login as Deployment Admin**: Use provided temporary credentials
+3. **Create Wheel Group**: Set up your organization with custom settings
+4. **Invite Users**: Add team members with appropriate roles
+5. **Configure Quotas**: Set limits and permissions per group
+6. **Create Wheels**: Set up your selection wheels with templates
+7. **Import Participants**: Use CSV import for bulk data
 
-### Option 2: Manual Deployment
+### V1 Single-Tenant Setup  
+1. **Access Application**: Use the provided endpoint
+2. **Login**: Use Cognito credentials from email
+3. **Create Wheels**: Set up participant groups
+4. **Start Spinning**: Begin fair selection process
 
-Go to the ``<PATH_TO_YOUR_WORKSPACE>`` directory and run:
+# 🔧 Administration & Maintenance
 
-```
-$ ./run \
-  --suffix <SUFFIX, optional with default value as no suffix, so stack name will be 'AWSOpsWheel'> \
-  --email <EMAIL_ADDRESS, required only during initial stack creation> \
-  --no-clean <CLEAN_BUILD_DIRECTORY, optional with default value as False. Note that do not clean the build directory before building or remove the deploy working directory>
-```
+## V2 Administrative Features
 
-This will:
+### Deployment Admin Dashboard
+- **Cross-Group Management**: Oversight across all wheel groups
+- **System Monitoring**: Health checks and performance metrics
+- **User Management**: Create and manage deployment administrators
+- **Resource Cleanup**: Automated maintenance and optimization
+- **Security Auditing**: Access logs and compliance reporting
 
-- Create a `./build` directory with all of the build artifacts
-- Package the build artifacts up into a zip file with name based on a hash of the contents and upload it to S3 for lambda deployment
-- Compile the Service CloudFormation Template:
-    - Create the lambda functions for all of the routes in the API
-    - Add policies for lambda functions to be called by the gateway's functions
-    - Create/update the DynamoDB Tables
-    - Create the lambda execution IAM role
-    - Create the swagger configuration for API Gateway that points the paths to their functions
-- Deploy the template directly to CloudFormation through update or create, depending on if it's a new stack
+### Wheel Group Management
+- **Organization Setup**: Create isolated wheel groups
+- **Quota Management**: Configure resource limits per group
+- **User Role Assignment**: Fine-grained permission control
+- **Data Export/Import**: Backup and migration capabilities
+- **Custom Branding**: Theme and appearance customization
 
-**Get Your Resource IDs**
-```
-# Run this script to get your resource information
-API_GATEWAY_ID=$(aws cloudformation describe-stacks --stack-name AWSOpsWheel --query 'Stacks[0].Outputs[?OutputKey==`AWSOpsWheelAPI`].OutputValue' --output text --region us-west-2)
-S3_BUCKET=$(aws cloudformation list-stack-resources --stack-name AWSOpsWheelSourceBucket --query 'StackResourceSummaries[?LogicalResourceId==`SourceS3Bucket`].PhysicalResourceId' --output text --region us-west-2)
-STATIC_DIR=$(aws s3 ls s3://$S3_BUCKET/ | grep static_ | awk '{print $2}' | sed 's|/||')
+### Multi-Tenant Security
+- **Data Isolation**: Complete separation between wheel groups
+- **Role-Based Access**: Granular permissions at multiple levels
+- **Audit Trails**: Comprehensive logging of all operations
+- **Secure APIs**: Authentication and authorization at every endpoint
+- **Cross-Tenant Protection**: Zero data leakage guarantees
 
-echo "API Gateway: $API_GATEWAY_ID"
-echo "S3 Bucket: $S3_BUCKET"
-echo "Static Directory: $STATIC_DIR"
-```
+## V1 Administrative Features
+- **Basic User Management**: Simple Cognito administration
+- **Wheel Operations**: Standard create/edit/delete functionality
+- **Participant Import**: CSV upload using utility script
+- **Simple Monitoring**: Basic CloudFormation stack management
 
-**Deploy CloudFront**
-```
-sed -i.bak \
-  -e "s/__PLACEHOLDER_BUCKET_NAME__/$S3_BUCKET/g" \
-  -e "s/__PLACEHOLDER_API_DOMAIN__/$API_GATEWAY_ID.execute-api.$REGION.amazonaws.com/g" \
-  -e "s/__PLACEHOLDER_STATIC_DIR__/$STATIC_DIR/g" \
-  cloudformation/s3-cloudfront-secure.yml
+# 🔄 Migration Guide
 
-aws cloudformation create-stack \
-  --stack-name AWSOpsWheel-CloudFront \
-  --template-body file://cloudformation/s3-cloudfront-secure.yml \
-  --region us-west-2
+## Migrating from V1 to V2
 
-aws cloudformation wait stack-create-complete --stack-name AWSOpsWheel-CloudFront --region us-west-2
-```
+### Pre-Migration Assessment
+1. **Data Inventory**: Document existing wheels and participants
+2. **User Mapping**: Plan role assignments for V2 structure
+3. **Backup Creation**: Export all V1 data using utility scripts
+4. **Environment Planning**: Design wheel group structure
 
-This will update template with your resources and deploy (takes 5-20 minutes)
+### Migration Process
+1. **Deploy V2**: Set up new V2 environment alongside V1
+2. **Create Wheel Groups**: Establish organizational structure
+3. **User Migration**: Create V2 users with appropriate roles
+4. **Data Import**: Use CSV tools to migrate wheels and participants
+5. **Testing Phase**: Validate all functionality in V2
+6. **Cutover**: Switch users to V2 and decommission V1
 
-**Configure & Rebuild Frontend**
+### Migration Tools
+```bash
+# Export V1 data (use existing utility)
+cd utils && python wheel_feeder.py --export --wheel-url <V1_URL>
 
-Recommended: Use the streamlined deployment script
-```
-# This handles everything automatically, including cleanup
-./deploy.sh --update-only
-```
-
-**Alternative: Manual approach**
-
-Get CloudFront domain
-```
-CLOUDFRONT_DOMAIN=$(aws cloudformation describe-stacks --stack-name AWSOpsWheel-CloudFront --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDomainName`].OutputValue' --output text --region us-west-2)
+# Import to V2 (enhanced CSV support)
+# Use V2 UI for bulk import or API endpoints
 ```
 
-Point frontend to CloudFront
-```
-echo "module.exports = 'https://$CLOUDFRONT_DOMAIN';" > ui/development_app_location.js
-```
-Rebuild and deploy (with fixed static directory selection)
-```
-./run build_ui
-NEW_STATIC_DIR=$(ls -t build/ | grep static_ | head -1)
-aws s3 sync build/$NEW_STATIC_DIR/ s3://$S3_BUCKET/app/static/ --region us-west-2
-```
+# 📋 Miscellaneous
 
-Optional: Clear CloudFront cache
-```
-DISTRIBUTION_ID=$(aws cloudformation describe-stacks --stack-name AWSOpsWheel-CloudFront --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDistributionId`].OutputValue' --output text --region us-west-2)
-aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*" --region us-west-2
-```
+## Import Participant Data from CSV
 
-Optional: Clean up old local static directories (keep last 2)
-```
-cd build && ls -t | grep static_ | tail -n +3 | xargs -r rm -rf
-```
+### V2 Enhanced CSV Import
+Use the web interface for bulk participant import:
+1. Navigate to **Participants** → **Import CSV**
+2. Upload file with columns: `name,email,url,weight,tags`
+3. Map columns and validate data
+4. Review and confirm import
 
-The output will be your resulting CloudFront Domain.
-```
-echo "CloudFront Domain: $CLOUDFRONT_DOMAIN"
-```
-
-For regular updates, just use `./deploy-v2.sh --quick-update`
-
-
-## Start Local Dev Server
-Go to the ``<PATH_TO_YOUR_WORKSPACE>/ui`` directory and run:
-
-```
-npm run dev
-```
-
-# Miscellaneous
-## Import Participant data from .csv file
-To populate Participant data from .csv file to one of your wheels you can use a tool that is in `utils` folder.
-All parameters are required.
-
-```
-$ <PATH_TO_YOUR_WORKSPACE>/utils/wheel_feeder.py \
-  --wheel-url <https://<your_api_gateway>.amazonaws.com> \
+### V1 Legacy CSV Import
+Use the utility script for V1 deployments:
+```bash
+cd utils && python wheel_feeder.py \
+  --wheel-url <https://your_api_gateway.amazonaws.com> \
   --wheel-id <TARGET_WHEEL_ID> \
   --csv-file-path <PATH_TO_CSV_FILE> \
   --cognito-user-pool-id <COGNITO_USER_POOL_ID> \
   --cognito-client-id <COGNITO_CLIENT_ID>
 ```
 
-## List Stacks
-To list all Stacks that are currently provisioned (or have been in the past):
+## Stack Management
 
-```
-$ aws cloudformation list-stacks
-```
+### V2 Stack Operations
+```bash
+# List all V2 stacks
+aws cloudformation list-stacks --query 'StackSummaries[?contains(StackName, `aws-ops-wheel-v2`)]'
 
-## Delete Stack
+# Delete V2 stack with cleanup
+./deploy-v2.sh --delete --suffix <SUFFIX>
 
-To delete existing stack (replace SUFFIX_NAME with your actual suffix or omit if no suffix):
-
-Step 1: Delete CloudFront first
-```
-aws cloudformation delete-stack --stack-name AWSOpsWheel-CloudFront --region us-west-2
-# Or with suffix:
-# aws cloudformation delete-stack --stack-name AWSOpsWheel-SUFFIX_NAME-CloudFront --region us-west-2
+# Quick updates
+./deploy-v2.sh --quick-update --suffix <SUFFIX>
 ```
 
-Step 2: Empty S3 bucket (REQUIRED before deleting source bucket stack)
-```
-# Get the S3 bucket name
-S3_BUCKET=$(aws cloudformation list-stack-resources \
-    --stack-name AWSOpsWheelSourceBucket \
-    --query 'StackResourceSummaries[?LogicalResourceId==`SourceS3Bucket`].PhysicalResourceId' \
-    --output text \
-    --region us-west-2)
+### V1 Stack Operations
+```bash
+# List V1 stacks
+aws cloudformation list-stacks --query 'StackSummaries[?contains(StackName, `AWSOpsWheel`)]'
 
-# Empty the S3 bucket
-aws s3 rm s3://$S3_BUCKET --recursive --region us-west-2
-
-# Verify bucket is empty
-aws s3 ls s3://$S3_BUCKET --region us-west-2
-```
-
-Step 3: Delete main stacks
-```
-# Delete main application stack
+# Delete V1 stack
 aws cloudformation delete-stack --stack-name AWSOpsWheel --region us-west-2
-# Or with suffix:
-# aws cloudformation delete-stack --stack-name AWSOpsWheel-SUFFIX_NAME --region us-west-2
-
-# Delete source bucket stack (now that bucket is empty)
-aws cloudformation delete-stack --stack-name AWSOpsWheelSourceBucket --region us-west-2
 ```
 
-If the bucket cannot be deleted with the command, the user can manually empty and delete the S3 Bucket on their console.
+## Customization
 
-## Wheel Customization
-To change how fast wheels spin, modify `EASE_OUT_FRAMES` and `LINEAR_FRAMES` in `wheel.jsx`. 
-Lower values correspond to faster spinning.
+### V2 Wheel Customization
+- **Animation Speed**: Configure in wheel group settings
+- **Themes**: Multiple built-in themes with custom options
+- **Branding**: Upload logos and customize colors
+- **Sound Effects**: Enable/disable audio feedback
+- **Multi-Language**: Internationalization support
+
+### V1 Wheel Customization
+To change wheel spinning speed, modify `EASE_OUT_FRAMES` and `LINEAR_FRAMES` in `ui/src/components/wheel.jsx`. Lower values correspond to faster spinning.
+
+## Performance & Scaling
+
+### V2 Performance Features
+- **Lambda Layer Optimization**: Content-hash based caching
+- **CloudFront CDN**: Global content delivery
+- **DynamoDB Optimization**: Efficient multi-tenant queries
+- **API Gateway Caching**: Reduced latency for frequent requests
+- **Batch Operations**: Optimized bulk data handling
+
+### V2 Scaling Considerations
+- **Concurrent Users**: Supports hundreds of simultaneous users per wheel group
+- **Data Limits**: Configurable quotas per wheel group (default: 1000 wheels, 1000 participants each)
+- **Geographic Distribution**: CloudFront provides global availability
+- **Multi-Region**: Deploy in multiple AWS regions for redundancy
+
+## Troubleshooting
+
+### Common V2 Issues
+- **Authentication Problems**: Check Cognito user pool configuration and custom attributes
+- **Permission Errors**: Verify user roles and wheel group membership
+- **Data Isolation**: Ensure proper wheel group scoping in all operations
+- **Deployment Failures**: Review CloudFormation events and Lambda logs
+
+### Common V1 Issues
+- **Regional Limitations**: V1 CloudFormation template may be region-specific
+- **Authentication**: Basic Cognito setup requires manual password reset
+- **Performance**: Single-tenant architecture may have scaling limits
+
+## Support & Contributing
+
+### Getting Help
+- **Documentation**: Comprehensive guides in `/api-v2/integration-tests/README.md`
+- **Issue Tracking**: Use GitHub issues for bug reports and feature requests
+- **Community**: Join discussions for best practices and use cases
+
+### Contributing
+- **Code Standards**: Follow existing patterns and include comprehensive tests
+- **Testing**: All contributions must include unit and integration tests
+- **Documentation**: Update relevant documentation with changes
+- **Security**: Follow secure coding practices, especially for multi-tenant features
+
+---
+
+## License & Legal
+
+This project is licensed under the Apache License 2.0. See [`LICENSE`](LICENSE), [`NOTICE`](NOTICE), and [`THIRD-PARTY-LICENSES`](THIRD-PARTY-LICENSES) for complete details.
+
