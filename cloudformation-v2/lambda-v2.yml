@@ -1,0 +1,282 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS Ops Wheel v2 - Lambda Functions and Layer'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    Description: Deployment suffix for naming resources
+
+  # Templates Bucket Parameter
+  TemplatesBucketName:
+    Type: String
+    Description: S3 bucket where nested CloudFormation templates and lambda layer are stored
+
+  # Lambda Layer ARN Parameter - passed from deployment script with content-hash layer
+  LayerArn:
+    Type: String
+    Description: ARN of the content-hash based Lambda layer created by deployment script
+
+  ForceUpdateTimestamp:
+    Type: String
+    Default: '1'
+    Description: Timestamp parameter to force nested stack updates
+
+  # DynamoDB Table Parameters
+  WheelGroupsTableName:
+    Type: String
+    Description: Name of the WheelGroups DynamoDB table
+
+  UsersTableName:
+    Type: String
+    Description: Name of the Users DynamoDB table
+
+  WheelsTableName:
+    Type: String
+    Description: Name of the Wheels DynamoDB table
+
+  ParticipantsTableName:
+    Type: String
+    Description: Name of the Participants DynamoDB table
+
+  WheelGroupsTableArn:
+    Type: String
+    Description: ARN of the WheelGroups DynamoDB table
+
+  UsersTableArn:
+    Type: String
+    Description: ARN of the Users DynamoDB table
+
+  WheelsTableArn:
+    Type: String
+    Description: ARN of the Wheels DynamoDB table
+
+  ParticipantsTableArn:
+    Type: String
+    Description: ARN of the Participants DynamoDB table
+
+  # Cognito Parameters  
+  UserPoolId:
+    Type: String
+    Description: Cognito User Pool ID
+
+  UserPoolClientId:
+    Type: String
+    Description: Cognito User Pool Client ID
+
+  UserPoolArn:
+    Type: String
+    Description: Cognito User Pool ARN
+
+Resources:
+  # =================== LAMBDA EXECUTION ROLE ===================
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'OpsWheelV2-LambdaExecutionRole-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:BatchGetItem
+                  - dynamodb:BatchWriteItem
+                Resource:
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${WheelGroupsTableName}'
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UsersTableName}'
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${WheelsTableName}'
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ParticipantsTableName}'
+                  - !Sub '${UsersTableArn}/index/*'
+                  - !Sub '${WheelsTableArn}/index/*'
+                  - !Sub '${ParticipantsTableArn}/index/*'
+                  - !Sub '${WheelGroupsTableArn}/index/*'
+        - PolicyName: CognitoAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminGetUser
+                  - cognito-idp:AdminUpdateUserAttributes
+                  - cognito-idp:ListUsers
+                  - cognito-idp:AdminCreateUser
+                  - cognito-idp:AdminSetUserPassword
+                  - cognito-idp:AdminDeleteUser
+                Resource:
+                  - !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPoolId}'
+
+  # =================== LAMBDA FUNCTIONS ===================
+  # Note: Lambda layer is created externally by deployment script using content-hash versioning
+
+  TenantManagementFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'ops-wheel-v2-tenant-management-${Environment}'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Layers:
+        - !Ref LayerArn
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          WHEEL_GROUPS_TABLE: !Ref WheelGroupsTableName
+          USERS_TABLE: !Ref UsersTableName
+          WHEELS_TABLE: !Ref WheelsTableName
+          PARTICIPANTS_TABLE: !Ref ParticipantsTableName
+          COGNITO_USER_POOL_ID: !Ref UserPoolId
+          COGNITO_CLIENT_ID: !Ref UserPoolClientId
+      Code:
+        S3Bucket: !Ref TemplatesBucketName
+        S3Key: 'index.zip'
+
+  WheelOperationsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'ops-wheel-v2-wheel-operations-${Environment}'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Layers:
+        - !Ref LayerArn
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          WHEEL_GROUPS_TABLE: !Ref WheelGroupsTableName
+          USERS_TABLE: !Ref UsersTableName
+          WHEELS_TABLE: !Ref WheelsTableName
+          PARTICIPANTS_TABLE: !Ref ParticipantsTableName
+          COGNITO_USER_POOL_ID: !Ref UserPoolId
+          COGNITO_CLIENT_ID: !Ref UserPoolClientId
+      Code:
+        S3Bucket: !Ref TemplatesBucketName
+        S3Key: 'index.zip'
+
+  ParticipantOperationsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'ops-wheel-v2-participant-operations-${Environment}'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Layers:
+        - !Ref LayerArn
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          WHEEL_GROUPS_TABLE: !Ref WheelGroupsTableName
+          USERS_TABLE: !Ref UsersTableName
+          WHEELS_TABLE: !Ref WheelsTableName
+          PARTICIPANTS_TABLE: !Ref ParticipantsTableName
+          COGNITO_USER_POOL_ID: !Ref UserPoolId
+          COGNITO_CLIENT_ID: !Ref UserPoolClientId
+      Code:
+        S3Bucket: !Ref TemplatesBucketName
+        S3Key: 'index.zip'
+
+  SelectionAlgorithmsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'ops-wheel-v2-selection-algorithms-${Environment}'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Layers:
+        - !Ref LayerArn
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          WHEEL_GROUPS_TABLE: !Ref WheelGroupsTableName
+          USERS_TABLE: !Ref UsersTableName
+          WHEELS_TABLE: !Ref WheelsTableName
+          PARTICIPANTS_TABLE: !Ref ParticipantsTableName
+          COGNITO_USER_POOL_ID: !Ref UserPoolId
+          COGNITO_CLIENT_ID: !Ref UserPoolClientId
+      Code:
+        S3Bucket: !Ref TemplatesBucketName
+        S3Key: 'index.zip'
+
+  ApiAuthorizerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'ops-wheel-v2-api-authorizer-${Environment}'
+      Runtime: python3.9
+      Handler: authorizer_index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Layers:
+        - !Ref LayerArn
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          WHEEL_GROUPS_TABLE: !Ref WheelGroupsTableName
+          USERS_TABLE: !Ref UsersTableName
+          COGNITO_USER_POOL_ID: !Ref UserPoolId
+          COGNITO_CLIENT_ID: !Ref UserPoolClientId
+      Code:
+        S3Bucket: !Ref TemplatesBucketName
+        S3Key: 'authorizer_index.zip'
+
+Outputs:
+  LambdaExecutionRoleArn:
+    Description: Lambda execution role ARN
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaExecutionRoleArn'
+
+  TenantManagementFunctionArn:
+    Description: Tenant Management Lambda function ARN
+    Value: !GetAtt TenantManagementFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-TenantManagementFunctionArn'
+
+  WheelOperationsFunctionArn:
+    Description: Wheel Operations Lambda function ARN
+    Value: !GetAtt WheelOperationsFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-WheelOperationsFunctionArn'
+
+  ParticipantOperationsFunctionArn:
+    Description: Participant Operations Lambda function ARN
+    Value: !GetAtt ParticipantOperationsFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ParticipantOperationsFunctionArn'
+
+  SelectionAlgorithmsFunctionArn:
+    Description: Selection Algorithms Lambda function ARN
+    Value: !GetAtt SelectionAlgorithmsFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-SelectionAlgorithmsFunctionArn'
+
+  ApiAuthorizerFunctionArn:
+    Description: API Authorizer Lambda function ARN
+    Value: !GetAtt ApiAuthorizerFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiAuthorizerFunctionArn'

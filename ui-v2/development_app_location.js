@@ -1,0 +1,1 @@
+module.exports = 'https://d2ug6nyunvxc97.cloudfront.net';

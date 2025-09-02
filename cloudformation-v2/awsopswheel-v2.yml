@@ -1,0 +1,260 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS Ops Wheel v2 - Main Orchestrator Stack'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    Description: Deployment suffix for naming resources
+
+  AdminEmail:
+    Type: String
+    Description: Admin email for Cognito notifications
+    Default: admin@example.com
+
+  TemplatesBucketName:
+    Type: String
+    Description: S3 bucket where nested CloudFormation templates are stored
+    Default: ops-wheel-v2-deployment-dev-us-west-2
+
+  LayerArn:
+    Type: String
+    Description: ARN of the content-hash based Lambda layer created by deployment script
+
+Resources:
+  # =================== DYNAMODB STACK (No Dependencies) ===================
+  DynamoDBStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${TemplatesBucketName}.s3.${AWS::Region}.amazonaws.com/templates/dynamodb-v2.yml'
+      Parameters:
+        Environment: !Ref Environment
+        ForceUpdateTimestamp: !Ref LayerArn
+
+  # =================== COGNITO STACK (No Dependencies) ===================
+  CognitoStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${TemplatesBucketName}.s3.${AWS::Region}.amazonaws.com/templates/cognito-v2.yml'
+      Parameters:
+        Environment: !Ref Environment
+        AdminEmail: !Ref AdminEmail
+        ForceUpdateTimestamp: !Ref LayerArn
+
+  # =================== LAMBDA STACK (Depends on DynamoDB + Cognito) ===================
+  LambdaStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - DynamoDBStack
+      - CognitoStack
+    Properties:
+      TemplateURL: !Sub 'https://${TemplatesBucketName}.s3.${AWS::Region}.amazonaws.com/templates/lambda-v2.yml'
+      Parameters:
+        Environment: !Ref Environment
+        TemplatesBucketName: !Ref TemplatesBucketName
+        LayerArn: !Ref LayerArn
+        ForceUpdateTimestamp: !Ref LayerArn
+        WheelGroupsTableName: !GetAtt DynamoDBStack.Outputs.WheelGroupsTableName
+        UsersTableName: !GetAtt DynamoDBStack.Outputs.UsersTableName
+        WheelsTableName: !GetAtt DynamoDBStack.Outputs.WheelsTableName
+        ParticipantsTableName: !GetAtt DynamoDBStack.Outputs.ParticipantsTableName
+        WheelGroupsTableArn: !GetAtt DynamoDBStack.Outputs.WheelGroupsTableArn
+        UsersTableArn: !GetAtt DynamoDBStack.Outputs.UsersTableArn
+        WheelsTableArn: !GetAtt DynamoDBStack.Outputs.WheelsTableArn
+        ParticipantsTableArn: !GetAtt DynamoDBStack.Outputs.ParticipantsTableArn
+        UserPoolId: !GetAtt CognitoStack.Outputs.UserPoolId
+        UserPoolClientId: !GetAtt CognitoStack.Outputs.UserPoolClientId
+        UserPoolArn: !GetAtt CognitoStack.Outputs.UserPoolArn
+
+  # =================== API GATEWAY STACK (Depends on Lambda) ===================
+  ApiGatewayStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: LambdaStack
+    Properties:
+      TemplateURL: !Sub 'https://${TemplatesBucketName}.s3.${AWS::Region}.amazonaws.com/templates/api-gateway-v2.yml'
+      Parameters:
+        Environment: !Ref Environment
+        ForceUpdateTimestamp: !Ref LayerArn
+        TenantManagementFunctionArn: !GetAtt LambdaStack.Outputs.TenantManagementFunctionArn
+        WheelOperationsFunctionArn: !GetAtt LambdaStack.Outputs.WheelOperationsFunctionArn
+        ParticipantOperationsFunctionArn: !GetAtt LambdaStack.Outputs.ParticipantOperationsFunctionArn
+        SelectionAlgorithmsFunctionArn: !GetAtt LambdaStack.Outputs.SelectionAlgorithmsFunctionArn
+        ApiAuthorizerFunctionArn: !GetAtt LambdaStack.Outputs.ApiAuthorizerFunctionArn
+
+  # =================== FRONTEND STACK (Depends on API Gateway + Cognito) ===================
+  FrontendStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - ApiGatewayStack
+      - CognitoStack
+    Properties:
+      TemplateURL: !Sub 'https://${TemplatesBucketName}.s3.${AWS::Region}.amazonaws.com/templates/frontend-v2.yml'
+      Parameters:
+        Environment: !Ref Environment
+        ApiGatewayDomainName: !GetAtt ApiGatewayStack.Outputs.ApiGatewayDomainName
+        UserPoolId: !GetAtt CognitoStack.Outputs.UserPoolId
+        UserPoolClientId: !GetAtt CognitoStack.Outputs.UserPoolClientId
+        ForceUpdateTimestamp: !Ref LayerArn
+
+Outputs:
+  # =================== DATABASE OUTPUTS ===================
+  WheelGroupsTableName:
+    Description: 'Name of the WheelGroups DynamoDB table'
+    Value: !GetAtt DynamoDBStack.Outputs.WheelGroupsTableName
+    Export:
+      Name: !Sub '${AWS::StackName}-WheelGroupsTable'
+
+  UsersTableName:
+    Description: 'Name of the Users DynamoDB table'
+    Value: !GetAtt DynamoDBStack.Outputs.UsersTableName
+    Export:
+      Name: !Sub '${AWS::StackName}-UsersTable'
+
+  WheelsTableName:
+    Description: 'Name of the Wheels DynamoDB table'
+    Value: !GetAtt DynamoDBStack.Outputs.WheelsTableName
+    Export:
+      Name: !Sub '${AWS::StackName}-WheelsTable'
+
+  ParticipantsTableName:
+    Description: 'Name of the Participants DynamoDB table'
+    Value: !GetAtt DynamoDBStack.Outputs.ParticipantsTableName
+    Export:
+      Name: !Sub '${AWS::StackName}-ParticipantsTable'
+
+  # =================== AUTHENTICATION OUTPUTS ===================
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !GetAtt CognitoStack.Outputs.UserPoolId
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPoolId'
+      
+  UserPoolClientId:
+    Description: Cognito User Pool Client ID
+    Value: !GetAtt CognitoStack.Outputs.UserPoolClientId
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPoolClientId'
+
+  # =================== COMPUTE OUTPUTS ===================
+  TenantManagementFunctionArn:
+    Description: Tenant Management Lambda function ARN
+    Value: !GetAtt LambdaStack.Outputs.TenantManagementFunctionArn
+    Export:
+      Name: !Sub '${AWS::StackName}-TenantManagementFunctionArn'
+
+  WheelOperationsFunctionArn:
+    Description: Wheel Operations Lambda function ARN
+    Value: !GetAtt LambdaStack.Outputs.WheelOperationsFunctionArn
+    Export:
+      Name: !Sub '${AWS::StackName}-WheelOperationsFunctionArn'
+
+  ParticipantOperationsFunctionArn:
+    Description: Participant Operations Lambda function ARN
+    Value: !GetAtt LambdaStack.Outputs.ParticipantOperationsFunctionArn
+    Export:
+      Name: !Sub '${AWS::StackName}-ParticipantOperationsFunctionArn'
+
+  SelectionAlgorithmsFunctionArn:
+    Description: Selection Algorithms Lambda function ARN
+    Value: !GetAtt LambdaStack.Outputs.SelectionAlgorithmsFunctionArn
+    Export:
+      Name: !Sub '${AWS::StackName}-SelectionAlgorithmsFunctionArn'
+
+  ApiAuthorizerFunctionArn:
+    Description: API Authorizer Lambda function ARN
+    Value: !GetAtt LambdaStack.Outputs.ApiAuthorizerFunctionArn
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiAuthorizerFunctionArn'
+
+  # =================== API OUTPUTS ===================
+  ApiGatewayURL:
+    Description: API Gateway endpoint URL
+    Value: !GetAtt ApiGatewayStack.Outputs.ApiGatewayURL
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiGatewayURL'
+
+  ApiGatewayId:
+    Description: API Gateway ID
+    Value: !GetAtt ApiGatewayStack.Outputs.ApiGatewayId
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiGatewayId'
+
+  # =================== FRONTEND OUTPUTS ===================
+  FrontendURL:
+    Description: Secure HTTPS URL for the v2 Multi-tenant Frontend
+    Value: !GetAtt FrontendStack.Outputs.FrontendURL
+    Export:
+      Name: !Sub '${AWS::StackName}-FrontendURL'
+
+  CloudFrontDomainName:
+    Description: CloudFront Distribution Domain Name  
+    Value: !GetAtt FrontendStack.Outputs.CloudFrontDomainName
+    Export:
+      Name: !Sub '${AWS::StackName}-CloudFrontDomain'
+
+  FrontendBucketName:
+    Description: Name of the S3 bucket for v2 frontend
+    Value: !GetAtt FrontendStack.Outputs.FrontendBucketName
+    Export:
+      Name: !Sub '${AWS::StackName}-FrontendBucket'
+
+  CloudFrontDistributionId:
+    Description: CloudFront Distribution ID for cache invalidation
+    Value: !GetAtt FrontendStack.Outputs.CloudFrontDistributionId
+    Export:
+      Name: !Sub '${AWS::StackName}-CloudFrontDistributionId'
+
+  # =================== APPLICATION INFO ===================
+  ApplicationInfo:
+    Description: Complete application deployment information
+    Value: !Sub |
+      AWS Ops Wheel v2 Multi-tenant Application - ${Environment}
+      
+      Backend API: ${ApiGatewayStack.Outputs.ApiGatewayURL}
+      Frontend URL: ${FrontendStack.Outputs.FrontendURL}
+      
+      Authentication:
+      - Cognito User Pool: ${CognitoStack.Outputs.UserPoolId}
+      - Cognito Client: ${CognitoStack.Outputs.UserPoolClientId}
+      
+      Database Tables:
+      - Wheel Groups: ${DynamoDBStack.Outputs.WheelGroupsTableName}
+      - Users: ${DynamoDBStack.Outputs.UsersTableName}
+      - Wheels: ${DynamoDBStack.Outputs.WheelsTableName}
+      - Participants: ${DynamoDBStack.Outputs.ParticipantsTableName}
+      
+      Lambda Functions:
+      - Tenant Management: ${LambdaStack.Outputs.TenantManagementFunctionArn}
+      - Wheel Operations: ${LambdaStack.Outputs.WheelOperationsFunctionArn}
+      - Participant Operations: ${LambdaStack.Outputs.ParticipantOperationsFunctionArn}
+      - Selection Algorithms: ${LambdaStack.Outputs.SelectionAlgorithmsFunctionArn}
+      - API Authorizer: ${LambdaStack.Outputs.ApiAuthorizerFunctionArn}
+      
+      Frontend Infrastructure:
+      - S3 Bucket: ${FrontendStack.Outputs.FrontendBucketName}
+      - CloudFront: ${FrontendStack.Outputs.CloudFrontDomainName}
+
+  # =================== DEPLOYMENT INSTRUCTIONS ===================
+  DeploymentInstructions:
+    Description: Instructions for deploying the application
+    Value: !Sub |
+      Deployment Instructions for ${Environment} environment:
+      
+      🚀 AUTOMATED DEPLOYMENT (Recommended):
+         ./deploy-v2-modular.sh
+      
+      This script automatically:
+      - Validates and uploads all CloudFormation templates
+      - Deploys the complete infrastructure stack
+      - Builds the frontend application (npm run build)
+      - Uploads frontend files to S3
+      - Invalidates CloudFront cache
+      
+      📱 Application URLs:
+         Frontend: ${FrontendStack.Outputs.FrontendURL}
+         Backend API: ${ApiGatewayStack.Outputs.ApiGatewayURL}
+      
+      🔧 Manual Steps (if needed):
+      1. Upload Lambda layer: aws s3 cp lambda-layer-v2-fixed.zip s3://${TemplatesBucketName}/lambda-layer-v2-fixed.zip
+      2. Manual frontend build: cd ui-v2 && npm run build && aws s3 sync ../build/static/ s3://${FrontendStack.Outputs.FrontendBucketName}/app/ --delete
+      3. Cache invalidation: aws cloudfront create-invalidation --distribution-id ${FrontendStack.Outputs.CloudFrontDistributionId} --paths "/*"

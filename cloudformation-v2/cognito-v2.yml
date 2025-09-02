@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS Ops Wheel v2 - Cognito User Pool'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    Description: Deployment suffix for naming resources
+
+  AdminEmail:
+    Type: String
+    Description: Admin email for Cognito notifications
+    Default: admin@example.com
+
+  ForceUpdateTimestamp:
+    Type: String
+    Default: '1'
+    Description: Timestamp parameter to force nested stack updates
+
+Resources:
+  # =================== COGNITO USER POOL ===================
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub 'aws-ops-wheel-v2-users-${Environment}'
+      AutoVerifiedAttributes:
+        - email
+      UsernameConfiguration:
+        CaseSensitive: false
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+      VerificationMessageTemplate:
+        DefaultEmailOption: CONFIRM_WITH_CODE
+        EmailMessage: 'Your AWS Ops Wheel password reset code is {####}. This code will expire in 24 hours. If you did not request this, please ignore this email.'
+        EmailSubject: 'AWS Ops Wheel - Password Reset Code'
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Required: true
+          Mutable: true
+        - Name: wheel_group_id
+          AttributeDataType: String
+          Mutable: true
+        - Name: deployment_admin
+          AttributeDataType: String
+          Mutable: true
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: !Sub 'aws-ops-wheel-v2-client-${Environment}'
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ADMIN_NO_SRP_AUTH
+        - USER_PASSWORD_AUTH
+      TokenValidityUnits:
+        IdToken: hours
+        AccessToken: hours
+        RefreshToken: days
+      IdTokenValidity: 24
+      AccessTokenValidity: 24
+      RefreshTokenValidity: 30
+
+  # Note: Deployment admin user will be created post-deployment via AWS CLI
+  # This avoids CloudFormation validation issues with custom attributes
+
+Outputs:
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref UserPool
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPoolId'
+      
+  UserPoolClientId:
+    Description: Cognito User Pool Client ID
+    Value: !Ref UserPoolClient
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPoolClientId'
+
+  UserPoolArn:
+    Description: 'Cognito User Pool ARN'
+    Value: !GetAtt UserPool.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPoolArn'
+
+  UserPoolProviderName:
+    Description: 'Cognito User Pool Provider Name'
+    Value: !GetAtt UserPool.ProviderName
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPoolProviderName'

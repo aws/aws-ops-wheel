@@ -1,0 +1,747 @@
+/*
+ * Copyright 2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License").
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *   http://aws.amazon.com/apache2.0/
+ *
+ * or in the "license" file accompanying this file. This file is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+/* Amazon Ember Font Import */
+@import url('https://d2c87l0yth4zbw.cloudfront.net/fonts/amazon-ember/amazon-ember.css');
+
+body {
+  background-color: #FAFAFA;
+}
+
+.pageRoot {
+    border: 1px solid #FAFAFA;
+}
+
+.title-text {
+    margin: auto;
+    width: 50%;
+}
+
+.wheelNavButtonGroup {
+    font-family: Arial;
+    position: absolute;
+    top: 2%;
+    left: 1%;
+}
+
+#app .card {
+    padding: 8px 12px;
+    background-color: #eaeded;
+    border-radius: 4px;
+    background-image: none;
+}
+
+#app .card-header {
+    padding-top: 7.5px;
+    padding-bottom: 7.5px;
+    margin: 0 0 18px;
+    border-bottom: 1px solid #879196;
+}
+
+thead th {
+    text-transform:uppercase;
+    text-align:left;
+    color: #545b64;
+    font-size: 14px;
+}
+
+button:focus {outline:0;}
+
+.title {
+    background-color: #FAFAFA;
+    text-align: center;
+    font-family: Helvetica;
+    color: #232F3E;
+    margin: 1rem 0 0.5rem 0 !important;
+}
+
+.notification {
+    float: right;
+}
+
+.errorNotification {
+    color: #df3312;
+}
+
+.tableHeader {
+    font-size: 20px;
+    color: #232F3E;
+}
+
+.navbar-tab-active {
+    background-color: rgba(0,0,0,0.1) !important;
+    margin-top: -8px !important;
+    margin-bottom: -8px !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+.navbar-tab-active .nav-link {
+    color: inherit !important;
+    padding: 0.5rem 1rem !important;
+}
+
+/* Modern Button Styles */
+.btn {
+    font-family: 'Amazon Ember', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, background 0.2s ease-in-out;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    position: relative;
+    overflow: hidden;
+    will-change: transform;
+    contain: layout style;
+}
+
+/* Button Sizes */
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    min-height: 32px;
+}
+
+.btn, .btn-md {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    line-height: 1.5rem;
+    min-height: 38px;
+}
+
+.btn-lg {
+    padding: 12px 24px;
+    font-size: 1rem;
+    line-height: 1.75rem;
+    min-height: 44px;
+}
+
+/* Primary Button */
+.btn-primary {
+    background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
+    color: white;
+    box-shadow: 0 1px 3px rgba(230, 126, 34, 0.2);
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #d35400 0%, #c0392b 100%);
+    box-shadow: 0 2px 6px rgba(230, 126, 34, 0.3);
+    transform: translateY(-1px);
+}
+
+.btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(230, 126, 34, 0.2);
+}
+
+/* Secondary Button */
+.btn-secondary {
+    background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+    color: white;
+    box-shadow: 0 1px 3px rgba(149, 165, 166, 0.2);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #7f8c8d 0%, #6c7b7b 100%);
+    box-shadow: 0 2px 6px rgba(149, 165, 166, 0.3);
+    transform: translateY(-1px);
+}
+
+/* Outline Button (Default) */
+.btn-outline-secondary, .btn:not([class*="btn-"]) {
+    background: white;
+    color: #495057;
+    border: 1.5px solid #dee2e6;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.btn-outline-secondary:hover:not(:disabled), .btn:not([class*="btn-"]):hover:not(:disabled) {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+    color: #343a40;
+}
+
+/* Success Button */
+.btn-success {
+    background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%);
+    color: white;
+    box-shadow: 0 1px 3px rgba(82, 196, 26, 0.2);
+}
+
+.btn-success:hover:not(:disabled) {
+    background: linear-gradient(135deg, #389e0d 0%, #237804 100%);
+    box-shadow: 0 2px 6px rgba(82, 196, 26, 0.3);
+    transform: translateY(-1px);
+}
+
+/* Warning Button */
+.btn-warning {
+    background: linear-gradient(135deg, #fadb14 0%, #d4b106 100%);
+    color: #595959;
+    box-shadow: 0 1px 3px rgba(250, 219, 20, 0.2);
+}
+
+.btn-warning:hover:not(:disabled) {
+    background: linear-gradient(135deg, #d4b106 0%, #b37400 100%);
+    box-shadow: 0 2px 6px rgba(250, 219, 20, 0.3);
+    transform: translateY(-1px);
+    color: #434343;
+}
+
+/* Danger Button */
+.btn-danger {
+    background: linear-gradient(135deg, #ff4d4f 0%, #f5222d 100%);
+    color: white;
+    box-shadow: 0 1px 3px rgba(255, 77, 79, 0.2);
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: linear-gradient(135deg, #f5222d 0%, #cf1322 100%);
+    box-shadow: 0 2px 6px rgba(255, 77, 79, 0.3);
+    transform: translateY(-1px);
+}
+
+/* Disabled State */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.btn:disabled:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Focus States for Accessibility */
+.btn:focus {
+    outline: 2px solid transparent;
+    box-shadow: 0 0 0 3px rgba(230, 126, 34, 0.3);
+}
+
+.btn-danger:focus {
+    box-shadow: 0 0 0 3px rgba(255, 77, 79, 0.3);
+}
+
+.btn-success:focus {
+    box-shadow: 0 0 0 3px rgba(82, 196, 26, 0.3);
+}
+
+/* Button Groups */
+.btn-group .btn {
+    margin-right: 8px;
+}
+
+.btn-group .btn:last-child {
+    margin-right: 0;
+}
+
+.btn-toolbar {
+    gap: 10px;
+}
+
+/* Special Button Styles */
+.backButton {
+    background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+    color: white;
+    border: none;
+}
+
+.backButton:hover:not(:disabled) {
+    background: linear-gradient(135deg, #7f8c8d 0%, #6c7b7b 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(149, 165, 166, 0.2);
+}
+
+/* Spin Button Special Styling */
+#btnSpin {
+    background: linear-gradient(135deg, #e67e22 0%, #d35400 100%) !important;
+    border: 1vmin solid #FAFAFA !important;
+    box-shadow: 0 4px 12px rgba(230, 126, 34, 0.3) !important;
+    font-weight: 600 !important;
+}
+
+#btnSpin:hover:not(:disabled) {
+    background: linear-gradient(135deg, #d35400 0%, #c0392b 100%) !important;
+    box-shadow: 0 6px 20px rgba(230, 126, 34, 0.4) !important;
+    transform: translateY(-2px) !important;
+}
+
+#btnSpin:active:not(:disabled) {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 8px rgba(230, 126, 34, 0.3) !important;
+}
+
+/* Sound Toggle Button */
+#btnSoundToggle {
+    background: linear-gradient(135deg, #5dade2 0%, #3498db 100%);
+    color: white;
+    border: none;
+    font-size: 1.1em;
+}
+
+#btnSoundToggle:hover:not(:disabled) {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(93, 173, 226, 0.2);
+}
+
+/* Fix LinkWrapper styling issues for buttons only */
+a:has(.btn) {
+    text-decoration: none !important;
+    color: inherit;
+}
+
+a:has(.btn):hover {
+    text-decoration: none !important;
+    color: inherit;
+}
+
+a:has(.btn):focus {
+    outline: none;
+    text-decoration: none !important;
+}
+
+a:has(.btn):visited {
+    color: inherit;
+}
+
+/* Ensure buttons inside links don't inherit link styles */
+a .btn {
+    text-decoration: none !important;
+}
+
+a:hover .btn {
+    text-decoration: none !important;
+}
+
+/* Keep normal hyperlink styling for table URLs */
+table a:not(:has(.btn)) {
+    color: #3498db;
+    text-decoration: underline;
+}
+
+table a:not(:has(.btn)):hover {
+    color: #2980b9;
+    text-decoration: underline;
+}
+
+table a:not(:has(.btn)):visited {
+    color: #8e44ad;
+}
+
+/* Fallback for browsers that don't support :has() */
+@supports not (selector(:has(*))) {
+    /* Reset all links first */
+    a {
+        text-decoration: none !important;
+        color: inherit;
+    }
+    
+    a:hover {
+        text-decoration: none !important;
+        color: inherit;
+    }
+    
+    a:focus {
+        outline: none;
+        text-decoration: none !important;
+    }
+    
+    a:visited {
+        color: inherit;
+    }
+    
+    /* Then specifically style table links */
+    table td a {
+        color: #3498db !important;
+        text-decoration: underline !important;
+    }
+    
+    table td a:hover {
+        color: #2980b9 !important;
+        text-decoration: underline !important;
+    }
+    
+    table td a:visited {
+        color: #8e44ad !important;
+    }
+    
+    /* And ensure buttons in links still work */
+    a .btn {
+        text-decoration: none !important;
+        color: white !important;
+    }
+    
+    a:hover .btn {
+        text-decoration: none !important;
+    }
+}
+
+
+/* Performance Optimizations */
+.pageRoot {
+    contain: layout style;
+}
+
+table {
+    contain: layout style;
+    table-layout: fixed;
+}
+
+.card {
+    contain: layout style;
+}
+
+/* Typography System */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Amazon Ember', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    color: #232F3E;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transform: translateZ(0); /* Enable hardware acceleration */
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Amazon Ember', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    line-height: 1.25;
+    margin: 0 0 1rem 0;
+    color: #232F3E;
+}
+
+h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+}
+
+h2 {
+    font-size: 2rem;
+    font-weight: 600;
+}
+
+h3 {
+    font-size: 1.75rem;
+    font-weight: 600;
+}
+
+h4 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+h5 {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+h6 {
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+
+/* Paragraphs and Text */
+p {
+    margin: 0 0 1rem 0;
+    line-height: 1.6;
+}
+
+/* Text Sizes */
+.text-xs {
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+
+.text-sm {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+}
+
+.text-base {
+    font-size: 1rem;
+    line-height: 1.5rem;
+}
+
+.text-lg {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+}
+
+.text-xl {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+}
+
+.text-2xl {
+    font-size: 1.5rem;
+    line-height: 2rem;
+}
+
+/* Font Weights */
+.font-light {
+    font-weight: 300;
+}
+
+.font-normal {
+    font-weight: 400;
+}
+
+.font-medium {
+    font-weight: 500;
+}
+
+.font-semibold {
+    font-weight: 600;
+}
+
+.font-bold {
+    font-weight: 700;
+}
+
+/* Text Colors */
+.text-primary {
+    color: #232F3E;
+}
+
+.text-secondary {
+    color: #545b64;
+}
+
+.text-muted {
+    color: #879196;
+}
+
+.text-success {
+    color: #28a745;
+}
+
+.text-warning {
+    color: #ffc107;
+}
+
+.text-danger {
+    color: #dc3545;
+}
+
+.text-white {
+    color: white;
+}
+
+/* Override existing inconsistent styles */
+.title {
+    font-family: 'Amazon Ember', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+    font-weight: 700;
+    color: #232F3E;
+    margin: 1rem 0 0.5rem 0 !important;
+}
+
+.tableHeader {
+    font-family: 'Amazon Ember', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+    font-size: 1.25rem !important;
+    font-weight: 700;
+    color: #232F3E !important;
+}
+
+thead th {
+    font-family: 'Amazon Ember', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+    text-transform: uppercase;
+    text-align: left;
+    color: #545b64 !important;
+    font-size: 0.875rem !important;
+    font-weight: 700;
+    letter-spacing: 0.025em;
+}
+
+/* Table text consistency */
+table {
+    font-family: 'Amazon Ember', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+td {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: #232F3E;
+}
+
+/* Form elements */
+input, textarea, select {
+    font-family: 'Amazon Ember', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+/* Notification text */
+.notification {
+    font-family: 'Amazon Ember', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: #545b64;
+}
+
+.errorNotification {
+    font-family: 'Amazon Ember', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: #df3312 !important;
+    font-weight: 600;
+}
+
+/* Modal text */
+.modal-title {
+    font-family: 'Amazon Ember', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    color: #232F3E;
+}
+
+.modal-body {
+    font-family: 'Amazon Ember', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: #232F3E;
+}
+
+/* Modal positioning and z-index fixes */
+.modal {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 1050 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 1rem !important;
+}
+
+.modal-backdrop {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 1040 !important;
+    background-color: rgba(0, 0, 0, 0.5) !important;
+}
+
+.modal-dialog {
+    position: relative !important;
+    z-index: 1055 !important;
+    margin: 0 !important;
+    max-width: 800px !important;
+    width: 90% !important;
+    max-height: 90vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.modal-content {
+    position: relative !important;
+    background-color: white !important;
+    border: 1px solid rgba(0,0,0,.2) !important;
+    border-radius: 0.3rem !important;
+    box-shadow: 0 0.25rem 0.5rem rgba(0,0,0,.5) !important;
+    min-height: 200px !important;
+    max-height: 90vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+.modal-body {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    padding: 1rem !important;
+}
+
+.modal-header {
+    flex-shrink: 0 !important;
+    padding: 1rem !important;
+    border-bottom: 1px solid #dee2e6 !important;
+}
+
+.modal-footer {
+    flex-shrink: 0 !important;
+    padding: 1rem !important;
+    border-top: 1px solid #dee2e6 !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+}
+
+/* Ensure modal is always fully visible */
+.modal.show {
+    display: flex !important;
+}
+
+.modal.show .modal-dialog {
+    transform: none !important;
+}
+
+.modal-lg {
+    max-width: 800px !important;
+    width: 90% !important;
+}
+
+/* Force modal to be above everything */
+body.modal-open {
+    overflow: hidden !important;
+}
+
+.modal-open .modal {
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+}
+
+/* Override any container constraints */
+.pageRoot, .container-fluid, .card {
+    position: relative !important;
+}
+
+/* Ensure modal breaks out of any container */
+.modal * {
+    box-sizing: border-box !important;
+}
+
+/* Navigation text */
+.nav-link {
+    font-family: 'Amazon Ember', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+    font-weight: 600;
+}
+
+/* Loading and status text */
+div[style*="padding: 15px"] {
+    font-family: 'Amazon Ember', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 1rem;
+    color: #545b64;
+}
