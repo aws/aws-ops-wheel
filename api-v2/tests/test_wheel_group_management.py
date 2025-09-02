@@ -622,7 +622,21 @@ def test_create_wheel_group_user_success_validates_business_logic(mock_context, 
     # Validate new user fields
     assert body['user_id'] == 'cognito-user-id-123', "Should use Cognito sub as user_id"
     assert 'temporary_password' in body, "Should include temporary password info"
-    assert body['temporary_password'] == 'TempPass123!'
+    
+    # Validate temporary password generation (should be random, not hardcoded)
+    temp_password = body['temporary_password']
+    assert isinstance(temp_password, str), "temporary_password must be a string"
+    assert len(temp_password) >= 8, "temporary_password must be at least 8 characters"
+    assert temp_password != '', "temporary_password must not be empty"
+    assert temp_password != 'TempPass123!', "Password should be randomly generated, not hardcoded"
+    
+    # Validate password complexity requirements
+    import re
+    assert re.search(r'[A-Z]', temp_password), "Password should contain uppercase letter"
+    assert re.search(r'[a-z]', temp_password), "Password should contain lowercase letter" 
+    assert re.search(r'[0-9]', temp_password), "Password should contain digit"
+    assert re.search(r'[!@#$%^&*(),.?":{}|<>]', temp_password), "Password should contain special character"
+    
     assert body['password_reset_required'] == True
     
     # Validate timestamps are recent and properly formatted

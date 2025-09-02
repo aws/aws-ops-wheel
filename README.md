@@ -377,74 +377,9 @@ aws cloudformation create-stack \
 3. **Create Wheels**: Set up participant groups
 4. **Start Spinning**: Begin fair selection process
 
-# 🔧 Administration & Maintenance
-
-## V2 Administrative Features
-
-### Deployment Admin Dashboard
-- **Cross-Group Management**: Oversight across all wheel groups
-- **System Monitoring**: Health checks and performance metrics
-- **User Management**: Create and manage deployment administrators
-- **Resource Cleanup**: Automated maintenance and optimization
-- **Security Auditing**: Access logs and compliance reporting
-
-### Wheel Group Management
-- **Organization Setup**: Create isolated wheel groups
-- **Quota Management**: Configure resource limits per group
-- **User Role Assignment**: Fine-grained permission control
-- **Data Export/Import**: Backup and migration capabilities
-- **Custom Branding**: Theme and appearance customization
-
-### Multi-Tenant Security
-- **Data Isolation**: Complete separation between wheel groups
-- **Role-Based Access**: Granular permissions at multiple levels
-- **Audit Trails**: Comprehensive logging of all operations
-- **Secure APIs**: Authentication and authorization at every endpoint
-- **Cross-Tenant Protection**: Zero data leakage guarantees
-
-## V1 Administrative Features
-- **Basic User Management**: Simple Cognito administration
-- **Wheel Operations**: Standard create/edit/delete functionality
-- **Participant Import**: CSV upload using utility script
-- **Simple Monitoring**: Basic CloudFormation stack management
-
-# 🔄 Migration Guide
-
-## Migrating from V1 to V2
-
-### Pre-Migration Assessment
-1. **Data Inventory**: Document existing wheels and participants
-2. **User Mapping**: Plan role assignments for V2 structure
-3. **Backup Creation**: Export all V1 data using utility scripts
-4. **Environment Planning**: Design wheel group structure
-
-### Migration Process
-1. **Deploy V2**: Set up new V2 environment alongside V1
-2. **Create Wheel Groups**: Establish organizational structure
-3. **User Migration**: Create V2 users with appropriate roles
-4. **Data Import**: Use CSV tools to migrate wheels and participants
-5. **Testing Phase**: Validate all functionality in V2
-6. **Cutover**: Switch users to V2 and decommission V1
-
-### Migration Tools
-```bash
-# Export V1 data (use existing utility)
-cd utils && python wheel_feeder.py --export --wheel-url <V1_URL>
-
-# Import to V2 (enhanced CSV support)
-# Use V2 UI for bulk import or API endpoints
-```
-
 # 📋 Miscellaneous
 
 ## Import Participant Data from CSV
-
-### V2 Enhanced CSV Import
-Use the web interface for bulk participant import:
-1. Navigate to **Participants** → **Import CSV**
-2. Upload file with columns: `name,email,url,weight,tags`
-3. Map columns and validate data
-4. Review and confirm import
 
 ### V1 Legacy CSV Import
 Use the utility script for V1 deployments:
@@ -471,67 +406,8 @@ aws cloudformation list-stacks --query 'StackSummaries[?contains(StackName, `aws
 ./deploy-v2.sh --quick-update --suffix <SUFFIX>
 ```
 
-### V1 Stack Operations
-```bash
-# List V1 stacks
-aws cloudformation list-stacks --query 'StackSummaries[?contains(StackName, `AWSOpsWheel`)]'
-
-# Delete V1 stack
-aws cloudformation delete-stack --stack-name AWSOpsWheel --region us-west-2
-```
-
-## Customization
-
-### V2 Wheel Customization
-- **Animation Speed**: Configure in wheel group settings
-- **Themes**: Multiple built-in themes with custom options
-- **Branding**: Upload logos and customize colors
-- **Sound Effects**: Enable/disable audio feedback
-- **Multi-Language**: Internationalization support
-
-### V1 Wheel Customization
+### Wheel Customization
 To change wheel spinning speed, modify `EASE_OUT_FRAMES` and `LINEAR_FRAMES` in `ui/src/components/wheel.jsx`. Lower values correspond to faster spinning.
-
-## Performance & Scaling
-
-### V2 Performance Features
-- **Lambda Layer Optimization**: Content-hash based caching
-- **CloudFront CDN**: Global content delivery
-- **DynamoDB Optimization**: Efficient multi-tenant queries
-- **API Gateway Caching**: Reduced latency for frequent requests
-- **Batch Operations**: Optimized bulk data handling
-
-### V2 Scaling Considerations
-- **Concurrent Users**: Supports hundreds of simultaneous users per wheel group
-- **Data Limits**: Configurable quotas per wheel group (default: 1000 wheels, 1000 participants each)
-- **Geographic Distribution**: CloudFront provides global availability
-- **Multi-Region**: Deploy in multiple AWS regions for redundancy
-
-## Troubleshooting
-
-### Common V2 Issues
-- **Authentication Problems**: Check Cognito user pool configuration and custom attributes
-- **Permission Errors**: Verify user roles and wheel group membership
-- **Data Isolation**: Ensure proper wheel group scoping in all operations
-- **Deployment Failures**: Review CloudFormation events and Lambda logs
-
-### Common V1 Issues
-- **Regional Limitations**: V1 CloudFormation template may be region-specific
-- **Authentication**: Basic Cognito setup requires manual password reset
-- **Performance**: Single-tenant architecture may have scaling limits
-
-## Support & Contributing
-
-### Getting Help
-- **Documentation**: Comprehensive guides in `/api-v2/integration-tests/README.md`
-- **Issue Tracking**: Use GitHub issues for bug reports and feature requests
-- **Community**: Join discussions for best practices and use cases
-
-### Contributing
-- **Code Standards**: Follow existing patterns and include comprehensive tests
-- **Testing**: All contributions must include unit and integration tests
-- **Documentation**: Update relevant documentation with changes
-- **Security**: Follow secure coding practices, especially for multi-tenant features
 
 ---
 

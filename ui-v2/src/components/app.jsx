@@ -236,7 +236,7 @@ class App extends Component {
 
 // Functional component that uses hooks to access permissions
 const AuthenticatedApp = React.memo(({ childProps, handleClickCapture }) => {
-  const { isRole, loading } = usePermissions();
+  const { isRole, hasPermission, loading } = usePermissions();
 
   // Track when permissions have been loaded to prevent redirect loops
   const [permissionsStable, setPermissionsStable] = React.useState(false);
@@ -293,7 +293,7 @@ const AuthenticatedApp = React.memo(({ childProps, handleClickCapture }) => {
             !isDeploymentAdmin ? <Wheel {...props} /> : <div>Access denied</div>
           } />
           <Route path={ROUTES.PARTICIPANTS} exact={true} render={(props) => 
-            !isDeploymentAdmin ? <ParticipantTable {...props} /> : <div>Access denied</div>
+            hasPermission('manage_participants') ? <ParticipantTable {...props} /> : <div>Access denied</div>
           } />
           
           <Route component={NotFound} />

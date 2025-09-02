@@ -4,6 +4,7 @@
 import json
 import os
 import boto3
+import logging
 from typing import Dict, Any
 from base import BadRequestError, NotFoundError
 from wheel_group_middleware import require_auth, require_wheel_group_permission, get_wheel_group_context
@@ -11,6 +12,58 @@ from utils_v2 import (
     WheelGroupRepository, UserRepository, WheelRepository, ParticipantsTable, 
     check_string, get_utc_timestamp, decimal_to_float
 )
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+
+def generate_secure_password(length=12):
+    """
+    Generate a cryptographically secure random password that meets AWS Cognito requirements.
+    
+    AWS Cognito password policy typically requires:
+    - At least 8 characters (we'll use 12 for better security)
+    - At least one uppercase letter
+    - At least one lowercase letter  
+    - At least one number
+    - At least one special character
+    
+    Args:
+        length (int): Password length, minimum 8, default 12
+        
+    Returns:
+        str: Generated password
+    """
+    import secrets
+    import string
+    
+    if length < 8:
+        length = 8
+    
+    # Define character sets
+    uppercase = string.ascii_uppercase
+    lowercase = string.ascii_lowercase
+    numbers = string.digits
+    # Use safe special characters that work well in most contexts
+    special_chars = "!@#$%^&*"
+    
+    # Ensure at least one character from each required category
+    password_chars = [
+        secrets.choice(uppercase),
+        secrets.choice(lowercase), 
+        secrets.choice(numbers),
+        secrets.choice(special_chars)
+    ]
+    
+    # Fill remaining length with random choices from all categories
+    all_chars = uppercase + lowercase + numbers + special_chars
+    for _ in range(length - 4):
+        password_chars.append(secrets.choice(all_chars))
+    
+    # Shuffle the password to avoid predictable patterns
+    secrets.SystemRandom().shuffle(password_chars)
+    
+    return ''.join(password_chars)
 
 # Constants
 HTTP_STATUS_CODES = {
@@ -65,7 +118,6 @@ VALIDATION_MESSAGES = {
 }
 
 COGNITO_CONFIG = {
-    'TEMP_PASSWORD': 'TempPass123!',
     'MESSAGE_ACTION': 'SUPPRESS'
 }
 
@@ -115,10 +167,13 @@ def validate_required_string(value: Any, field_name: str) -> None:
         raise BadRequestError(f"{field_name} is required and must be a non-empty string")
 
 
-def create_cognito_user(email: str, username: str, wheel_group_id: str) -> str:
-    """Create user in Cognito and return the user ID (sub)"""
+def create_cognito_user(email: str, username: str, wheel_group_id: str) -> tuple[str, str]:
+    """Create user in Cognito and return the user ID (sub) and generated password"""
     cognito_client = boto3.client('cognito-idp')
     user_pool_id = os.environ.get('COGNITO_USER_POOL_ID')
+    
+    # Generate secure random password
+    temp_password = generate_secure_password()
     
     try:
         cognito_response = cognito_client.admin_create_user(
@@ -130,14 +185,14 @@ def create_cognito_user(email: str, username: str, wheel_group_id: str) -> str:
                 {'Name': 'name', 'Value': username},
                 {'Name': 'custom:wheel_group_id', 'Value': wheel_group_id}
             ],
-            TemporaryPassword=COGNITO_CONFIG['TEMP_PASSWORD'],
+            TemporaryPassword=temp_password,
             MessageAction=COGNITO_CONFIG['MESSAGE_ACTION']
         )
         
         # Extract Cognito user ID (sub)
         for attr in cognito_response['User']['Attributes']:
             if attr['Name'] == 'sub':
-                return attr['Value']
+                return attr['Value'], temp_password
         
         raise Exception("Failed to get Cognito user ID from response")
         
@@ -158,10 +213,10 @@ def delete_cognito_user(email: str) -> None:
             Username=email
         )
     except cognito_client.exceptions.UserNotFoundException:
-        pass  # User already deleted, that's ok
-    except Exception:
+        logger.info(f"User {email} already deleted from Cognito - no action needed")
+    except Exception as e:
         # Don't fail the request if Cognito deletion fails
-        pass
+        logger.error(f"Unexpected error while deleting user {email} from Cognito: {str(e)}")
 
 
 @require_auth()
@@ -445,6 +500,9 @@ def create_wheel_group_user(event, context=None):
         cognito_client = boto3.client('cognito-idp')
         user_pool_id = os.environ.get('COGNITO_USER_POOL_ID')
         
+        # Generate secure random password
+        temp_password = generate_secure_password()
+        
         try:
             # Create user in Cognito with username as the login identifier
             cognito_response = cognito_client.admin_create_user(
@@ -457,7 +515,7 @@ def create_wheel_group_user(event, context=None):
                     {'Name': 'custom:wheel_group_id', 'Value': wheel_group_context['wheel_group_id']},
                     {'Name': 'custom:deployment_admin', 'Value': 'false'}
                 ],
-                TemporaryPassword='TempPass123!',  # User must change on first login
+                TemporaryPassword=temp_password,  # Use generated password
                 MessageAction='SUPPRESS'  # Don't send welcome email automatically
             )
             
@@ -490,7 +548,7 @@ def create_wheel_group_user(event, context=None):
         created_user = UserRepository.create_user(user_data)
         
         # Add temporary password info to response (admin needs to communicate this to user)
-        created_user['temporary_password'] = 'TempPass123!'
+        created_user['temporary_password'] = temp_password  # Use generated password
         created_user['password_reset_required'] = True
         
         return {
@@ -800,10 +858,10 @@ def delete_wheel_group_user(event, context=None):
             )
         except cognito_client.exceptions.UserNotFoundException:
             # User already deleted from Cognito, that's ok
-            pass
-        except Exception:
+            logger.info(f"User {user['name']} (ID: {user_id}) already deleted from Cognito - no action needed")
+        except Exception as e:
             # Don't fail the request if Cognito deletion fails
-            pass
+            logger.error(f"Unexpected error while deleting user {user['name']} (ID: {user_id}) from Cognito: {str(e)}")
         
         # Delete user from DynamoDB
         UserRepository.delete_user(user_id)
@@ -1033,8 +1091,8 @@ def delete_wheel_group_recursive(event, context=None):
                         'wheel_group_wheel_id': participant['wheel_group_wheel_id'],
                         'participant_id': participant['participant_id']
                     })
-                except Exception:
-                    pass  # Continue with other participants
+                except Exception as e:
+                    logger.warning(f"Failed to delete participant {participant.get('participant_id', 'unknown')} during recursive cleanup: {str(e)}")
                     
         except Exception:
             pass  # Continue with cleanup
@@ -1054,15 +1112,15 @@ def delete_wheel_group_recursive(event, context=None):
                         Username=username  # Use username (stored in 'name' field) for Cognito
                     )
                 except cognito_client.exceptions.UserNotFoundException:
-                    pass  # User already deleted
-                except Exception:
-                    pass  # Continue with other users
+                    logger.info(f"User {username} (ID: {user_id}) already deleted from Cognito during recursive cleanup - no action needed")
+                except Exception as e:
+                    logger.error(f"Failed to delete user {username} (ID: {user_id}) from Cognito during recursive cleanup: {str(e)}")
                 
                 # Delete from DynamoDB
                 try:
                     UserRepository.delete_user(user_id)
-                except Exception:
-                    pass  # Continue with other users
+                except Exception as e:
+                    logger.warning(f"Failed to delete user {username} (ID: {user_id}) from DynamoDB during recursive cleanup: {str(e)}")
                     
         except Exception:
             pass  # Continue with cleanup

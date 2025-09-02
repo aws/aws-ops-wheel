@@ -19,7 +19,7 @@ import connect from 'react-redux-fetch';
 import UserRow from './user_row';
 import UserModal from './user_modal';
 import DeleteWheelGroupModal from './delete_wheel_group_modal';
-import {Card, Table, Button} from 'react-bootstrap';
+import {Card, Table, Button, Modal, Alert, Form, InputGroup} from 'react-bootstrap';
 import {apiURL, getAuthHeaders} from '../../util';
 import PermissionGuard, { usePermissions } from '../PermissionGuard';
 
@@ -27,13 +27,15 @@ import PermissionGuard, { usePermissions } from '../PermissionGuard';
 const INITIAL_STATE = {
   isUserModalOpen: false,
   isDeleteWheelGroupModalOpen: false,
+  isPasswordModalOpen: false,
   create: false,
   edit: false,
   delete: false,
   deleteWheelGroup: false,
   isDeletingWheelGroup: false,
   wheelGroupName: null,
-  currentUser: null
+  currentUser: null,
+  createdUserInfo: null
 };
 
 const TABLE_HEADERS = [
@@ -94,6 +96,24 @@ export class UserTable extends Component {
 
   toggleDeleteWheelGroupModal = () => {
     this.setState({isDeleteWheelGroupModalOpen: !this.state.isDeleteWheelGroupModalOpen});
+  };
+
+  togglePasswordModal = () => {
+    this.setState({isPasswordModalOpen: !this.state.isPasswordModalOpen});
+  };
+
+  copyToClipboard = (text) => {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text);
+    } else {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+    }
   };
 
   handleDeleteTenant = async () => {
@@ -157,9 +177,34 @@ export class UserTable extends Component {
     }
   };
 
-  handleUserAdd = (user) => {
-    this.props.dispatchCreateUserPost(user);
-    this.setState({create: true});
+  handleUserAdd = async (user) => {
+    try {
+      const response = await fetch(apiURL('wheel-group/users'), {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(user)
+      });
+
+      if (response.ok) {
+        const createdUser = await response.json();
+        
+        // Store the created user info with password
+        this.setState({ 
+          createdUserInfo: createdUser,
+          isPasswordModalOpen: true
+        });
+
+        // Refresh the user list
+        this.props.dispatchUsersGet();
+      } else {
+        const errorData = await response.json();
+        console.error('Failed to create user:', errorData);
+        alert(`Failed to create user: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error creating user:', error);
+      alert('Failed to create user. Please try again.');
+    }
   };
 
   handleUserEdit = (user) => {
@@ -245,7 +290,14 @@ export class UserTable extends Component {
       return <div style={{padding: '15px'}}>Loading...</div>;
     }
 
-    const { isUserModalOpen, isDeleteWheelGroupModalOpen, isDeletingWheelGroup, wheelGroupName } = this.state;
+    const { 
+      isUserModalOpen, 
+      isDeleteWheelGroupModalOpen, 
+      isPasswordModalOpen,
+      isDeletingWheelGroup, 
+      wheelGroupName,
+      createdUserInfo 
+    } = this.state;
     const users = this.getSortedUsers(this.cachedUsersData);
     const userRows = this.renderUserRows(users);
 
@@ -297,6 +349,73 @@ export class UserTable extends Component {
           onClose={this.toggleDeleteWheelGroupModal}
           wheelGroupName={wheelGroupName}
           isDeleting={isDeletingWheelGroup}/>
+        
+        {/* Password Display Modal */}
+        <Modal
+          show={isPasswordModalOpen}
+          onHide={this.togglePasswordModal}
+          size="lg"
+          backdrop="static">
+          <Modal.Header closeButton>
+            <Modal.Title>User Created Successfully!</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {createdUserInfo && (
+              <>
+                <Alert variant="success">
+                  <strong>User "{createdUserInfo.name}" has been created successfully!</strong>
+                </Alert>
+                
+                <div className="mb-3">
+                  <h5>User Details:</h5>
+                  <ul>
+                    <li><strong>Username:</strong> {createdUserInfo.name}</li>
+                    <li><strong>Email:</strong> {createdUserInfo.email}</li>
+                    <li><strong>Role:</strong> {createdUserInfo.role}</li>
+                  </ul>
+                </div>
+
+                <Alert variant="warning">
+                  <strong>Important: Temporary Password</strong>
+                  <p className="mb-2">
+                    A secure temporary password has been generated for this user. 
+                    Please share this password with the user securely.
+                  </p>
+                  
+                  <Form.Group className="mb-3">
+                    <Form.Label><strong>Temporary Password:</strong></Form.Label>
+                    <InputGroup>
+                      <Form.Control
+                        type="text"
+                        value={createdUserInfo.temporary_password || ''}
+                        readOnly
+                        style={{ fontFamily: 'monospace', fontSize: '16px' }}
+                      />
+                      <Button
+                        variant="outline-secondary"
+                        onClick={() => this.copyToClipboard(createdUserInfo.temporary_password)}
+                        title="Copy to clipboard">
+                        📋 Copy
+                      </Button>
+                    </InputGroup>
+                  </Form.Group>
+
+                  <small className="text-muted">
+                    The user must change this password on their first login. 
+                    Please communicate this password to the user through a secure channel.
+                  </small>
+                </Alert>
+              </>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button
+              variant="primary"
+              onClick={this.togglePasswordModal}>
+              I've Saved the Password
+            </Button>
+          </Modal.Footer>
+        </Modal>
       </div>
     );
   }

@@ -319,7 +319,7 @@ export default class UserModal extends Component {
                   </Form.Group>
                   <div className="mb-3">
                     <div className="alert alert-info">
-                      <strong>Note:</strong> User will receive a temporary password (TempPass123!) and must change it on first login.
+                      <strong>Note:</strong> A secure temporary password will be generated for the user. You'll receive the password after creation to share with the user securely.
                     </div>
                   </div>
                 </>
