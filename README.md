@@ -377,6 +377,102 @@ aws cloudformation create-stack \
 3. **Create Wheels**: Set up participant groups
 4. **Start Spinning**: Begin fair selection process
 
+# 🔧 Administration & Maintenance
+
+## V2 Administrative Features
+
+### Deployment Admin Dashboard
+- **Cross-Group Management**: Oversight across all wheel groups
+- **System Monitoring**: Health checks and performance metrics
+- **User Management**: Create and manage deployment administrators
+- **Resource Cleanup**: Automated maintenance and optimization
+- **Security Auditing**: Access logs and compliance reporting
+
+### Wheel Group Management
+- **Organization Setup**: Create isolated wheel groups
+- **Quota Management**: Configure resource limits per group
+- **User Role Assignment**: Fine-grained permission control
+- **Data Export/Import**: Backup and migration capabilities
+- **Custom Branding**: Theme and appearance customization
+
+### Multi-Tenant Security
+- **Data Isolation**: Complete separation between wheel groups
+- **Role-Based Access**: Granular permissions at multiple levels
+- **Audit Trails**: Comprehensive logging of all operations
+- **Secure APIs**: Authentication and authorization at every endpoint
+- **Cross-Tenant Protection**: Zero data leakage guarantees
+
+## V1 Administrative Features
+- **Basic User Management**: Simple Cognito administration
+- **Wheel Operations**: Standard create/edit/delete functionality
+- **Participant Import**: CSV upload using utility script
+- **Simple Monitoring**: Basic CloudFormation stack management
+
+>>>>>>> 1d1196afb6e73e23c969e15bcc52370716a8caab
+# 🔧 Administration & Maintenance
+
+## V2 Administrative Features
+
+### Deployment Admin Dashboard
+- **Cross-Group Management**: Oversight across all wheel groups
+- **System Monitoring**: Health checks and performance metrics
+- **User Management**: Create and manage deployment administrators
+- **Resource Cleanup**: Automated maintenance and optimization
+- **Security Auditing**: Access logs and compliance reporting
+
+### Wheel Group Management
+- **Organization Setup**: Create isolated wheel groups
+- **Quota Management**: Configure resource limits per group
+- **User Role Assignment**: Fine-grained permission control
+- **Data Export/Import**: Backup and migration capabilities
+- **Custom Branding**: Theme and appearance customization
+
+### Multi-Tenant Security
+- **Data Isolation**: Complete separation between wheel groups
+- **Role-Based Access**: Granular permissions at multiple levels
+- **Audit Trails**: Comprehensive logging of all operations
+- **Secure APIs**: Authentication and authorization at every endpoint
+- **Cross-Tenant Protection**: Zero data leakage guarantees
+
+## V1 Administrative Features
+- **Basic User Management**: Simple Cognito administration
+- **Wheel Operations**: Standard create/edit/delete functionality
+- **Participant Import**: CSV upload using utility script
+- **Simple Monitoring**: Basic CloudFormation stack management
+
+=======
+# 🔧 Administration & Maintenance
+
+## V2 Administrative Features
+
+### Deployment Admin Dashboard
+- **Cross-Group Management**: Oversight across all wheel groups
+- **System Monitoring**: Health checks and performance metrics
+- **User Management**: Create and manage deployment administrators
+- **Resource Cleanup**: Automated maintenance and optimization
+- **Security Auditing**: Access logs and compliance reporting
+
+### Wheel Group Management
+- **Organization Setup**: Create isolated wheel groups
+- **Quota Management**: Configure resource limits per group
+- **User Role Assignment**: Fine-grained permission control
+- **Data Export/Import**: Backup and migration capabilities
+- **Custom Branding**: Theme and appearance customization
+
+### Multi-Tenant Security
+- **Data Isolation**: Complete separation between wheel groups
+- **Role-Based Access**: Granular permissions at multiple levels
+- **Audit Trails**: Comprehensive logging of all operations
+- **Secure APIs**: Authentication and authorization at every endpoint
+- **Cross-Tenant Protection**: Zero data leakage guarantees
+
+## V1 Administrative Features
+- **Basic User Management**: Simple Cognito administration
+- **Wheel Operations**: Standard create/edit/delete functionality
+- **Participant Import**: CSV upload using utility script
+- **Simple Monitoring**: Basic CloudFormation stack management
+
+>>>>>>> 1d1196afb6e73e23c969e15bcc52370716a8caab
 # 📋 Miscellaneous
 
 ## Import Participant Data from CSV
@@ -414,4 +510,3 @@ To change wheel spinning speed, modify `EASE_OUT_FRAMES` and `LINEAR_FRAMES` in 
 ## License & Legal
 
 This project is licensed under the Apache License 2.0. See [`LICENSE`](LICENSE), [`NOTICE`](NOTICE), and [`THIRD-PARTY-LICENSES`](THIRD-PARTY-LICENSES) for complete details.
-
