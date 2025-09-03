@@ -82,14 +82,10 @@ This algorithm ensures recently chosen participants have lower probability of be
   - Optional wheel templates for consistency
 - **Edit an existing wheel**: Modify settings, appearance, and selection parameters
 - **Delete a wheel**: Remove wheel and all associated participants
-- **Multi-Select Spin**: Select multiple participants simultaneously (up to 30)
-  - ***Notes:*** Weights are adjusted proportionally for all selected participants
 - **Single Spin**: Traditional single participant selection with enhanced animations
   - ***Notes:*** This does not adjust weighting, so if you're unhappy with the result, you can spin again
 - **Proceed**: Accept the suggested participant(s) and adjust weights accordingly
 - **Reset**: Restart all participants to equal weights as 1.0
-- **Export wheel data**: Download participant lists and selection history
-- **Duplicate wheel**: Create copies with same participants but fresh weights
 
 ### Advanced Participant Operations
 ***Notes:*** Participants have enhanced profiles and are isolated within wheel groups
@@ -101,14 +97,11 @@ This algorithm ensures recently chosen participants have lower probability of be
   - Batch import support via CSV upload
 - **Edit participant details**: Update name, URL, weight, tags, and metadata
 - **Delete specific participants**: Remove individuals from wheels
-- **Bulk participant management**: Mass updates, imports, and exports
 - **Advanced rigging**: Configure participants to be selected next
   - Doesn't change actual weighting - bypasses selection algorithm temporarily
   - After proceeding, weights adjust as if participant was selected normally
   - Can be hidden (deceptive) or visible (comical demonstration mode)
   - Supports multi-participant rigging for complex scenarios
-- **Participant history**: View selection history, frequency, and weight changes over time
-- **Weight management**: Fine-tune individual participant probabilities
 
 ### User Management Operations (V2 Multi-Tenant)
 ***Notes:*** Users belong to wheel groups with role-based permissions
@@ -119,9 +112,7 @@ This algorithm ensures recently chosen participants have lower probability of be
   - Email verification and welcome workflows
 - **Update user roles**: Change permissions within the wheel group
 - **Delete users**: Remove users from both the wheel group and authentication system
-- **Invite users**: Send invitations to join the wheel group
-- **User activity monitoring**: Track login history and wheel usage
-- **Bulk user import**: CSV-based user creation for large teams
+- **Create users**: Create users within the wheel group
 
 ### Deployment Admin Operations (Platform Management)
 ***Notes:*** Deployment Admins have cross-group platform oversight
@@ -135,8 +126,6 @@ This algorithm ensures recently chosen participants have lower probability of be
   - Complete cleanup with no recovery option
   - ***Warning:*** This is the most destructive operation in the system
 - **System monitoring**: Platform-wide health checks and performance metrics
-- **Cross-tenant troubleshooting**: Debug issues across organizations
-- **Platform maintenance**: System updates, cleanup, and optimization
 
 ## V1 Legacy Operations
 
@@ -172,21 +161,17 @@ This algorithm ensures recently chosen participants have lower probability of be
 - **Single organization**: All users share the same wheel instance
 
 ## Screenshots
-### Wheels Table (V2 Enhanced)
+### Wheels Table 
 ![Wheels Table](screenshots/wheels_table.png)
-*Multi-tenant wheel management with group isolation*
 
-### Participants Table (V2 Enhanced)
+### Participants Table 
 ![Participants Table](screenshots/participants_table.png)
-*Advanced participant management with role-based access*
 
 ### Wheel Interface (Pre-spin)
 ![Wheel Pre-spin](screenshots/wheel_pre_spin.png)
-*Enhanced UI with improved user experience*
 
 ### Wheel Interface (Post-spin)
 ![Wheel Post-spin](screenshots/wheel_post_spin.png)
-*Real-time selection with smooth animations*
 
 # User Guide
 
@@ -196,8 +181,6 @@ This algorithm ensures recently chosen participants have lower probability of be
 **Wheel Groups** are isolated organizational containers that provide:
 - **Data Isolation**: Complete separation between organizations
 - **User Management**: Role-based access control within groups
-- **Resource Quotas**: Configurable limits for wheels and participants
-- **Custom Settings**: Organization-specific configurations
 - **Multi-Tenant Security**: Zero data leakage between groups
 
 ### User Roles & Permissions
@@ -210,15 +193,9 @@ This algorithm ensures recently chosen participants have lower probability of be
 - **Create/Edit/Delete** wheels within your wheel group
 - **Multi-Select Spin**: Select multiple participants simultaneously (up to 30)
 - **Advanced Rigging**: Hide or display rigged selections for demonstrations
-- **Wheel Templates**: Reusable wheel configurations
-- **Audit Trail**: Complete history of all wheel operations
-- **Bulk Operations**: Mass updates and configurations
 
 ### Participant Management
-- **Batch Import**: CSV upload for bulk participant creation
-- **Custom Weights**: Fine-tune selection probabilities
 - **Follow-through URLs**: Direct links when participants are selected
-- **Participant Profiles**: Enhanced metadata and history tracking
 - **Group-Scoped Participants**: Complete isolation per wheel group
 
 ## Legacy V1 Concepts
@@ -228,7 +205,7 @@ V1 provides the original single-tenant experience:
 - **Standard Operations**: Create, spin, proceed, reset functionality
 - **Simple Participant Management**: Add/edit/delete with basic weighting
 
-# 🛠️ Development Guide
+# Development Guide
 
 ## Development Dependencies
 
@@ -366,10 +343,8 @@ aws cloudformation create-stack \
 1. **Access Application**: Use the provided CloudFront URL
 2. **Login as Deployment Admin**: Use provided temporary credentials
 3. **Create Wheel Group**: Set up your organization with custom settings
-4. **Invite Users**: Add team members with appropriate roles
-5. **Configure Quotas**: Set limits and permissions per group
+4. **Creare Users**: Add team members with appropriate roles
 6. **Create Wheels**: Set up your selection wheels with templates
-7. **Import Participants**: Use CSV import for bulk data
 
 ### V1 Single-Tenant Setup  
 1. **Access Application**: Use the provided endpoint
@@ -377,7 +352,7 @@ aws cloudformation create-stack \
 3. **Create Wheels**: Set up participant groups
 4. **Start Spinning**: Begin fair selection process
 
-# 📋 Miscellaneous
+# Miscellaneous
 
 ## Import Participant Data from CSV
 
