@@ -17,7 +17,7 @@ import React, {PureComponent} from 'react';
 import PropTypes from 'prop-types';
 import ReactDOM from 'react-dom';
 import connect from 'react-redux-fetch';
-import {Button} from 'react-bootstrap';
+import {Button, Modal} from 'react-bootstrap';
 import {WheelType, ParticipantType} from '../types';
 import {LinkWrapper, WHEEL_COLORS, apiURL, staticURL, getAuthHeaders} from '../util';
 import {usePermissions} from './PermissionContext';
@@ -122,7 +122,8 @@ const ANIMATION_CONFIG = {
 // CSS Styles as Constants
 const STYLES = {
   pageRoot: {
-    textAlign: 'center'
+    textAlign: 'center',
+    position: 'relative'
   },
   loadingContainer: {
     padding: '15px'
@@ -150,9 +151,38 @@ const STYLES = {
   buttonsContainer: {
     textAlign: 'center',
     display: 'flex',
-    justifyContent: 'space-around',
+    justifyContent: 'center',
     alignItems: 'center',
     gap: BUTTON_GAP
+  },
+  rightSideControls: {
+    position: 'absolute',
+    right: '20px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: '15px',
+    zIndex: 200
+  },
+  multiSelectContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '12px 16px',
+    border: '2px solid #007bff',
+    borderRadius: '8px',
+    backgroundColor: '#ffffff',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+    minWidth: '200px'
+  },
+  multiSelectInput: {
+    width: '60px',
+    padding: '6px 10px',
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+    fontSize: '14px'
   },
   editButton: {
     margin: BUTTON_MARGIN,
@@ -279,11 +309,17 @@ export class Wheel extends PureComponent {
       fetching: true,
       rigExtra: undefined,
       isMuted: (this.storage.getItem(STORAGE_KEYS.IS_MUTED) === 'true' ? true : false),
+      isMultiSelect: false,
+      multiSelectCount: 2,
+      selectedParticipants: [],
+      showResultsModal: false,
     };
     this.lastSector = 0;
   }
 
   componentDidMount() {
+    // Ensure clean state on mount (especially after navigation)
+    this.resetMultiSelectState();
     this.fetchWheelAndParticipants();
     // Fetch the wheel click MP3 for later playback
     fetch(staticURL('wheel_click.mp3'), { headers: {'Accept': 'audio/mpeg'} })
@@ -300,6 +336,20 @@ export class Wheel extends PureComponent {
     }
   }
 
+  /**
+   * Reset all multi-select related state to ensure clean state after navigation
+   */
+  resetMultiSelectState() {
+    this.setState({
+      isMultiSelect: false,
+      multiSelectCount: 2,
+      selectedParticipants: [],
+      selectedParticipant: undefined,
+      showResultsModal: false,
+      isSpinning: false
+    });
+  }
+
   fetchWheelAndParticipants() {
     this.props.dispatchWheelGet(this.props.match.params.wheel_id);
     this.props.dispatchAllParticipantsGet(this.props.match.params.wheel_id);
@@ -307,7 +357,7 @@ export class Wheel extends PureComponent {
   }
 
   componentDidUpdate() {
-    const {wheelFetch, allParticipantsFetch, participantSuggestFetch} = this.props;
+    const {wheelFetch, allParticipantsFetch, participantSuggestFetch, multiSuggestFetch} = this.props;
 
     // Process gets for the wheel and participant data and draw the wheel
     if (wheelFetch.fulfilled && allParticipantsFetch.fulfilled && this.state.fetching) {
@@ -324,10 +374,22 @@ export class Wheel extends PureComponent {
         }, this.drawInitialWheel);
     }
 
-    // Process suggested participant result and spin the wheel
-    if (this.state.isSpinning && this.state.selectedParticipant === undefined && participantSuggestFetch.fulfilled) {
-      const {participants} = this.state;
+    // Process multi-select result - only if we're actually in multi-select mode
+    if (this.state.isSpinning && this.state.selectedParticipants.length === 0 && this.state.isMultiSelect && multiSuggestFetch?.fulfilled) {
+      const apiResponse = multiSuggestFetch.value;
+      const selectedParticipants = apiResponse.selected_participants || [];
       
+      // For multi-select, we don't animate the wheel, just show results in modal
+      this.setState({
+        selectedParticipants: selectedParticipants,
+        isSpinning: false,
+        showResultsModal: true
+      });
+    }
+
+    // Process single-select result and spin the wheel
+    if (this.state.isSpinning && this.state.selectedParticipant === undefined && participantSuggestFetch.fulfilled && !this.state.isMultiSelect) {
+      const {participants} = this.state;
       
       // Extract selected participant from API response (v2 API structure)
       const apiResponse = participantSuggestFetch.value;
@@ -447,13 +509,29 @@ export class Wheel extends PureComponent {
    */
   startSpinningWheel = () => {
     // If already spinning or we have stuff in flight, do nothing
-    if (this.state.isSpinning || this.props.participantSelectFetch.pending) {
+    if (this.state.isSpinning || this.props.participantSelectFetch.pending || this.props.multiSuggestFetch?.pending) {
       return;
     }
     
+    // Capture the current multi-select state before clearing other state
+    const isMultiSelectMode = this.state.isMultiSelect;
+    const multiSelectCount = this.state.multiSelectCount;
     
-    this.setState({selectedParticipant: undefined, isSpinning: true});
-    this.props.dispatchParticipantSuggestPost(this.props.match.params.wheel_id);
+    // Clear previous selections and modal state
+    this.setState({
+      selectedParticipant: undefined, 
+      selectedParticipants: [],
+      showResultsModal: false,
+      isSpinning: true
+    });
+
+    // Use multi-select or single-select API based on captured checkbox state
+    if (isMultiSelectMode) {
+      // For multi-select, don't apply weight changes during spin - just get selections
+      this.props.dispatchMultiSuggestPost(this.props.match.params.wheel_id, multiSelectCount, false);
+    } else {
+      this.props.dispatchParticipantSuggestPost(this.props.match.params.wheel_id);
+    }
   }
 
   spin = (delta) => {
@@ -502,7 +580,7 @@ export class Wheel extends PureComponent {
   }
 
   /**
-   * Opens the selected Participant's Web Page
+   * Opens the selected Participant's Web Page(s)
    */
   openParticipantPage = () => {
     // If already spinning, do nothing
@@ -510,11 +588,47 @@ export class Wheel extends PureComponent {
       return;
     }
 
-    // POST the selected participant (this also un-rigs the wheel)
-    this.props.dispatchParticipantSelectPost(this.props.match.params.wheel_id, this.state.selectedParticipant.participant_id);
+    if (this.state.selectedParticipant) {
+      // Single-select mode: open single participant's URL
+      this.props.dispatchParticipantSelectPost(this.props.match.params.wheel_id, this.state.selectedParticipant.participant_id);
+      window.open(this.state.selectedParticipant.participant_url);
+    }
+  }
 
-    // Open the participant's URL
-    window.open(this.state.selectedParticipant.participant_url);
+  /**
+   * Opens a single participant's page (for individual buttons in multi-select modal)
+   */
+  openSingleParticipantPage = (participant) => {
+    if (this.state.isSpinning) {
+      return;
+    }
+    this.props.dispatchParticipantSelectPost(this.props.match.params.wheel_id, participant.participant_id);
+    window.open(participant.participant_url);
+  }
+
+  /**
+   * Opens all selected participants' pages with proper timing to avoid popup blockers
+   * First applies weight redistribution, then opens URLs
+   */
+  openAllParticipantPages = () => {
+    if (this.state.isSpinning) {
+      return;
+    }
+    
+    // First, apply weight redistribution by calling the multi-suggest API with apply_changes: true
+    this.props.dispatchMultiSuggestApplyChangesPost(
+      this.props.match.params.wheel_id, 
+      this.state.selectedParticipants.length
+    );
+    
+    // Open URLs with small delays to avoid popup blockers
+    // Note: We don't call dispatchParticipantSelectPost here because the multi-selection
+    // was already recorded when the multi-suggest API was called during spinning
+    this.state.selectedParticipants.forEach((participant, index) => {
+      setTimeout(() => {
+        window.open(participant.participant_url);
+      }, index * 100); // 100ms delay between each window
+    });
   }
 
   toggleSound = () => {
@@ -527,14 +641,121 @@ export class Wheel extends PureComponent {
     this.refs.clickSound.volume = (!newMuted ? AUDIO_VOLUME : AUDIO_RESET_TIME);
   }
 
+  /**
+   * Handle multi-select checkbox change
+   */
+  handleMultiSelectChange = (event) => {
+    const isMultiSelect = event.target.checked;
+    this.setState({
+      isMultiSelect,
+      selectedParticipants: [], // Clear previous selections when toggling
+      selectedParticipant: undefined,
+      showResultsModal: false // Clear modal state when switching modes
+    });
+  }
+
+  /**
+   * Handle multi-select count input change
+   */
+  handleMultiSelectCountChange = (event) => {
+    const count = parseInt(event.target.value) || 2;
+    const maxCount = Math.min(50, this.state.participants ? this.state.participants.length : 50);
+    const validCount = Math.max(1, Math.min(count, maxCount));
+    
+    this.setState({
+      multiSelectCount: validCount
+    });
+  }
+
+  /**
+   * Close the results modal
+   */
+  closeResultsModal = () => {
+    this.setState({ showResultsModal: false });
+  }
+
+  /**
+   * Render multi-select results modal
+   */
+  renderMultiSelectModal = () => {
+    const { selectedParticipants, showResultsModal } = this.state;
+    
+    if (!showResultsModal || selectedParticipants.length === 0) {
+      return null;
+    }
+
+    return (
+      <Modal show={showResultsModal} onHide={this.closeResultsModal} size="lg" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>
+            Selected Participants ({selectedParticipants.length})
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div style={{
+            maxHeight: '400px',
+            overflowY: 'auto'
+          }}>
+            {selectedParticipants.map((participant, index) => (
+              <div key={participant.participant_id || index} style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '12px 16px',
+                marginBottom: '8px',
+                backgroundColor: '#f8f9fa',
+                border: '1px solid #dee2e6',
+                borderRadius: '6px',
+                fontSize: '14px'
+              }}>
+                <span style={{
+                  fontWeight: '500',
+                  flex: 1,
+                  textAlign: 'left'
+                }}>
+                  {participant.participant_name}
+                </span>
+                <Button 
+                  variant="primary" 
+                  size="sm"
+                  onClick={() => this.openSingleParticipantPage(participant)}
+                  style={{
+                    marginLeft: '12px',
+                    minWidth: '80px'
+                  }}
+                >
+                  Choose
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={this.closeResultsModal}>
+            Close
+          </Button>
+          <Button variant="primary" onClick={this.openAllParticipantPages} size="lg">
+            Choose All Participants
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    );
+  }
+
   render() {
     const {wheelFetch, allParticipantsFetch, participantSuggestFetch} = this.props;
-    const {wheel, participants, isSpinning, selectedParticipant, isMuted} = this.state;
+    const {wheel, participants, isSpinning, selectedParticipant, isMuted, isMultiSelect, selectedParticipants} = this.state;
 
     let participantName;
+    let chooseButtonText = UI_MESSAGES.CHOOSE;
+    let chooseButtonDisabled = true;
 
-    if (selectedParticipant !== undefined && !isSpinning) {
+    if (isMultiSelect && selectedParticipants.length > 0) {
+      chooseButtonText = `Choose ${selectedParticipants.length} Participants`;
+      chooseButtonDisabled = false;
+    } else if (selectedParticipant !== undefined && !isSpinning) {
       participantName = selectedParticipant.participant_name;
+      chooseButtonDisabled = false;
     }
 
     let header;
@@ -576,10 +797,37 @@ export class Wheel extends PureComponent {
           </Button>
           <div style={STYLES.buttonsContainer}>
             <EditParticipantsButton wheelId={this.props.match.params.wheel_id} />
-            <Button variant='primary' size='md' disabled={participantName === undefined} onClick={this.openParticipantPage}
+
+            <Button variant='primary' size='md' disabled={chooseButtonDisabled} onClick={this.openParticipantPage}
             style={STYLES.chooseButton}>
-                {UI_MESSAGES.CHOOSE}{participantName && <>&nbsp;<b>{participantName}</b></>}
+                {isMultiSelect && selectedParticipants.length > 0 ? chooseButtonText : (
+                  <>{UI_MESSAGES.CHOOSE}{participantName && <>&nbsp;<b>{participantName}</b></>}</>
+                )}
             </Button>
+          </div>
+          
+          {/* Right side controls */}
+          <div style={STYLES.rightSideControls}>
+            <div style={STYLES.multiSelectContainer}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={this.state.isMultiSelect}
+                  onChange={this.handleMultiSelectChange}
+                  style={{ marginRight: '6px' }}
+                />
+                Multi-Select
+              </label>
+              <input
+                type="number"
+                min="1"
+                max={Math.min(50, participants ? participants.length : 50)}
+                value={this.state.multiSelectCount}
+                onChange={this.handleMultiSelectCountChange}
+                disabled={!this.state.isMultiSelect}
+                style={STYLES.multiSelectInput}
+              />
+            </div>
           </div>
         </div>
         <div style={STYLES.wheelContainer}>
@@ -592,6 +840,7 @@ export class Wheel extends PureComponent {
             {UI_MESSAGES.SPIN}
           </Button>
         </div>
+        {this.renderMultiSelectModal()}
       </div>
     );
   }
@@ -629,6 +878,30 @@ export default connect(
       request: (wheelId)  => ({
         url: apiURL(`wheels/${wheelId}/suggest`),
         headers: getAuthHeaders(),
+      })
+    },
+    {
+      resource: 'multiSuggest',
+      method: 'post',
+      request: (wheelId, count, applyChanges = true)  => ({
+        url: apiURL(`wheels/${wheelId}/multi-suggest`),
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          count: count,
+          apply_changes: applyChanges
+        })
+      })
+    },
+    {
+      resource: 'multiSuggestApplyChanges',
+      method: 'post',
+      request: (wheelId, count)  => ({
+        url: apiURL(`wheels/${wheelId}/multi-suggest`),
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          count: count,
+          apply_changes: true
+        })
       })
     },
   ]

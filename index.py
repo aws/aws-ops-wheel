@@ -282,6 +282,11 @@ class RouteRegistry:
             [HttpMethod.POST]
         )
         self.register_route(
+            ['/v2/wheels/{wheel_id}/multi-suggest', '/app/api/v2/wheels/{wheel_id}/multi-suggest'], 
+            selection_handlers['multi_suggest_participant'], 
+            [HttpMethod.POST]
+        )
+        self.register_route(
             ['/v2/wheels/{wheel_id}/probabilities', '/app/api/v2/wheels/{wheel_id}/probabilities'], 
             selection_handlers['get_selection_probabilities'], 
             [HttpMethod.GET]

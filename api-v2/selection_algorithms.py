@@ -95,6 +95,92 @@ def calculate_selection_probabilities(participants: List[Dict]) -> Dict[str, flo
     return probabilities
 
 
+def get_all_participants(wheel: List[Dict]) -> List[Dict]:
+    """
+    Helper function to get all participants from wheel
+    """
+    return wheel
+
+
+def select_multiple_participants_fair(wheel: List[Dict], selected_participants: List[Dict]):
+    """
+    Apply correct cross-redistribution algorithm for multi-select weight adjustment
+    
+    Algorithm: Each selected participant's weight is distributed equally among ALL other participants
+    (both selected and unselected). This creates the cross-redistribution effect where:
+    - Selected participants lose their original weight but gain redistributed weight from other selected participants
+    - Unselected participants keep their original weight and gain redistributed weight from all selected participants
+    """
+    all_participants = get_all_participants(wheel)
+    selected_ids = {p['participant_id'] for p in selected_participants}
+    num_total = len(all_participants)
+    num_selected = len(selected_participants)
+    
+    if len(all_participants) <= 1:
+        return  # No redistribution needed for single participant
+    
+    # Create weight adjustment map to track redistributed weight
+    weight_adjustments = {p['participant_id']: Decimal('0') for p in all_participants}
+    
+    # For each selected participant, distribute their weight equally among ALL other participants
+    for selected in selected_participants:
+        weight_to_distribute = float(selected.get('weight', 1.0))
+        others_count = num_total - 1  # Everyone except this selected participant
+        weight_per_other = weight_to_distribute / others_count
+        
+        # Give weight to everyone except this selected participant
+        for participant in all_participants:
+            if participant['participant_id'] != selected['participant_id']:
+                weight_adjustments[participant['participant_id']] += Decimal(str(weight_per_other))
+    
+    # Apply weight changes
+    for participant in all_participants:
+        if participant['participant_id'] in selected_ids:
+            # Selected participants get only the redistributed weight from other selected participants
+            participant['weight'] = weight_adjustments[participant['participant_id']]
+        else:
+            current_weight = Decimal(str(participant.get('weight', 1.0)))
+            # Unselected participants add redistributed weight to their existing weight
+            participant['weight'] = current_weight + weight_adjustments[participant['participant_id']]
+    
+    return selected_participants
+
+
+def multi_select_participants(wheel: List[Dict], count: int) -> List[Dict]:
+    """
+    Select multiple participants using bias-free algorithm with cross-redistribution
+    """
+    if count > min(50, len(wheel)):  # Updated max to 50 per requirements
+        raise ValueError("Selection count exceeds maximum allowed")
+    
+    original_weights = {p['participant_id']: p.get('weight', 1.0) for p in wheel}
+    selected_participants = []
+    
+    # Use rejection sampling to avoid bias
+    attempts = 0
+    max_attempts = count * 10  # Prevent infinite loops
+    
+    while len(selected_participants) < count and attempts < max_attempts:
+        # Restore original weights for each selection attempt
+        for participant in wheel:
+            participant['weight'] = Decimal(str(original_weights[participant['participant_id']]))
+        
+        candidate = suggest_participant_legacy(wheel)
+        
+        if candidate not in selected_participants:
+            selected_participants.append(candidate)
+        
+        attempts += 1
+    
+    if len(selected_participants) < count:
+        raise Exception(f"Could not select {count} unique participants after {max_attempts} attempts")
+    
+    # Apply cross-redistribution algorithm
+    select_multiple_participants_fair(wheel, selected_participants)
+    
+    return selected_participants
+
+
 def suggest_participant_legacy(participants: List[Dict], rigging_data: Optional[Dict] = None) -> Dict:
     """
     Single selection algorithm using cumulative weight selection
@@ -270,6 +356,115 @@ def suggest_participant(event, context=None):
     })
 
 
+@require_wheel_group_permission('spin_wheel')
+@handle_api_exceptions
+def multi_suggest_participant(event, context=None):
+    """
+    Multi-participant selection endpoint
+    
+    POST /v2/wheels/{wheel_id}/multi-suggest
+    
+    {
+      "count": 2,
+      "apply_changes": true
+    }
+    """
+    wheel_group_context = get_wheel_group_context(event)
+    
+    # Safe extraction of wheel_id
+    path_params = event.get('pathParameters') or {}
+    wheel_id = path_params.get('wheel_id') if path_params else None
+    body = event.get('body') or {}
+    
+    # Handle case where body might be a JSON string
+    if isinstance(body, str):
+        try:
+            body = json.loads(body)
+        except json.JSONDecodeError:
+            body = {}
+    
+    if not wheel_id:
+        raise BadRequestError(VALIDATION_MESSAGES['WHEEL_ID_REQUIRED'])
+    
+    # Get count from request body
+    count = body.get('count', 1)
+    if not isinstance(count, int) or count < 1 or count > 50:
+        raise BadRequestError("Count must be an integer between 1 and 50")
+    
+    # Get wheel and check permissions
+    wheel = WheelRepository.get_wheel(wheel_group_context['wheel_group_id'], wheel_id)
+    
+    # Get participants
+    participants = ParticipantRepository.list_wheel_participants(
+        wheel_group_context['wheel_group_id'], 
+        wheel_id
+    )
+    
+    if not participants:
+        raise BadRequestError(VALIDATION_MESSAGES['NO_PARTICIPANTS'])
+    
+    if count > len(participants):
+        raise BadRequestError(f"Cannot select {count} participants from {len(participants)} available")
+    
+    # Select multiple participants using multi-select algorithm
+    selected_participants = multi_select_participants(participants, count)
+    
+    # Calculate probabilities for UI display
+    probabilities = calculate_selection_probabilities(participants)
+    
+    # Apply changes if requested
+    apply_changes = body.get('apply_changes', False)
+    
+    if apply_changes:
+        # Update participants in database
+        updates = []
+        selected_ids = {p['participant_id'] for p in selected_participants}
+        
+        for participant in participants:
+            is_selected = participant['participant_id'] in selected_ids
+            update_data = {
+                'participant_id': participant['participant_id'],
+                'weight': Decimal(str(participant['weight'])) if not isinstance(participant['weight'], Decimal) else participant['weight'],
+                'selection_count': Decimal(str((participant.get('selection_count', 0) + 1) if is_selected else participant.get('selection_count', 0)))
+            }
+            
+            # Only set last_selected_at for selected participants to avoid GSI issues
+            if is_selected:
+                update_data['last_selected_at'] = get_utc_timestamp()
+            elif participant.get('last_selected_at'):
+                # Only include last_selected_at if it already exists (not None)
+                update_data['last_selected_at'] = participant['last_selected_at']
+            
+            updates.append(update_data)
+        
+        ParticipantRepository.batch_update_participants(
+            wheel_group_context['wheel_group_id'],
+            wheel_id,
+            updates
+        )
+        
+        # Update wheel spin information
+        wheel_updates = {
+            'last_spun_at': get_utc_timestamp(),
+            'last_spun_by': wheel_group_context['user_id'],
+            'total_spins': wheel.get('total_spins', 0) + 1
+        }
+        
+        WheelRepository.update_wheel(
+            wheel_group_context['wheel_group_id'],
+            wheel_id,
+            wheel_updates
+        )
+    
+    return create_api_response(HTTP_STATUS_CODES['OK'], {
+        'selected_participants': selected_participants,
+        'selection_type': 'multi',
+        'count': len(selected_participants),
+        'probabilities': probabilities,
+        'changes_applied': apply_changes
+    })
+
+
 @require_wheel_group_permission('view_wheels')
 @handle_api_exceptions
 def get_selection_probabilities(event, context=None):
@@ -322,5 +517,6 @@ def get_selection_probabilities(event, context=None):
 # Export Lambda handler functions  
 lambda_handlers = {
     'suggest_participant': suggest_participant,
+    'multi_suggest_participant': multi_suggest_participant,
     'get_selection_probabilities': get_selection_probabilities
 }
