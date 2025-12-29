@@ -469,7 +469,7 @@ build_and_upload_lambda_layer() {
             --layer-name "$layer_name" \
             --description "Content-hash layer for AWS Ops Wheel v2 - Hash: $short_hash" \
             --content S3Bucket="$TEMPLATES_BUCKET",S3Key="lambda-layer-v2.zip" \
-            --compatible-runtimes python3.9 \
+            --compatible-runtimes python3.10 \
             --license-info "Apache-2.0" \
             --region "$REGION")
         

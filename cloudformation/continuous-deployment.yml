@@ -228,7 +228,7 @@ Resources:
           Value: !Ref 'ArtifactsBucket'
         - Name: WEBSITE_ASSETS_BUCKET
           Value: !Ref 'WebsiteAssetsBucket'
-        Image: aws/codebuild/python:3.6.5
+        Image: aws/codebuild/standard:5.0
         Type: LINUX_CONTAINER
       Name: !Ref 'AWS::StackName'
       ServiceRole: !Ref 'CodeBuildRole'
