@@ -211,7 +211,7 @@ V1 provides the original single-tenant experience:
 
 ### V2 Requirements (Recommended)
 - **Node.js** 16.x+ (for enhanced UI features)
-- **Python** 3.9+ (for Lambda compatibility)
+- **Python** 3.10+ (for Lambda compatibility)
 - **AWS CLI** 2.x+ with proper permissions
 - **Dependencies**:
   ```bash
