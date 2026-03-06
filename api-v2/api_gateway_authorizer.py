@@ -12,66 +12,15 @@ sys.path.insert(0, '/opt/python/api-v2')
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-def decode_jwt_payload_only(token: str) -> dict:
-    """
-    Decode JWT payload without signature verification (inline copy)
-    """
-    import base64
-    try:
-        parts = token.split('.')
-        if len(parts) != 3:
-            raise ValueError("Invalid JWT format")
-        
-        # Decode payload (middle part)
-        payload_encoded = parts[1]
-        # Add padding if necessary
-        payload_encoded += '=' * (4 - len(payload_encoded) % 4)
-        payload_bytes = base64.urlsafe_b64decode(payload_encoded)
-        payload = json.loads(payload_bytes.decode('utf-8'))
-        
-        return payload
-    except Exception as e:
-        raise ValueError(f"Failed to decode JWT payload: {str(e)}")
+from jwt_verifier import verify_cognito_token
 
-def validate_token_basic(token: str, user_pool_id: str, client_id: str) -> dict:
+def validate_token(token: str, user_pool_id: str, client_id: str) -> dict:
     """
-    Basic JWT token validation without signature verification (inline copy)
+    Validate a Cognito JWT token with full cryptographic signature verification.
+    Uses the shared jwt_verifier module which fetches JWKS from the Cognito
+    User Pool and verifies the RS256 signature before trusting any claims.
     """
-    import time
-    try:
-        payload = decode_jwt_payload_only(token)
-        
-        # Basic validations
-        required_claims = ['sub', 'exp', 'iss', 'aud']
-        for claim in required_claims:
-            if claim not in payload:
-                raise ValueError(f"Missing required claim: {claim}")
-        
-        # Check issuer format (handle AWS Cognito service issue with typo)
-        region = user_pool_id.split('_')[0]
-        expected_iss = f"https://cognito-idp.{region}.amazonaws.com/{user_pool_id}"
-        typo_iss = f"https://cognitm-idp.{region}.amazonaws.com/{user_pool_id}"  # AWS service issue
-        
-        if payload['iss'] not in [expected_iss, typo_iss]:
-            raise ValueError(f"Invalid issuer: {payload['iss']}. Expected: {expected_iss}")
-        
-        # Check audience
-        if payload['aud'] != client_id:
-            raise ValueError(f"Invalid audience: {payload['aud']}")
-        
-        # Check token type
-        if payload.get('token_use') != 'id':
-            raise ValueError(f"Invalid token use: {payload.get('token_use')}")
-        
-        # Check expiration (basic check)
-        current_time = int(time.time())
-        if payload['exp'] < current_time:
-            raise ValueError("Token has expired")
-        
-        return payload
-        
-    except Exception as e:
-        raise ValueError(f"Token validation failed: {str(e)}")
+    return verify_cognito_token(token, user_pool_id, client_id)
 
 def lookup_user_wheel_group_info(user_email: str) -> dict:
     """
@@ -160,8 +109,8 @@ def lambda_handler(event, context):
                 logger.error("Missing Cognito configuration in environment variables")
                 raise Exception('Unauthorized')
             
-            # Basic JWT validation
-            payload = validate_token_basic(jwt_token, user_pool_id, client_id)
+            # Verify JWT with cryptographic signature validation
+            payload = validate_token(jwt_token, user_pool_id, client_id)
             
             # Get user email from JWT
             user_email = payload.get('email')
