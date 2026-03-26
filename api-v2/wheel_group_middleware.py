@@ -69,6 +69,15 @@ def lookup_user_wheel_group_info(user_email: str) -> Dict[str, Any]:
     except Exception as e:
         raise ValueError(f"Failed to lookup user wheel group info: {str(e)}")
 
+def _is_verified_deployment_admin(email):
+    """Check if email is in the DEPLOYMENT_ADMIN_EMAILS environment variable (case-insensitive)."""
+    admin_emails_raw = os.environ.get('DEPLOYMENT_ADMIN_EMAILS', '')
+    if not admin_emails_raw:
+        return False
+    admin_emails = [e.strip().lower() for e in admin_emails_raw.split(',') if e.strip()]
+    return email.strip().lower() in admin_emails
+
+
 def wheel_group_middleware(event, context):
     """
     Hybrid wheel group middleware: Uses JWT custom attributes first, falls back to DynamoDB lookup
@@ -125,8 +134,11 @@ def wheel_group_middleware(event, context):
                 'body': json.dumps({'error': 'Token missing required claims (email or sub)'})
             }
         
-        # Check if this is a deployment admin user
-        is_deployment_admin = payload.get('custom:deployment_admin') == 'true'
+        # Check if this is a deployment admin user — verify against server-side admin list
+        is_deployment_admin = (
+            payload.get('custom:deployment_admin') == 'true'
+            and _is_verified_deployment_admin(user_email)
+        )
         
         if is_deployment_admin:
             # Deployment admin doesn't belong to any wheel group

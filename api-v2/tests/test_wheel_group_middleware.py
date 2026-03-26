@@ -285,7 +285,7 @@ def test_wheel_group_middleware_missing_email_claim(mock_verify):
     assert 'Token missing required claims' in error_body['error']
 
 
-@patch.dict(os.environ, {'COGNITO_USER_POOL_ID': 'us-west-2_TestPool', 'COGNITO_CLIENT_ID': 'test-client-id'})
+@patch.dict(os.environ, {'COGNITO_USER_POOL_ID': 'us-west-2_TestPool', 'COGNITO_CLIENT_ID': 'test-client-id', 'DEPLOYMENT_ADMIN_EMAILS': 'test@example.com'})
 @patch('wheel_group_middleware.verify_cognito_token')
 def test_wheel_group_middleware_deployment_admin_success(mock_verify):
     """Test middleware with valid deployment admin token"""
@@ -540,7 +540,7 @@ def test_nested_decorators_success(mock_verify, mock_lookup):
     assert body['message'] == 'wheel rigged'
 
 
-@patch.dict(os.environ, {'COGNITO_USER_POOL_ID': 'us-west-2_TestPool', 'COGNITO_CLIENT_ID': 'test-client-id'})
+@patch.dict(os.environ, {'COGNITO_USER_POOL_ID': 'us-west-2_TestPool', 'COGNITO_CLIENT_ID': 'test-client-id', 'DEPLOYMENT_ADMIN_EMAILS': 'test@example.com'})
 @patch('wheel_group_middleware.lookup_user_wheel_group_info')
 @patch('wheel_group_middleware.verify_cognito_token')
 def test_deployment_admin_permissions_override(mock_verify, mock_lookup):
@@ -711,7 +711,7 @@ def test_middleware_prevents_role_escalation(mock_verify, mock_lookup):
     assert context['permissions']['create_wheel'] == False
 
 
-@patch.dict(os.environ, {'COGNITO_USER_POOL_ID': 'us-west-2_TestPool', 'COGNITO_CLIENT_ID': 'test-client-id'})
+@patch.dict(os.environ, {'COGNITO_USER_POOL_ID': 'us-west-2_TestPool', 'COGNITO_CLIENT_ID': 'test-client-id', 'DEPLOYMENT_ADMIN_EMAILS': 'test@example.com'})
 @patch('wheel_group_middleware.verify_cognito_token')
 def test_middleware_header_case_insensitive(mock_verify):
     """Test middleware handles Authorization header case variations"""

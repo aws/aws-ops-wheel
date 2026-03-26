@@ -70,6 +70,15 @@ def create_response(status_code, body, additional_headers=None):
     }
 
 
+def _is_verified_deployment_admin(email):
+    """Check if email is in the DEPLOYMENT_ADMIN_EMAILS environment variable (case-insensitive)."""
+    admin_emails_raw = os.environ.get('DEPLOYMENT_ADMIN_EMAILS', '')
+    if not admin_emails_raw:
+        return False
+    admin_emails = [e.strip().lower() for e in admin_emails_raw.split(',') if e.strip()]
+    return email.strip().lower() in admin_emails
+
+
 def check_deployment_admin_permission(event):
     """
     Check if the authenticated user is a deployment admin
@@ -98,6 +107,16 @@ def check_deployment_admin_permission(event):
             logger.warning(f"Available user_info keys: {list(user_info.keys())}")
             logger.warning(f"Available wheel_group_context keys: {list(wheel_group_context.keys())}")
             logger.warning(f"Available authorizer_context keys: {list(authorizer_context.keys())}")
+            return False
+
+        # Server-side verification: even if the flag is set, verify email against admin list
+        user_email = (
+            user_info.get('email', '') or
+            wheel_group_context.get('email', '') or
+            authorizer_context.get('email', '')
+        )
+        if not _is_verified_deployment_admin(user_email):
+            logger.warning(f"Deployment admin flag set but email {user_email} is not in DEPLOYMENT_ADMIN_EMAILS")
             return False
 
         return True
