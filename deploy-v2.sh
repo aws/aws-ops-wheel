@@ -848,7 +848,12 @@ create_deployment_admin_user() {
         return 1
     fi
     
-    local temp_password="TempPass123!${SUFFIX}"
+    # Generate a random temporary password (16 chars: upper, lower, digits, special)
+    local temp_password=$(LC_ALL=C tr -dc 'A-Za-z0-9!@#$%^&*' < /dev/urandom | head -c 16)
+    # Ensure password meets Cognito complexity requirements (upper, lower, digit, special)
+    temp_password="${temp_password:0:12}A1a!"
+    # Store for display in show_outputs
+    GENERATED_ADMIN_PASSWORD="$temp_password"
     
     # Determine if admin email/username were explicitly provided (not defaults)
     local admin_email_provided=false
@@ -1425,7 +1430,7 @@ main() {
     log_info "=== Deployment Admin Credentials ==="
     log_success "Username: ${FINAL_ADMIN_USERNAME:-$ADMIN_USERNAME}"
     log_success "Email: $ADMIN_EMAIL"
-    log_success "Temporary Password: TempPass123!${SUFFIX}"
+    log_success "Temporary Password: $GENERATED_ADMIN_PASSWORD"
     log_warning "⚠️  IMPORTANT: You will be prompted to change this password on first login"
     log_warning "⚠️  The deployment admin will see the admin dashboard automatically after login"
     echo
