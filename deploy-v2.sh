@@ -36,6 +36,61 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+install_lambda_layer_dependencies() {
+    local target_dir="$1"
+    local requirements_file="$2"
+    local container_image="public.ecr.aws/lambda/python:3.10"
+    local runtime_platform="linux/amd64"
+    local host_os=$(uname -s 2>/dev/null || echo "unknown")
+    local host_arch=$(uname -m 2>/dev/null || echo "unknown")
+    local repo_root=$(pwd)
+
+    if [ ! -f "$requirements_file" ]; then
+        log_warning "Requirements file not found: $requirements_file"
+        return 1
+    fi
+
+    if command -v docker >/dev/null 2>&1; then
+        log_info "Installing Lambda layer dependencies in Docker (${runtime_platform})..."
+        docker run --rm \
+            --platform "${runtime_platform}" \
+            --entrypoint /bin/sh \
+            -v "${repo_root}:/var/task" \
+            -w /var/task \
+            "${container_image}" \
+            -lc "python -m pip install --upgrade pip >/dev/null 2>&1 && python -m pip install --no-cache-dir -r ${requirements_file} -t ${target_dir}"
+        return $?
+    fi
+
+    if command -v podman >/dev/null 2>&1; then
+        log_info "Installing Lambda layer dependencies in Podman (${runtime_platform})..."
+        podman run --rm \
+            --platform "${runtime_platform}" \
+            --entrypoint /bin/sh \
+            -v "${repo_root}:/var/task:Z" \
+            -w /var/task \
+            "${container_image}" \
+            -lc "python -m pip install --upgrade pip >/dev/null 2>&1 && python -m pip install --no-cache-dir -r ${requirements_file} -t ${target_dir}"
+        return $?
+    fi
+
+    if [ "$host_os" = "Linux" ] && [ "$host_arch" = "x86_64" ]; then
+        if command -v python3 >/dev/null 2>&1 && command -v pip3 >/dev/null 2>&1; then
+            log_warning "Docker/Podman not found. Falling back to local python3 and pip3 on Linux x86_64."
+            python3 -m pip install --no-cache-dir -r "$requirements_file" -t "$target_dir"
+            return $?
+        elif command -v python >/dev/null 2>&1 && command -v pip >/dev/null 2>&1; then
+            log_warning "Docker/Podman not found. Falling back to local python and pip on Linux x86_64."
+            python -m pip install --no-cache-dir -r "$requirements_file" -t "$target_dir"
+            return $?
+        fi
+    fi
+
+    log_error "Cannot build Lambda-compatible Python dependencies on this host."
+    log_error "Install Docker or Podman, or run the deployment from a Linux x86_64 environment."
+    return 1
+}
+
 # Function to check if AWS CLI is configured
 check_aws_config() {
     log_info "Checking AWS CLI configuration..."
@@ -366,23 +421,16 @@ build_and_upload_lambda_layer() {
     # Step 2: Clean up any existing layer directory
     rm -rf lambda-layer-fixed
     mkdir -p lambda-layer-fixed/python
-    
-    # Step 3: Install minimal Python dependencies first (if requirements exist)
+
+    # Step 3: Install Python dependencies in a Lambda-compatible environment
     if [ -f "lambda-layer-requirements.txt" ]; then
         log_info "Installing minimal Python dependencies from lambda-layer-requirements.txt..."
-        
-        # Check if we have python3 and pip
-        if command -v python3 >/dev/null 2>&1 && command -v pip3 >/dev/null 2>&1; then
-            log_info "Using python3 and pip3 for dependency installation..."
-            pip3 install --target lambda-layer-fixed/python -r lambda-layer-requirements.txt --no-deps --quiet
-            log_success "✓ Minimal dependencies installed successfully"
-        elif command -v python >/dev/null 2>&1 && command -v pip >/dev/null 2>&1; then
-            log_info "Using python and pip for dependency installation..."
-            pip install --target lambda-layer-fixed/python -r lambda-layer-requirements.txt --no-deps --quiet
+
+        if install_lambda_layer_dependencies "lambda-layer-fixed/python" "lambda-layer-requirements.txt"; then
             log_success "✓ Minimal dependencies installed successfully"
         else
-            log_warning "Python/pip not found, skipping dependency installation"
-            log_info "Layer will only contain application code (Lambda runtime provides boto3/botocore)"
+            log_error "Failed to install Lambda layer dependencies"
+            exit 1
         fi
     else
         log_info "No lambda-layer-requirements.txt found, building layer with code only"
