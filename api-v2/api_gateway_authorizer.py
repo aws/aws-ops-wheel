@@ -81,6 +81,15 @@ def get_role_permissions(role: str) -> list:
     }
     return permissions_map.get(role.upper(), permissions_map['USER'])
 
+def _is_verified_deployment_admin(email):
+    """Check if email is in the DEPLOYMENT_ADMIN_EMAILS environment variable (case-insensitive)."""
+    admin_emails_raw = os.environ.get('DEPLOYMENT_ADMIN_EMAILS', '')
+    if not admin_emails_raw:
+        return False
+    admin_emails = [e.strip().lower() for e in admin_emails_raw.split(',') if e.strip()]
+    return email.strip().lower() in admin_emails
+
+
 def lambda_handler(event, context):
     """
     API Gateway Lambda Authorizer using DynamoDB-based tenant lookup
@@ -118,8 +127,11 @@ def lambda_handler(event, context):
                 logger.error("Token missing email claim")
                 raise Exception('Unauthorized')
             
-            # Check if this is a deployment admin user
-            is_deployment_admin = payload.get('custom:deployment_admin') == 'true'
+            # Check if this is a deployment admin user — verify against server-side admin list
+            is_deployment_admin = (
+                payload.get('custom:deployment_admin') == 'true'
+                and _is_verified_deployment_admin(user_email)
+            )
             
             if is_deployment_admin:
                 # For deployment admin, create context without database lookup

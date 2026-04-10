@@ -68,6 +68,11 @@ Parameters:
     Type: String
     Description: Cognito User Pool ARN
 
+  AdminEmail:
+    Type: String
+    Description: Comma-separated list of deployment admin email addresses
+    Default: admin@example.com
+
 Resources:
   # =================== LAMBDA EXECUTION ROLE ===================
 
@@ -146,6 +151,7 @@ Resources:
           PARTICIPANTS_TABLE: !Ref ParticipantsTableName
           COGNITO_USER_POOL_ID: !Ref UserPoolId
           COGNITO_CLIENT_ID: !Ref UserPoolClientId
+          DEPLOYMENT_ADMIN_EMAILS: !Ref AdminEmail
       Code:
         S3Bucket: !Ref TemplatesBucketName
         S3Key: 'index.zip'
@@ -240,6 +246,7 @@ Resources:
           USERS_TABLE: !Ref UsersTableName
           COGNITO_USER_POOL_ID: !Ref UserPoolId
           COGNITO_CLIENT_ID: !Ref UserPoolClientId
+          DEPLOYMENT_ADMIN_EMAILS: !Ref AdminEmail
       Code:
         S3Bucket: !Ref TemplatesBucketName
         S3Key: 'authorizer_index.zip'

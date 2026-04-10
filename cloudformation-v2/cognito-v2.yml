@@ -64,6 +64,9 @@ Resources:
       ExplicitAuthFlows:
         - ADMIN_NO_SRP_AUTH
         - USER_PASSWORD_AUTH
+      WriteAttributes:
+        - email
+        - name
       TokenValidityUnits:
         IdToken: hours
         AccessToken: hours

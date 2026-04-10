@@ -443,7 +443,7 @@ def test_generate_policy_empty_context():
 
 # Lambda Handler Tests (10 tests)
 
-@patch.dict(os.environ, {'COGNITO_USER_POOL_ID': 'us-west-2_TestPool', 'COGNITO_CLIENT_ID': 'test-client-id'})
+@patch.dict(os.environ, {'COGNITO_USER_POOL_ID': 'us-west-2_TestPool', 'COGNITO_CLIENT_ID': 'test-client-id', 'DEPLOYMENT_ADMIN_EMAILS': 'test@example.com'})
 @patch('api_gateway_authorizer.lookup_user_wheel_group_info')
 @patch('api_gateway_authorizer.verify_cognito_token')
 def test_lambda_handler_deployment_admin_success(mock_verify, mock_lookup):
@@ -633,7 +633,7 @@ def test_authorizer_end_to_end_regular_user(mock_lookup, mock_verify):
     mock_lookup.assert_called_once_with('wheeladmin@example.com')
 
 
-@patch.dict(os.environ, {'COGNITO_USER_POOL_ID': 'us-west-2_TestPool', 'COGNITO_CLIENT_ID': 'test-client-id'})
+@patch.dict(os.environ, {'COGNITO_USER_POOL_ID': 'us-west-2_TestPool', 'COGNITO_CLIENT_ID': 'test-client-id', 'DEPLOYMENT_ADMIN_EMAILS': 'admin@example.com'})
 @patch('api_gateway_authorizer.verify_cognito_token')
 def test_authorizer_end_to_end_deployment_admin(mock_verify):
     """Test complete authorizer flow for deployment admin"""
