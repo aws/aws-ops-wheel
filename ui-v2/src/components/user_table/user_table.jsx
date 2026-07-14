@@ -21,6 +21,7 @@ import UserModal from './user_modal';
 import DeleteWheelGroupModal from './delete_wheel_group_modal';
 import {Card, Table, Button, Modal, Alert, Form, InputGroup} from 'react-bootstrap';
 import {apiURL, getAuthHeaders} from '../../util';
+import {clearStoredTokens} from '../../auth_storage';
 import PermissionGuard, { usePermissions } from '../PermissionGuard';
 
 // Constants
@@ -148,7 +149,10 @@ export class UserTable extends Component {
 
   performCompleteLogout = () => {
     try {
-      // Clear all possible authentication tokens
+      // Clear in-memory auth tokens (the source of truth; see auth_storage.jsx).
+      clearStoredTokens();
+
+      // Clear any legacy authentication tokens that may linger in web storage.
       localStorage.removeItem('userToken');
       localStorage.removeItem('idToken');
       localStorage.removeItem('accessToken');
