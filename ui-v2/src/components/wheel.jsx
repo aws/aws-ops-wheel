@@ -19,7 +19,7 @@ import ReactDOM from 'react-dom';
 import connect from 'react-redux-fetch';
 import {Button} from 'react-bootstrap';
 import {WheelType, ParticipantType} from '../types';
-import {LinkWrapper, WHEEL_COLORS, apiURL, staticURL, getAuthHeaders, isSafeHttpUrl} from '../util';
+import {LinkWrapper, WHEEL_COLORS, apiURL, staticURL, getAuthHeaders} from '../util';
 import {usePermissions} from './PermissionContext';
 import '../static_content/wheel_click.mp3';
 import 'isomorphic-fetch';
@@ -513,16 +513,8 @@ export class Wheel extends PureComponent {
     // POST the selected participant (this also un-rigs the wheel)
     this.props.dispatchParticipantSelectPost(this.props.match.params.wheel_id, this.state.selectedParticipant.participant_id);
 
-    // Open the participant's URL. Only http/https URLs are opened; a stored
-    // javascript:/data:/etc. participant_url is refused here as defense-in-depth
-    // (the server-side scheme allowlist is the primary control). noopener,noreferrer
-    // severs window.opener so the opened page cannot reach back into this app.
-    const participantUrl = this.state.selectedParticipant.participant_url;
-    if (isSafeHttpUrl(participantUrl)) {
-      window.open(participantUrl, '_blank', 'noopener,noreferrer');
-    } else if (participantUrl) {
-      console.warn('Refusing to open participant_url with disallowed scheme:', participantUrl);
-    }
+    // Open the participant's URL
+    window.open(this.state.selectedParticipant.participant_url);
   }
 
   toggleSound = () => {

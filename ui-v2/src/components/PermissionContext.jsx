@@ -15,7 +15,6 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { authenticatedFetch, apiURL } from '../util';
-import { getStoredIdToken, clearStoredTokens } from '../auth_storage';
 
 // Permission mappings matching backend role definitions
 const ROLE_PERMISSIONS = {
@@ -109,7 +108,7 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
         tokenInfo = extractUserInfoFromToken();
       } catch (error) {
         console.warn('Failed to extract user info from token:', error);
-        clearStoredTokens();
+        localStorage.removeItem('idToken');
         window.location.href = '/app/login';
         return;
       }
@@ -139,7 +138,7 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
               permissions: backendUserInfo.permissions || {}
             };
           } else if (response && response.status === 401) {
-            clearStoredTokens();
+            localStorage.removeItem('idToken');
             window.location.href = '/app/login';
             return;
           } else {
@@ -180,8 +179,17 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
   };
 
   const extractUserInfoFromToken = () => {
-    // Read the ID token from the in-memory auth store (never localStorage).
-    let idToken = getStoredIdToken();
+    let idToken = localStorage.getItem('idToken');
+    
+    if (!idToken) {
+      const cognitoKeys = Object.keys(localStorage).filter(key => 
+        key.includes('CognitoIdentityServiceProvider') && key.endsWith('.idToken')
+      );
+      
+      if (cognitoKeys.length > 0) {
+        idToken = localStorage.getItem(cognitoKeys[0]);
+      }
+    }
 
     if (!idToken) {
       return null;
@@ -192,7 +200,7 @@ export const PermissionProvider = ({ children, validateWithBackend = false }) =>
       
       const currentTime = Math.floor(Date.now() / 1000);
       if (payload.exp && payload.exp < currentTime) {
-        clearStoredTokens();
+        localStorage.removeItem('idToken');
         return null;
       }
 

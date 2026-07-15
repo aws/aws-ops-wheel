@@ -18,7 +18,6 @@ import PropTypes from "prop-types";
 import { Alert, Button, Form } from "react-bootstrap";
 import { CognitoUser } from "amazon-cognito-identity-js";
 import { withRouter } from 'react-router-dom';
-import {authStorage} from '../auth_storage';
 
 // Forgot Password Component Constants
 const FORGOT_PASSWORD_CONFIG = {
@@ -111,8 +110,7 @@ class ForgotPassword extends Component {
     
     const cognitoUser = new CognitoUser({
       Username: this.state.username,
-      Pool: this.props.userPool,
-      Storage: authStorage
+      Pool: this.props.userPool
     });
 
     // Use forgotPassword directly - Cognito will handle email lookup internally

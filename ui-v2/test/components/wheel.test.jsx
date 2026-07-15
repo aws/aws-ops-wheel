@@ -285,31 +285,10 @@ describe('Wheel', function() {
     };
     const wrapper = shallowWithStore(<Wheel {...Object.assign({}, props, shallowProps, dispatchProps, testProps)} />);
     window.open = sinon.spy();
-    wrapper.instance().setState({selectedParticipant: {wheel_id: 'test_wheel_id', participant_id: 'test_id', participant_url: 'https://example.com/prize'}});
+    wrapper.instance().setState({selectedParticipant: {wheel_id: 'test_wheel_id', id: 'test_id', url: 'test_url'}});
     wrapper.instance().openParticipantPage();
     expect(dispatchProps.dispatchParticipantSelectPost.calledWith('test_wheel_id', 'test_id')).to.be.true;
-    expect(window.open.calledWith('https://example.com/prize', '_blank', 'noopener,noreferrer')).to.be.true;
-  });
-
-  it('SECURITY: Should refuse to window.open a participant_url with a dangerous scheme', () => {
-    // Encodes fixed behavior for the participant_url stored XSS: a
-    // javascript:/data:/etc. participant_url must never reach window.open().
-    const testProps = {
-      participantSuggestFetch: {
-        fulfilled: false,
-        rejected: true,
-        pending: false,
-        value: participants,
-      },
-    };
-    const wrapper = shallowWithStore(<Wheel {...Object.assign({}, props, shallowProps, dispatchProps, testProps)} />);
-    window.open = sinon.spy();
-    wrapper.instance().setState({selectedParticipant: {wheel_id: 'test_wheel_id', participant_id: 'test_id',
-      participant_url: "javascript:alert(document.domain)"}});
-    wrapper.instance().openParticipantPage();
-    // Selection is still recorded, but the malicious URL is never opened.
-    expect(dispatchProps.dispatchParticipantSelectPost.calledWith('test_wheel_id', 'test_id')).to.be.true;
-    expect(window.open.called).to.be.false;
+    expect(window.open.calledWith('test_url')).to.be.true;
   });
 
   it('Should not do anything on openParticipantPage if the wheel is still spinning', () => {

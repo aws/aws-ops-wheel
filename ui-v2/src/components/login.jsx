@@ -18,7 +18,6 @@ import PropTypes from "prop-types";
 import {Alert, Button, Form} from "react-bootstrap";
 import {AuthenticationDetails, CognitoUser} from "amazon-cognito-identity-js";
 import { withRouter } from 'react-router-dom';
-import {authStorage} from '../auth_storage';
 
 // Login Component Constants
 const LOGIN_CONFIG = {
@@ -122,7 +121,7 @@ class Login extends Component {
   login = (event) => {
     event.preventDefault();
     this.setState({isInFlight: true});
-    const user = new CognitoUser({ Username: this.state.username, Pool: this.props.userPool, Storage: authStorage });
+    const user = new CognitoUser({ Username: this.state.username, Pool: this.props.userPool });
     const authenticationData = { Username: this.state.username, Password: this.state.password };
     const authenticationDetails = new AuthenticationDetails(authenticationData);
     this.setState({user}, () => user.authenticateUser(authenticationDetails, this));
