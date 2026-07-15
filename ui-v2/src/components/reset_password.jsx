@@ -18,6 +18,7 @@ import PropTypes from "prop-types";
 import { Alert, Button, Form } from "react-bootstrap";
 import { CognitoUser } from "amazon-cognito-identity-js";
 import { withRouter } from 'react-router-dom';
+import {authStorage} from '../auth_storage';
 
 // Reset Password Component Constants
 const RESET_PASSWORD_CONFIG = {
@@ -165,7 +166,8 @@ class ResetPassword extends Component {
     
     const cognitoUser = new CognitoUser({
       Username: this.state.username,
-      Pool: this.props.userPool
+      Pool: this.props.userPool,
+      Storage: authStorage
     });
 
     cognitoUser.confirmPassword(this.state.code, this.state.password, {

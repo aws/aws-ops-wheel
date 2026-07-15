@@ -28,6 +28,7 @@ import '../styles.css';
 import {CognitoUserPool} from 'amazon-cognito-identity-js';
 import {BrowserRouter} from 'react-router-dom';
 import {setAPIConfig} from '../util';
+import {authStorage, clearStoredTokens} from '../auth_storage';
 import { PermissionProvider, usePermissions } from './PermissionContext';
 
 // Lazy load heavy components for better performance
@@ -42,12 +43,6 @@ const INITIAL_STATE = {
   cognitoUserPool: undefined,
   cognitoSession: undefined,
   showTenantCreation: false
-};
-
-const TOKEN_KEYS = {
-  ID_TOKEN: 'idToken',
-  ACCESS_TOKEN: 'accessToken',
-  REFRESH_TOKEN: 'refreshToken'
 };
 
 const ROUTES = {
@@ -86,6 +81,7 @@ class App extends Component {
       const cognitoUserPool = new CognitoUserPool({
         UserPoolId: this.props.configFetch.value.UserPoolId,
         ClientId: this.props.configFetch.value.ClientId,
+        Storage: authStorage,
       })
       this.setState({cognitoUserPool}, this.refreshSession);
     }
@@ -100,22 +96,17 @@ class App extends Component {
           return;
         }
         const idToken = session.getIdToken().getJwtToken();
-        
+
         // Only update state if the session actually changed to prevent unnecessary re-renders
         const currentIdToken = app.state.cognitoSession?.getIdToken()?.getJwtToken();
-        const currentStoredToken = localStorage.getItem(TOKEN_KEYS.ID_TOKEN);
-        
+
         if (currentIdToken !== idToken) {
-          // Store token for both react-redux-fetch and direct API calls
+          // Register the token as an in-memory request header for react-redux-fetch.
+          // The Cognito session tokens themselves live only in the in-memory
+          // authStorage (see auth_storage.jsx); we deliberately no longer copy them
+          // into localStorage, so a stored-XSS payload cannot read them.
           container.registerRequestHeader('Authorization', idToken);
-          
-          // Only update localStorage if the token is actually different to prevent storage events
-          if (currentStoredToken !== idToken) {
-            localStorage.setItem(TOKEN_KEYS.ID_TOKEN, idToken);
-            localStorage.setItem(TOKEN_KEYS.ACCESS_TOKEN, session.getAccessToken().getJwtToken());
-            localStorage.setItem(TOKEN_KEYS.REFRESH_TOKEN, session.getRefreshToken().getToken());
-          }
-          
+
           app.setState({cognitoSession: session});
         }
       })
@@ -124,10 +115,9 @@ class App extends Component {
 
   userLogout = () => {
     this.state.cognitoUserPool.getCurrentUser().signOut();
-    // Clear stored tokens
-    localStorage.removeItem(TOKEN_KEYS.ID_TOKEN);
-    localStorage.removeItem(TOKEN_KEYS.ACCESS_TOKEN);
-    localStorage.removeItem(TOKEN_KEYS.REFRESH_TOKEN);
+    // Clear in-memory tokens (see auth_storage.jsx). signOut() already clears the
+    // Cognito keys from authStorage; this also drops any legacy plain keys.
+    clearStoredTokens();
     this.setState(INITIAL_STATE);
   }
 
@@ -135,6 +125,7 @@ class App extends Component {
     return new CognitoUserPool({
       UserPoolId: config.UserPoolId,
       ClientId: config.ClientId,
+      Storage: authStorage,
     });
   }
 

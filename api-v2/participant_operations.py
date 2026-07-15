@@ -4,6 +4,7 @@
 import json
 from typing import Dict, Any, List
 from decimal import Decimal
+from urllib.parse import urlparse
 from base import BadRequestError, NotFoundError
 from wheel_group_middleware import require_wheel_group_permission, get_wheel_group_context
 from utils_v2 import (
@@ -42,12 +43,18 @@ PARTICIPANT_CONSTRAINTS = {
     'DEFAULT_MAX_PARTICIPANTS': 100
 }
 
+# Only absolute http/https URLs are permitted for participant_url. This blocks
+# dangerous schemes (javascript:, data:, vbscript:, file:) that lead to stored
+# XSS when the URL is later passed to window.open()/<a href> in the frontend.
+ALLOWED_URL_SCHEMES = ('http', 'https')
+
 VALIDATION_MESSAGES = {
     'WHEEL_ID_REQUIRED': "wheel_id is required",
     'PARTICIPANT_ID_REQUIRED': "participant_id is required",
     'PARTICIPANT_NAME_REQUIRED': "participant_name is required and must be a non-empty string",
     'PARTICIPANT_NAME_TOO_LONG': f"participant_name must be {PARTICIPANT_CONSTRAINTS['MAX_NAME_LENGTH']} characters or less",
     'PARTICIPANT_URL_TOO_LONG': f"participant_url must be {PARTICIPANT_CONSTRAINTS['MAX_URL_LENGTH']} characters or less",
+    'PARTICIPANT_URL_INVALID_SCHEME': "participant_url must be an absolute http:// or https:// URL",
     'INVALID_WEIGHT': f"weight must be a number between {PARTICIPANT_CONSTRAINTS['MIN_WEIGHT']} and {PARTICIPANT_CONSTRAINTS['MAX_WEIGHT']}",
     'INVALID_REQUEST_BODY': "Invalid request body format",
     'PARTICIPANT_EXISTS': "Participant '{}' already exists in this wheel",
@@ -108,9 +115,23 @@ def validate_participant_name(participant_name: str) -> None:
 
 
 def validate_participant_url(participant_url: str) -> None:
-    """Validate participant URL"""
-    if participant_url and len(participant_url) > PARTICIPANT_CONSTRAINTS['MAX_URL_LENGTH']:
+    """Validate participant URL: optional, length-bounded, and http/https scheme only.
+
+    An empty/omitted URL is allowed (the field is optional). When a value is
+    provided it must be an absolute http:// or https:// URL; any other scheme
+    (javascript:, data:, vbscript:, file:, mailto:, relative, etc.) is rejected
+    to prevent stored XSS at the frontend window.open()/<a href> sinks.
+    """
+    if not participant_url:
+        return
+    if len(participant_url) > PARTICIPANT_CONSTRAINTS['MAX_URL_LENGTH']:
         raise BadRequestError(VALIDATION_MESSAGES['PARTICIPANT_URL_TOO_LONG'])
+    try:
+        scheme = urlparse(participant_url).scheme.lower()
+    except ValueError:
+        raise BadRequestError(VALIDATION_MESSAGES['PARTICIPANT_URL_INVALID_SCHEME'])
+    if scheme not in ALLOWED_URL_SCHEMES:
+        raise BadRequestError(VALIDATION_MESSAGES['PARTICIPANT_URL_INVALID_SCHEME'])
 
 
 def validate_weight(weight: Any) -> float:
