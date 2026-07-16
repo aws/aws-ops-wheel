@@ -22,9 +22,13 @@ def validate_token(token: str, user_pool_id: str, client_id: str) -> dict:
     """
     return verify_cognito_token(token, user_pool_id, client_id)
 
-def lookup_user_wheel_group_info(user_email: str) -> dict:
+def lookup_user_wheel_group_info(user_email: str, user_id: str = None) -> dict:
     """
-    Look up wheel group information from DynamoDB based on user email (inline copy)
+    Look up wheel group information from DynamoDB based on user email (inline copy).
+
+    If ``user_id`` is provided, it MUST match the DynamoDB user record's user_id
+    (i.e. the Cognito sub). Without this cross-check, two Users rows with the
+    same email would let a caller assume whichever tenant surfaces first.
     """
     import boto3
     from boto3.dynamodb.conditions import Attr
@@ -33,17 +37,29 @@ def lookup_user_wheel_group_info(user_email: str) -> dict:
         dynamodb = boto3.resource('dynamodb', region_name=os.environ.get('AWS_DEFAULT_REGION', 'us-west-2'))
         users_table = dynamodb.Table(os.environ.get('USERS_TABLE'))
         wheel_groups_table = dynamodb.Table(os.environ.get('WHEEL_GROUPS_TABLE'))
-        
+
         # Query Users table by email using safe condition
         response = users_table.scan(
             FilterExpression=Attr('email').eq(user_email)
         )
-        
+
         items = response.get('Items', [])
         if not items:
             raise ValueError(f"User not found in database: {user_email}")
-        
-        user_record = items[0]
+
+        user_record = None
+        if user_id is not None:
+            for candidate in items:
+                if candidate.get('user_id') == user_id:
+                    user_record = candidate
+                    break
+            if user_record is None:
+                raise ValueError(
+                    f"User record does not match authenticated identity for {user_email}"
+                )
+        else:
+            user_record = items[0]
+
         wheel_group_id = user_record['wheel_group_id']
         user_role = user_record.get('role', 'USER')
         
@@ -153,8 +169,10 @@ def lambda_handler(event, context):
                     ]
                 }
             else:
-                # Look up wheel group information from DynamoDB for regular users
-                wheel_group_info = lookup_user_wheel_group_info(user_email)
+                # Look up wheel group information from DynamoDB for regular users.
+                # Pass the JWT sub so a Users row belonging to a different Cognito
+                # user (same email, different sub) is never accepted.
+                wheel_group_info = lookup_user_wheel_group_info(user_email, user_id=payload.get('sub'))
                 logger.info(f"Regular user token validated for user: {user_email}, wheel_group: {wheel_group_info['wheel_group_id']}")
             
             # Generate Allow policy

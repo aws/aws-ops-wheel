@@ -487,7 +487,9 @@ def test_lambda_handler_regular_user_success(mock_verify, mock_lookup):
     assert result['policyDocument']['Statement'][0]['Effect'] == 'Allow'
     validate_regular_user_context(result['context'], 'wg-123', 'USER')
 
-    mock_lookup.assert_called_once_with('test@example.com')
+    # user_id kwarg carries the JWT sub so the lookup can disambiguate
+    # DynamoDB rows that share an email (cross-tenant takeover fix).
+    mock_lookup.assert_called_once_with('test@example.com', user_id='test-user-id-123')
 
 
 def test_lambda_handler_missing_authorization_token():
@@ -630,7 +632,7 @@ def test_authorizer_end_to_end_regular_user(mock_lookup, mock_verify):
     assert context['role'] == 'WHEEL_ADMIN'
     assert context['deployment_admin'] == 'false'
 
-    mock_lookup.assert_called_once_with('wheeladmin@example.com')
+    mock_lookup.assert_called_once_with('wheeladmin@example.com', user_id='test-user-id-123')
 
 
 @patch.dict(os.environ, {'COGNITO_USER_POOL_ID': 'us-west-2_TestPool', 'COGNITO_CLIENT_ID': 'test-client-id', 'DEPLOYMENT_ADMIN_EMAILS': 'admin@example.com'})
