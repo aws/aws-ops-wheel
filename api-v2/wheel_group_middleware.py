@@ -24,29 +24,48 @@ def validate_token(token: str, user_pool_id: str, client_id: str) -> Dict[str, A
     """
     return verify_cognito_token(token, user_pool_id, client_id)
 
-def lookup_user_wheel_group_info(user_email: str) -> Dict[str, Any]:
+def lookup_user_wheel_group_info(user_email: str, user_id: str = None) -> Dict[str, Any]:
     """
-    Look up wheel group information from DynamoDB based on user email
+    Look up wheel group information from DynamoDB based on user email.
+
+    If ``user_id`` is provided, it MUST match the DynamoDB user record's
+    user_id (i.e. the Cognito sub for that record). This guards against a
+    cross-tenant takeover where two Users rows exist for the same email:
+    without the check, the middleware would return whichever row the GSI
+    surfaces first and bind the caller's session to a stranger's tenant.
     """
     try:
         # Direct DynamoDB queries to avoid import issues
         users_table_name = os.environ.get('USERS_TABLE', 'OpsWheelV2-Users-dev')
         wheel_groups_table_name = os.environ.get('WHEEL_GROUPS_TABLE', 'OpsWheelV2-WheelGroups-dev')
-        
+
         users_table = dynamodb.Table(users_table_name)
         wheel_groups_table = dynamodb.Table(wheel_groups_table_name)
-        
+
         # Find user by email using GSI
         response = users_table.query(
             IndexName='email-index',
             KeyConditionExpression=boto3.dynamodb.conditions.Key('email').eq(user_email)
         )
-        
+
         items = response.get('Items', [])
         if not items:
             raise ValueError(f"User not found in database: {user_email}")
-            
-        user_record = items[0]
+
+        user_record = None
+        if user_id is not None:
+            # Pick the row whose user_id matches the caller's Cognito sub.
+            for candidate in items:
+                if candidate.get('user_id') == user_id:
+                    user_record = candidate
+                    break
+            if user_record is None:
+                raise ValueError(
+                    f"User record does not match authenticated identity for {user_email}"
+                )
+        else:
+            user_record = items[0]
+
         wheel_group_id = user_record['wheel_group_id']
         user_role = user_record.get('role', 'USER')
         
@@ -152,9 +171,11 @@ def wheel_group_middleware(event, context):
                 'deployment_admin': True
             }
         else:
-            # Regular user - get latest user info from DynamoDB to ensure roles are up-to-date
+            # Regular user - get latest user info from DynamoDB to ensure roles are up-to-date.
+            # Pass the JWT sub so lookup_user_wheel_group_info refuses to return a
+            # row belonging to a different Cognito user with the same email.
             try:
-                wheel_group_info = lookup_user_wheel_group_info(user_email)
+                wheel_group_info = lookup_user_wheel_group_info(user_email, user_id=user_id)
                 wheel_group_info['deployment_admin'] = False
             except Exception as db_error:
                 # For /auth/me endpoint, allow access without wheel group info

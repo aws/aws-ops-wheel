@@ -371,8 +371,9 @@ def test_preservation_authorizer_regular_user_dynamo_lookup(mock_lookup, mock_ve
 
     result = lambda_handler(event, _mock_lambda_context())
 
-    # DynamoDB lookup must have been called
-    mock_lookup.assert_called_once_with("regular@example.com")
+    # DynamoDB lookup must have been called with the JWT sub so it can
+    # disambiguate rows that share an email (cross-tenant takeover fix).
+    mock_lookup.assert_called_once_with("regular@example.com", user_id="regular-sub-id-002")
 
     # The authorizer must return Allow with the role from DynamoDB
     context = result.get("context", {})
@@ -436,8 +437,9 @@ def test_preservation_middleware_regular_user_dynamo_lookup(mock_lookup, mock_ve
 
     result = wheel_group_middleware(event, _mock_lambda_context())
 
-    # DynamoDB lookup must have been called
-    mock_lookup.assert_called_once_with("user@example.com")
+    # DynamoDB lookup must have been called with the JWT sub so it can
+    # disambiguate rows that share an email (cross-tenant takeover fix).
+    mock_lookup.assert_called_once_with("user@example.com", user_id="regular-sub-id-003")
 
     # The middleware must return an enriched event (not an error response)
     assert "wheel_group_context" in result, (

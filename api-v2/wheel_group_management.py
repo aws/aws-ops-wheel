@@ -927,9 +927,21 @@ def create_wheel_group_public(event, context=None):
     # Validate password strength
     if len(admin_user['password']) < 8:
         raise BadRequestError("Password must be at least 8 characters long")
-    
+
+    # Reject if the email is already registered in this deployment.
+    # Without this, an attacker could register a second Cognito user with the
+    # same email as an existing admin; the email-index GSI in the Users table
+    # would then hold two rows for the same email, and the request middleware
+    # (which resolves tenant context by email lookup) could bind the attacker
+    # to the victim's tenant.
+    existing_user = UserRepository.get_user_by_email(admin_user['email'])
+    if existing_user is not None:
+        raise BadRequestError(
+            f"A user with email {admin_user['email']} already exists"
+        )
+
     from decimal import Decimal
-    
+
     # Create wheel group with default values
     wheel_group_data = {
         'wheel_group_name': body['wheel_group_name'],
@@ -939,21 +951,23 @@ def create_wheel_group_public(event, context=None):
             'default_participant_weight': Decimal(str(DEFAULT_WHEEL_GROUP_SETTINGS['default_participant_weight']))
         })
     }
-    
+
     wheel_group = WheelGroupRepository.create_wheel_group(wheel_group_data)
-    
+
     # Create user in Cognito first to get the Cognito user ID
     cognito_client = boto3.client('cognito-idp')
     user_pool_id = os.environ.get('COGNITO_USER_POOL_ID')
-    
+
     try:
-        # Create user in Cognito with username as login identifier
+        # Create user in Cognito with username as login identifier.
+        # email_verified is intentionally NOT set here: the caller has not
+        # proven ownership of the address, so we rely on the Cognito
+        # verification flow to mark it verified.
         cognito_response = cognito_client.admin_create_user(
             UserPoolId=user_pool_id,
             Username=admin_user['username'],  # Use username as Cognito username
                 UserAttributes=[
                     {'Name': 'email', 'Value': admin_user['email']},
-                    {'Name': 'email_verified', 'Value': 'true'},
                     {'Name': 'name', 'Value': admin_user['username']},
                     {'Name': 'custom:wheel_group_id', 'Value': wheel_group['wheel_group_id']},
                     {'Name': 'custom:deployment_admin', 'Value': 'false'}
