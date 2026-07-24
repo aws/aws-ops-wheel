@@ -93,7 +93,7 @@
     "font-awesome": "^4.7.0",
     "isomorphic-fetch": "^3.0.0",
     "just-extend": "^4.0.0",
-    "lodash": "^4.17.21",
+    "lodash": "^4.17.23",
     "moment": "^2.29.4",
     "moment-timezone": "^0.5.35",
     "node-fetch": ">=3.2.10",
