@@ -98,7 +98,7 @@ class TemplateCompiler:
         self.filenames = filenames
 
     def __enter__(self):
-        self.configs = [yaml.load(open(os.path.join(self.in_dir, name))) for name in self.filenames]
+        self.configs = [yaml.safe_load(open(os.path.join(self.in_dir, name))) for name in self.filenames]
         for config in self.configs:
             config.setdefault('Resources', {})
             config.setdefault('Outputs', {})
@@ -133,7 +133,7 @@ class TemplateCompiler:
                     f.write(yaml.dump(config, default_flow_style=False))
 
             # Compile the overall configuration
-            overall_config = yaml.load(open(os.path.join(self.in_dir, 'aws-ops-wheel.yml')))
+            overall_config = yaml.safe_load(open(os.path.join(self.in_dir, 'aws-ops-wheel.yml')))
             overall_config.setdefault('Resources', {})
             overall_config.setdefault('Outputs', {})
             for template_filename, config in zip(self.filenames, self.configs):
