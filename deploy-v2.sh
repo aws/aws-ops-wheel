@@ -60,8 +60,14 @@ check_aws_config() {
 create_templates_bucket() {
     log_info "Creating/checking S3 bucket for templates: $TEMPLATES_BUCKET"
     
-    if aws s3 ls "s3://$TEMPLATES_BUCKET" > /dev/null 2>&1; then
-        log_success "Templates bucket already exists: $TEMPLATES_BUCKET"
+    # Verify existence AND ownership. If the bucket exists but is owned by a
+    # different account (potential squatting), abort the deployment.
+    if aws s3api head-bucket --bucket "$TEMPLATES_BUCKET" --expected-bucket-owner "$ACCOUNT_ID" --region $REGION > /dev/null 2>&1; then
+        log_success "Templates bucket already exists and is owned by this account: $TEMPLATES_BUCKET"
+    elif aws s3api head-bucket --bucket "$TEMPLATES_BUCKET" --region $REGION > /dev/null 2>&1; then
+        log_error "Templates bucket exists but is NOT owned by this account: $TEMPLATES_BUCKET"
+        log_error "This may indicate a bucket squatting attempt. Aborting deployment."
+        exit 1
     else
         log_info "Creating templates bucket: $TEMPLATES_BUCKET"
         if [ "$REGION" = "us-east-1" ]; then
@@ -88,7 +94,7 @@ upload_templates() {
     for template in "${templates[@]}"; do
         if [ -f "cloudformation-v2/$template" ]; then
             log_info "Uploading $template..."
-            aws s3 cp "cloudformation-v2/$template" "s3://$TEMPLATES_BUCKET/templates/$template" --region $REGION
+            aws s3 cp "cloudformation-v2/$template" "s3://$TEMPLATES_BUCKET/templates/$template" --expected-bucket-owner "$ACCOUNT_ID" --region $REGION
             log_success "Uploaded $template"
         else
             log_error "Template not found: cloudformation-v2/$template"
@@ -461,7 +467,7 @@ build_and_upload_lambda_layer() {
         
         # Upload to S3
         log_info "Uploading Lambda layer to S3..."
-        aws s3 cp lambda-layer-v2.zip "s3://$TEMPLATES_BUCKET/lambda-layer-v2.zip" --region $REGION
+        aws s3 cp lambda-layer-v2.zip "s3://$TEMPLATES_BUCKET/lambda-layer-v2.zip" --expected-bucket-owner "$ACCOUNT_ID" --region $REGION
         
         # Publish new layer version
         log_info "Publishing new layer version: $layer_name"
@@ -570,7 +576,7 @@ build_and_upload_lambda_functions() {
     for zip_file in "${zip_files[@]}"; do
         if [ -f "$zip_file" ]; then
             log_info "Uploading $zip_file to S3..."
-            aws s3 cp "$zip_file" "s3://$TEMPLATES_BUCKET/$zip_file" --region $REGION
+            aws s3 cp "$zip_file" "s3://$TEMPLATES_BUCKET/$zip_file" --expected-bucket-owner "$ACCOUNT_ID" --region $REGION
             log_success "Uploaded $zip_file"
         else
             log_warning "Lambda function zip file not found, skipping: $zip_file"
@@ -1247,24 +1253,24 @@ delete_stacks() {
         fi
     fi
     
-    # Step 5: Clean up templates bucket
-    if aws s3 ls "s3://$TEMPLATES_BUCKET" > /dev/null 2>&1; then
+    # Step 5: Clean up templates bucket (only if owned by this account)
+    if aws s3api head-bucket --bucket "$TEMPLATES_BUCKET" --expected-bucket-owner "$ACCOUNT_ID" --region "$REGION" > /dev/null 2>&1; then
         log_info "Emptying and deleting templates bucket: $TEMPLATES_BUCKET"
         
         # Empty the bucket first
         aws s3 rm "s3://$TEMPLATES_BUCKET" --recursive --region "$REGION" 2>/dev/null || true
         
         # Delete the bucket
-        aws s3api delete-bucket --bucket "$TEMPLATES_BUCKET" --region "$REGION" 2>/dev/null || {
+        aws s3api delete-bucket --bucket "$TEMPLATES_BUCKET" --expected-bucket-owner "$ACCOUNT_ID" --region "$REGION" 2>/dev/null || {
             log_warning "Could not delete templates bucket: $TEMPLATES_BUCKET"
             log_warning "You may need to delete it manually in the AWS Console"
         }
         
-        if ! aws s3 ls "s3://$TEMPLATES_BUCKET" > /dev/null 2>&1; then
+        if ! aws s3api head-bucket --bucket "$TEMPLATES_BUCKET" --region "$REGION" > /dev/null 2>&1; then
             log_success "Templates bucket deleted: $TEMPLATES_BUCKET"
         fi
     else
-        log_info "Templates bucket does not exist: $TEMPLATES_BUCKET"
+        log_info "Templates bucket does not exist or is not owned by this account: $TEMPLATES_BUCKET"
     fi
     
     # Step 6: Clean up local build artifacts
@@ -1499,7 +1505,15 @@ done
 
 # Set derived configuration variables after parsing command line arguments
 STACK_NAME="aws-ops-wheel-v2-${SUFFIX}"
-TEMPLATES_BUCKET="ops-wheel-v2-deployment-${SUFFIX}-${REGION}"
+
+# Include AWS account ID in the templates bucket name to prevent cross-account
+# bucket squatting. Aborts if AWS credentials are not configured.
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null)
+if [ -z "$ACCOUNT_ID" ] || [ "$ACCOUNT_ID" = "None" ]; then
+    echo -e "\033[0;31m[ERROR]\033[0m Unable to determine AWS account ID. Please run 'aws configure' first."
+    exit 1
+fi
+TEMPLATES_BUCKET="ops-wheel-v2-deployment-${ACCOUNT_ID}-${SUFFIX}-${REGION}"
 
 # Run main function
 main
